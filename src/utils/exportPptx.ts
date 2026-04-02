@@ -2,7 +2,6 @@ import PptxGenJS from 'pptxgenjs';
 import type { Project, Product, ShelfItem, ShelfLabel } from '../types';
 
 const SLIDE_WIDTH = 13.333; // inches (16:9 at 96dpi)
-const SLIDE_HEIGHT = 7.5;
 const CARD_W = 1.0;
 const CARD_H = 1.4;
 const SHELF_Y_CURRENT = 1.2;
