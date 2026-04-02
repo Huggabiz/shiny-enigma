@@ -1,0 +1,78 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+.workspace {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.shelves-area {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Welcome screen */
+.welcome-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+}
+
+.welcome-card {
+  background: #fff;
+  padding: 48px;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  max-width: 460px;
+}
+
+.welcome-card h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 8px;
+  letter-spacing: -0.5px;
+}
+
+.welcome-card > p {
+  color: #888;
+  font-size: 14px;
+  margin: 0 0 28px;
+}
+
+.welcome-form {
+  display: flex;
+  gap: 8px;
+}
+
+.welcome-form input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.welcome-form input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.welcome-hint {
+  margin-top: 16px;
+  font-size: 12px;
+  color: #aaa;
+}
