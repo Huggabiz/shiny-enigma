@@ -51,6 +51,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
     linkSource,
     setLinkSource,
     addLink,
+    removeLink,
     updateLabel,
     removeLabel,
     addLabel,
@@ -74,28 +75,33 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
       if (shelf.id === 'current') {
         setLinkSource(item.id);
       } else if (shelf.id === 'future' && linkSource) {
-        // Click future SKU to add connection from selected source
-        const sourceItem = useProjectStore
-          .getState()
-          .project?.currentShelf.items.find((i) => i.id === linkSource);
-        const sourceProduct = sourceItem
-          ? catalogue.find((p) => p.id === sourceItem.productId)
-          : null;
+        // Click future SKU to toggle connection from selected source
         const existingLinks = useProjectStore.getState().project?.sankeyLinks.filter(
           (l) => l.sourceItemId === linkSource
         ) || [];
-        // Check if already linked
-        if (existingLinks.some((l) => l.targetItemId === item.id)) return;
-        const usedPercent = existingLinks.reduce((sum, l) => sum + (l.percent ?? 100), 0);
-        const remaining = Math.max(0, 100 - usedPercent);
-        const sourceVolume = sourceProduct?.volume || 0;
-        addLink({
-          sourceItemId: linkSource,
-          targetItemId: item.id,
-          percent: remaining,
-          volume: Math.round(sourceVolume * remaining / 100),
-          type: 'transfer',
-        });
+        const existingLink = existingLinks.find((l) => l.targetItemId === item.id);
+        if (existingLink) {
+          // Already linked — remove it (toggle off)
+          removeLink(linkSource, item.id);
+        } else {
+          // Not linked — add connection with remaining %
+          const sourceItem = useProjectStore
+            .getState()
+            .project?.currentShelf.items.find((i) => i.id === linkSource);
+          const sourceProduct = sourceItem
+            ? catalogue.find((p) => p.id === sourceItem.productId)
+            : null;
+          const usedPercent = existingLinks.reduce((sum, l) => sum + (l.percent ?? 100), 0);
+          const remaining = Math.max(0, 100 - usedPercent);
+          const sourceVolume = sourceProduct?.volume || 0;
+          addLink({
+            sourceItemId: linkSource,
+            targetItemId: item.id,
+            percent: remaining,
+            volume: Math.round(sourceVolume * remaining / 100),
+            type: 'transfer',
+          });
+        }
         setLinkSource(null);
       }
     } else {

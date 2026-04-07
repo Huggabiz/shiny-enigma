@@ -1,0 +1,225 @@
+.range-design {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.range-design-canvas {
+  flex: 1;
+  padding: 20px;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: #f5f5f5;
+}
+
+.matrix-wrapper {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  padding: 16px;
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Header row */
+.matrix-header-row {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.matrix-corner {
+  /* Empty top-left corner */
+}
+
+.matrix-col-header {
+  background: #f0f4f8;
+  border-radius: 6px;
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #333;
+  position: relative;
+  user-select: none;
+}
+
+.matrix-col-header:hover .matrix-label-remove {
+  display: block;
+}
+
+/* Grid rows */
+.matrix-row {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.matrix-row-header {
+  background: #f0f4f8;
+  border-radius: 6px;
+  padding: 8px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #333;
+  position: relative;
+  user-select: none;
+}
+
+.matrix-row-header:hover .matrix-label-remove {
+  display: block;
+}
+
+.matrix-label-remove {
+  display: none;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: #ef5350;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.matrix-label-input {
+  width: 80%;
+  padding: 2px 4px;
+  border: 1px solid #1976d2;
+  border-radius: 3px;
+  font-size: 11px;
+  text-align: center;
+}
+
+/* Matrix cells */
+.matrix-cell {
+  background: #fafafa;
+  border: 2px dashed #e0e0e0;
+  border-radius: 8px;
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.matrix-cell.cell-over {
+  background: #e3f2fd;
+  border-color: #90caf9;
+  border-style: solid;
+}
+
+.matrix-cell.cell-filled {
+  border-style: solid;
+  border-color: #e0e0e0;
+  background: #fff;
+}
+
+/* Products in matrix */
+.matrix-product {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+  cursor: grab;
+  user-select: none;
+  width: 100%;
+}
+
+.matrix-product.dragging {
+  opacity: 0.3;
+}
+
+.matrix-product-image {
+  width: 48px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.matrix-product-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.matrix-product-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #bbb;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+.matrix-product-name {
+  font-size: 9px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  line-height: 1.2;
+  max-height: 2.4em;
+  overflow: hidden;
+}
+
+.matrix-product-sku {
+  font-size: 8px;
+  color: #999;
+}
+
+/* Add buttons */
+.matrix-add-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px dashed #ccc;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #999;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.matrix-add-btn:hover {
+  background: #f0f0f0;
+  border-color: #aaa;
+  color: #666;
+}
+
+.matrix-add-row {
+  padding-left: 80px;
+  margin-top: 4px;
+}
+
+/* Drag preview */
+.matrix-drag-preview {
+  background: #fff;
+  border: 2px solid #1976d2;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}

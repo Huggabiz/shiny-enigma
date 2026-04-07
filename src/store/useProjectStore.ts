@@ -15,6 +15,7 @@ interface ProjectStore {
 
   // Catalogue actions
   setCatalogue: (products: Product[]) => void;
+  clearCatalogue: () => void;
 
   // Shelf actions
   addItemToShelf: (shelfId: string, item: ShelfItem) => void;
@@ -54,7 +55,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   selectedItemId: null,
   linkMode: false,
   linkSource: null,
-  assumeContinuity: false,
+  assumeContinuity: true,
 
   createProject: (name, catalogue) => {
     set({
@@ -80,10 +81,56 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ project: { ...project, name, updatedAt: new Date().toISOString() } });
   },
 
-  setCatalogue: (products) => {
+  setCatalogue: (newProducts) => {
     const { project } = get();
     if (!project) return;
-    set({ project: { ...project, catalogue: products, updatedAt: new Date().toISOString() } });
+
+    // Build lookup of new products by SKU
+    const newBySku = new Map(newProducts.map((p) => [p.sku, p]));
+
+    // Update existing catalogue products with new data, keeping IDs stable
+    const updatedCatalogue = newProducts.map((p) => {
+      // Check if this SKU already existed in the old catalogue
+      const existing = project.catalogue.find((old) => old.sku === p.sku);
+      if (existing) {
+        // Preserve the old ID so shelf references remain valid
+        return { ...p, id: existing.id };
+      }
+      return p;
+    });
+
+    // Find products on shelves whose SKU is missing from the new import
+    const allShelfItems = [...project.currentShelf.items, ...project.futureShelf.items];
+    const missingProducts: string[] = [];
+    for (const item of allShelfItems) {
+      if (item.isPlaceholder || !item.productId) continue;
+      const oldProduct = project.catalogue.find((p) => p.id === item.productId);
+      if (!oldProduct) continue;
+      if (!newBySku.has(oldProduct.sku)) {
+        missingProducts.push(oldProduct.name || oldProduct.sku);
+        // Keep the old product in catalogue so the shelf reference doesn't break
+        if (!updatedCatalogue.some((p) => p.id === oldProduct.id)) {
+          updatedCatalogue.push(oldProduct);
+        }
+      }
+    }
+
+    set({
+      project: { ...project, catalogue: updatedCatalogue, updatedAt: new Date().toISOString() },
+    });
+
+    // Return missing products for notification
+    if (missingProducts.length > 0) {
+      setTimeout(() => {
+        alert(`The following products are in your ranges but missing from the new catalogue:\n\n${missingProducts.join('\n')}\n\nThey have been kept with their old data.`);
+      }, 100);
+    }
+  },
+
+  clearCatalogue: () => {
+    const { project } = get();
+    if (!project) return;
+    set({ project: { ...project, catalogue: [], updatedAt: new Date().toISOString() } });
   },
 
   addItemToShelf: (shelfId, item) => {

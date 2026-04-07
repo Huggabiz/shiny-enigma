@@ -84,3 +84,50 @@
   accent-color: #4CAF50;
   cursor: pointer;
 }
+
+.toolbar-dropdown-wrapper {
+  position: relative;
+}
+
+.toolbar-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  min-width: 180px;
+  z-index: 50;
+  overflow: hidden;
+}
+
+.toolbar-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  color: #333;
+  cursor: pointer;
+}
+
+.toolbar-dropdown button:hover {
+  background: #f5f5f5;
+}
+
+.toolbar-dropdown button.danger {
+  color: #f44336;
+}
+
+.toolbar-dropdown button.danger:hover {
+  background: #ffebee;
+}
+
+.toolbar-dropdown hr {
+  margin: 0;
+  border: none;
+  border-top: 1px solid #eee;
+}

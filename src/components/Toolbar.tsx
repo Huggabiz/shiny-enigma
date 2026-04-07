@@ -1,6 +1,6 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
-import { saveProject, loadProjectFile } from '../utils/projectFile';
+import { saveProject, saveRangeStructure, loadProjectFile } from '../utils/projectFile';
 import { exportToPptx } from '../utils/exportPptx';
 import { exportToExcel } from '../utils/exportExcel';
 import { APP_VERSION } from '../version';
@@ -13,12 +13,26 @@ interface ToolbarProps {
 export function Toolbar({ onImport }: ToolbarProps) {
   const {
     project, loadProject, linkMode, setLinkMode, setLinkSource,
-    assumeContinuity, setAssumeContinuity,
+    assumeContinuity, setAssumeContinuity, clearCatalogue,
   } = useProjectStore();
   const loadRef = useRef<HTMLInputElement>(null);
+  const [showSaveMenu, setShowSaveMenu] = useState(false);
 
   const handleSave = () => {
     if (project) saveProject(project);
+    setShowSaveMenu(false);
+  };
+
+  const handleSaveStructure = () => {
+    if (project) saveRangeStructure(project);
+    setShowSaveMenu(false);
+  };
+
+  const handleClearCatalogue = () => {
+    if (confirm('Clear the catalogue? Range structure will be kept but product data (volume, revenue) will be lost.')) {
+      clearCatalogue();
+    }
+    setShowSaveMenu(false);
   };
 
   const handleLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +79,7 @@ export function Toolbar({ onImport }: ToolbarProps) {
 
             <div className="toolbar-divider" />
 
-            <label className="toolbar-checkbox" title="When ticked, products added to current range are automatically added to future range too">
+            <label className="toolbar-checkbox" title="Products added to current range are automatically added to future range">
               <input
                 type="checkbox"
                 checked={assumeContinuity}
@@ -79,39 +93,38 @@ export function Toolbar({ onImport }: ToolbarProps) {
             <button
               className={`toolbar-btn ${linkMode ? 'active' : ''}`}
               onClick={toggleLinkMode}
-              title="Toggle link mode to connect products between shelves"
             >
               {linkMode ? 'Exit Link Mode' : 'Link Mode'}
             </button>
 
             <div className="toolbar-divider" />
 
-            <button className="toolbar-btn" onClick={handleSave} title="Save project">
-              Save
-            </button>
+            {/* Save dropdown */}
+            <div className="toolbar-dropdown-wrapper">
+              <button className="toolbar-btn" onClick={() => setShowSaveMenu(!showSaveMenu)}>
+                Save ▾
+              </button>
+              {showSaveMenu && (
+                <div className="toolbar-dropdown" onMouseLeave={() => setShowSaveMenu(false)}>
+                  <button onClick={handleSave}>Save Full Project</button>
+                  <button onClick={handleSaveStructure}>Save Range Structure</button>
+                  <hr />
+                  <button onClick={handleClearCatalogue} className="danger">Clear Catalogue</button>
+                </div>
+              )}
+            </div>
 
             <button className="toolbar-btn" onClick={handleExportPptx} title="Export to PowerPoint">
               PPT
             </button>
-
             <button className="toolbar-btn" onClick={handleExportExcel} title="Export to Excel">
               Excel
             </button>
           </>
         )}
 
-        <input
-          ref={loadRef}
-          type="file"
-          accept=".json"
-          onChange={handleLoad}
-          hidden
-        />
-        <button
-          className="toolbar-btn"
-          onClick={() => loadRef.current?.click()}
-          title="Load saved project"
-        >
+        <input ref={loadRef} type="file" accept=".json" onChange={handleLoad} hidden />
+        <button className="toolbar-btn" onClick={() => loadRef.current?.click()}>
           Load
         </button>
       </div>
