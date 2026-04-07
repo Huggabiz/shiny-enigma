@@ -59,6 +59,7 @@ function App() {
     setLinkMode,
     setLinkSource,
     assumeContinuity,
+    copyCurrentToFuture,
   } = useProjectStore();
 
   const [showImport, setShowImport] = useState(false);
@@ -303,6 +304,15 @@ function App() {
             <div className="shelves-area">
               {project && (
                 <>
+                  {/* Shared title */}
+                  <div className="transform-title-bar">
+                    <h2 className="transform-title">{project.currentShelf.matrixLayout?.title || project.name}</h2>
+                    <button className="transform-copy-btn" onClick={copyCurrentToFuture}
+                      title="Copy all current range products to future range as a starting point">
+                      Copy Current → Future
+                    </button>
+                  </div>
+
                   <Shelf shelf={project.currentShelf} catalogue={project.catalogue}
                     onAddPlaceholder={() => handleAddPlaceholder('current')}
                     onRailWidthChange={handleRailWidthChange}

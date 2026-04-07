@@ -35,6 +35,8 @@ interface ProjectStore {
   clearLinks: () => void;
   autoLinkMatchingProducts: () => void;
   recalculateLinkVolumes: () => void;
+  copyCurrentToFuture: () => void;
+  reorderShelfByMatrix: (shelfId: string) => void;
 
   // Matrix layout
   updateMatrixLayout: (shelfId: string, layout: Partial<import('../types').MatrixLayout>) => void;
@@ -358,6 +360,89 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     });
   },
 
+  copyCurrentToFuture: () => {
+    const { project } = get();
+    if (!project) return;
+    // Copy items, matrix layout; generate new IDs; create 100% links
+    const newItems: ShelfItem[] = [];
+    const newLinks: SankeyLink[] = [...project.sankeyLinks];
+    const currentLayout = project.currentShelf.matrixLayout;
+    const newAssignments: { itemId: string; row: number; col: number }[] = [];
+
+    for (const item of project.currentShelf.items) {
+      // Skip if already on future shelf
+      if (item.productId && project.futureShelf.items.some((fi) => fi.productId === item.productId)) continue;
+      const newId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      newItems.push({ ...item, id: newId });
+      // Create 100% link
+      const prod = project.catalogue.find((p) => p.id === item.productId);
+      newLinks.push({
+        sourceItemId: item.id,
+        targetItemId: newId,
+        percent: 100,
+        volume: prod?.volume || 0,
+        type: 'transfer',
+      });
+      // Copy matrix assignment
+      if (currentLayout) {
+        const assignment = currentLayout.assignments.find((a) => a.itemId === item.id);
+        if (assignment) newAssignments.push({ itemId: newId, row: assignment.row, col: assignment.col });
+      }
+    }
+
+    const futureLayout = project.futureShelf.matrixLayout || {
+      title: currentLayout?.title || project.name,
+      xLabels: [], yLabels: [], assignments: [],
+    };
+
+    set({
+      project: {
+        ...project,
+        futureShelf: {
+          ...project.futureShelf,
+          items: [...project.futureShelf.items, ...newItems],
+          matrixLayout: {
+            ...futureLayout,
+            xLabels: currentLayout?.xLabels || futureLayout.xLabels,
+            yLabels: currentLayout?.yLabels || futureLayout.yLabels,
+            assignments: [...futureLayout.assignments, ...newAssignments],
+          },
+        },
+        sankeyLinks: newLinks,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  reorderShelfByMatrix: (shelfId) => {
+    const { project } = get();
+    if (!project) return;
+    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
+    const shelf = project[shelfKey];
+    const layout = shelf.matrixLayout;
+    if (!layout || layout.assignments.length === 0) return;
+
+    // Sort items: by column first, then row within column, then unassigned at end
+    const assignmentMap = new Map(layout.assignments.map((a) => [a.itemId, a]));
+    const sorted = [...shelf.items].sort((a, b) => {
+      const aa = assignmentMap.get(a.id);
+      const ba = assignmentMap.get(b.id);
+      if (!aa && !ba) return 0;
+      if (!aa) return 1;
+      if (!ba) return -1;
+      if (aa.col !== ba.col) return aa.col - ba.col;
+      return aa.row - ba.row;
+    }).map((item, idx) => ({ ...item, position: idx }));
+
+    set({
+      project: {
+        ...project,
+        [shelfKey]: { ...shelf, items: sorted },
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
   updateMatrixLayout: (shelfId, layoutUpdates) => {
     const { project } = get();
     if (!project) return;
@@ -390,6 +475,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         updatedAt: new Date().toISOString(),
       },
     });
+    // Auto-reorder shelf items to match matrix layout
+    get().reorderShelfByMatrix(shelfId);
   },
 
   removeMatrixAssignment: (shelfId, itemId) => {

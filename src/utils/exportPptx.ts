@@ -385,7 +385,8 @@ export function exportToPptx(project: Project): void {
 
   // Slide 1: Transform
   const tSlide = pptx.addSlide();
-  tSlide.addText(project.name + ' — Range Transformation', {
+  const sharedTitle = project.currentShelf.matrixLayout?.title || project.name;
+  tSlide.addText(sharedTitle + ' — Range Transformation', {
     x: 0.3, y: 0.15, w: SLIDE_WIDTH - 0.6, h: 0.5,
     fontSize: 20, bold: true, color: '1a1a2e', objectName: 'transform-title',
   });
