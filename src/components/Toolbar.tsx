@@ -11,7 +11,10 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ onImport }: ToolbarProps) {
-  const { project, loadProject, linkMode, setLinkMode, setLinkSource, autoLinkMatchingProducts } = useProjectStore();
+  const {
+    project, loadProject, linkMode, setLinkMode, setLinkSource,
+    assumeContinuity, setAssumeContinuity,
+  } = useProjectStore();
   const loadRef = useRef<HTMLInputElement>(null);
 
   const handleSave = () => {
@@ -62,20 +65,23 @@ export function Toolbar({ onImport }: ToolbarProps) {
 
             <div className="toolbar-divider" />
 
+            <label className="toolbar-checkbox" title="When ticked, products added to current range are automatically added to future range too">
+              <input
+                type="checkbox"
+                checked={assumeContinuity}
+                onChange={(e) => setAssumeContinuity(e.target.checked)}
+              />
+              <span>Range continuity</span>
+            </label>
+
+            <div className="toolbar-divider" />
+
             <button
               className={`toolbar-btn ${linkMode ? 'active' : ''}`}
               onClick={toggleLinkMode}
               title="Toggle link mode to connect products between shelves"
             >
               {linkMode ? 'Exit Link Mode' : 'Link Mode'}
-            </button>
-
-            <button
-              className="toolbar-btn"
-              onClick={autoLinkMatchingProducts}
-              title="Auto-link products that appear in both current and future ranges"
-            >
-              Auto-Link
             </button>
 
             <div className="toolbar-divider" />

@@ -22,8 +22,6 @@ export interface ShelfItem {
   position: number;
   isPlaceholder: boolean;
   placeholderName?: string;
-  // SKU-level growth/decline percentage (e.g. +10 = 10% growth, -15 = 15% decline)
-  growthPercent?: number;
 }
 
 // A labelled section on a shelf

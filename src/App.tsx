@@ -50,8 +50,10 @@ function App() {
     addItemToShelf,
     reorderShelfItems,
     removeLink,
+    addLink,
     linkMode,
     linkSource,
+    assumeContinuity,
   } = useProjectStore();
 
   const [showImport, setShowImport] = useState(false);
@@ -178,12 +180,31 @@ function App() {
       if (isProductOnShelf(project, data.product.id, targetShelfId)) {
         showDuplicateWarning(data.product.name); return;
       }
+      const currentItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       addItemToShelf(targetShelfId, {
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: currentItemId,
         productId: data.product.id,
         position: project[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length,
         isPlaceholder: false,
       });
+
+      // Range continuity: if adding to current shelf, also add to future + auto-link
+      if (targetShelfId === 'current' && assumeContinuity && !isProductOnShelf(project, data.product.id, 'future')) {
+        const futureItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        addItemToShelf('future', {
+          id: futureItemId,
+          productId: data.product.id,
+          position: project.futureShelf.items.length,
+          isPlaceholder: false,
+        });
+        addLink({
+          sourceItemId: currentItemId,
+          targetItemId: futureItemId,
+          percent: 100,
+          volume: data.product.volume || 0,
+          type: 'transfer',
+        });
+      }
       return;
     }
 

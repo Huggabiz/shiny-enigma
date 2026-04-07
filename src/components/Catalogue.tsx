@@ -132,6 +132,7 @@ function groupByCategory(products: Product[]): GroupedProducts[] {
 export function Catalogue({ products, onImport, currentProductIds, futureProductIds }: CatalogueProps) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [subCategoryFilter, setSubCategoryFilter] = useState('');
   const [familyFilter, setFamilyFilter] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
@@ -141,6 +142,14 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
     () => [...new Set(products.map((p) => p.category).filter(Boolean))].sort(),
     [products]
   );
+
+  // Sub-categories filtered by selected category
+  const subCategories = useMemo(() => {
+    const source = categoryFilter
+      ? products.filter((p) => p.category === categoryFilter)
+      : products;
+    return [...new Set(source.map((p) => p.subCategory).filter(Boolean))].sort();
+  }, [products, categoryFilter]);
 
   const families = useMemo(
     () => [...new Set(products.map((p) => p.productFamily).filter(Boolean))].sort(),
@@ -154,10 +163,11 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.sku.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = !categoryFilter || p.category === categoryFilter;
+      const matchesSubCategory = !subCategoryFilter || p.subCategory === subCategoryFilter;
       const matchesFamily = !familyFilter || p.productFamily === familyFilter;
-      return matchesSearch && matchesCategory && matchesFamily;
+      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily;
     });
-  }, [products, search, categoryFilter, familyFilter]);
+  }, [products, search, categoryFilter, subCategoryFilter, familyFilter]);
 
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
@@ -206,12 +216,24 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
         <select
           className="catalogue-select"
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
+          onChange={(e) => { setCategoryFilter(e.target.value); setSubCategoryFilter(''); }}
         >
           <option value="">All Categories</option>
           {categories.map((c) => (
             <option key={c} value={c}>
               {c}
+            </option>
+          ))}
+        </select>
+        <select
+          className="catalogue-select"
+          value={subCategoryFilter}
+          onChange={(e) => setSubCategoryFilter(e.target.value)}
+        >
+          <option value="">All Sub-Categories</option>
+          {subCategories.map((sc) => (
+            <option key={sc} value={sc}>
+              {sc}
             </option>
           ))}
         </select>

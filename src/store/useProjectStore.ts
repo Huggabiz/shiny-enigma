@@ -6,6 +6,7 @@ interface ProjectStore {
   selectedItemId: string | null;
   linkMode: boolean;
   linkSource: string | null;
+  assumeContinuity: boolean;
 
   // Project actions
   createProject: (name: string, catalogue: Product[]) => void;
@@ -38,6 +39,7 @@ interface ProjectStore {
   setSelectedItem: (id: string | null) => void;
   setLinkMode: (enabled: boolean) => void;
   setLinkSource: (id: string | null) => void;
+  setAssumeContinuity: (enabled: boolean) => void;
 }
 
 const createEmptyShelf = (id: string, name: string): Shelf => ({
@@ -52,6 +54,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   selectedItemId: null,
   linkMode: false,
   linkSource: null,
+  assumeContinuity: false,
 
   createProject: (name, catalogue) => {
     set({
@@ -300,4 +303,5 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setSelectedItem: (id) => set({ selectedItemId: id }),
   setLinkMode: (enabled) => set({ linkMode: enabled, linkSource: enabled ? get().linkSource : null }),
   setLinkSource: (id) => set({ linkSource: id }),
+  setAssumeContinuity: (enabled) => set({ assumeContinuity: enabled }),
 }));

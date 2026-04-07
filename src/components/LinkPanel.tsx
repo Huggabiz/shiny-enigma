@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { Product, ShelfItem, SankeyLink } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
 import './LinkPanel.css';
@@ -12,12 +11,10 @@ interface LinkPanelProps {
 }
 
 export function LinkPanel({ sourceItem, sourceProduct, links, futureItems, catalogue }: LinkPanelProps) {
-  const { updateLink, removeLink, addLink, updateShelfItem } = useProjectStore();
-  const [editingLink, setEditingLink] = useState<string | null>(null);
+  const { updateLink, removeLink, addLink } = useProjectStore();
 
   const sourceVolume = sourceProduct?.volume || 0;
   const sourceRevenue = sourceProduct?.revenue || 0;
-  const growthPercent = sourceItem.growthPercent || 0;
 
   // Links from this source
   const outgoingLinks = links.filter((l) => l.sourceItemId === sourceItem.id);
@@ -39,10 +36,6 @@ export function LinkPanel({ sourceItem, sourceProduct, links, futureItems, catal
       volume: Math.round(sourceVolume * defaultPercent / 100),
       type: 'transfer',
     });
-  };
-
-  const handleGrowthChange = (value: number) => {
-    updateShelfItem('current', sourceItem.id, { growthPercent: value });
   };
 
   // Future items not yet linked from this source
@@ -68,25 +61,7 @@ export function LinkPanel({ sourceItem, sourceProduct, links, futureItems, catal
         </div>
       </div>
 
-      {/* Growth/decline */}
-      <div className="link-panel-growth">
-        <label>SKU Growth/Decline</label>
-        <div className="growth-input-row">
-          <input
-            type="range"
-            min={-100}
-            max={100}
-            value={growthPercent}
-            onChange={(e) => handleGrowthChange(Number(e.target.value))}
-            className={`growth-slider ${growthPercent > 0 ? 'positive' : growthPercent < 0 ? 'negative' : ''}`}
-          />
-          <span className={`growth-value ${growthPercent > 0 ? 'positive' : growthPercent < 0 ? 'negative' : ''}`}>
-            {growthPercent > 0 ? '+' : ''}{growthPercent}%
-          </span>
-        </div>
-      </div>
-
-      {/* Allocation table */}
+      {/* Allocation table with sliders */}
       <div className="link-panel-allocations">
         <div className="link-alloc-header">
           <span>Allocated to</span>
@@ -100,38 +75,22 @@ export function LinkPanel({ sourceItem, sourceProduct, links, futureItems, catal
           const targetName = targetItem?.isPlaceholder
             ? targetItem.placeholderName
             : targetProduct?.name || 'Unknown';
+          const pct = link.percent ?? 100;
 
           return (
             <div key={link.targetItemId} className="link-alloc-row">
               <span className="link-alloc-name" title={targetName}>{targetName}</span>
-              {editingLink === link.targetItemId ? (
+              <div className="link-alloc-slider-group">
                 <input
-                  type="number"
-                  className="link-alloc-input"
-                  defaultValue={link.percent ?? 100}
+                  type="range"
+                  className="link-alloc-slider"
                   min={0}
                   max={100}
-                  autoFocus
-                  onBlur={(e) => {
-                    handlePercentChange(link.targetItemId, Number(e.target.value));
-                    setEditingLink(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handlePercentChange(link.targetItemId, Number((e.target as HTMLInputElement).value));
-                      setEditingLink(null);
-                    }
-                  }}
+                  value={pct}
+                  onChange={(e) => handlePercentChange(link.targetItemId, Number(e.target.value))}
                 />
-              ) : (
-                <span
-                  className="link-alloc-percent"
-                  onClick={() => setEditingLink(link.targetItemId)}
-                  title="Click to edit"
-                >
-                  {link.percent ?? 100}%
-                </span>
-              )}
+                <span className="link-alloc-percent-value">{pct}%</span>
+              </div>
               <span className="link-alloc-volume">{link.volume.toLocaleString()}</span>
               <button
                 className="link-alloc-remove"
@@ -187,7 +146,7 @@ export function LinkPanel({ sourceItem, sourceProduct, links, futureItems, catal
       )}
 
       <div className="link-panel-hint">
-        Click a future range product above to connect, or use the buttons below.
+        Click a future range product to connect, or use the buttons above. Adjust sliders to set volume allocation.
       </div>
     </div>
   );

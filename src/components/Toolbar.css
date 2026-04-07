@@ -68,3 +68,19 @@
   background: rgba(255, 255, 255, 0.15);
   margin: 0 4px;
 }
+
+.toolbar-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.toolbar-checkbox input {
+  accent-color: #4CAF50;
+  cursor: pointer;
+}
