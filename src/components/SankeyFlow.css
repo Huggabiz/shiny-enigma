@@ -1,11 +1,12 @@
 .sankey-container {
-  overflow-x: auto;
-  padding: 0 16px;
+  width: 100%;
+  overflow: hidden;
 }
 
 .sankey-svg {
   display: block;
   min-height: 120px;
+  width: 100%;
 }
 
 .sankey-empty {

@@ -11,7 +11,9 @@ interface SankeyFlowProps {
   onRemoveLink?: (sourceId: string, targetId: string) => void;
 }
 
-const CARD_SLOT_WIDTH = 110;
+const CARD_WIDTH = 100;
+const CARD_GAP = 10;
+const CARD_SLOT_WIDTH = CARD_WIDTH + CARD_GAP;
 const FLOW_HEIGHT = 120;
 const DEAD_END_Y = FLOW_HEIGHT - 10;
 
@@ -25,7 +27,7 @@ export function SankeyFlow({
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Find unlinked current shelf items (no outgoing link)
+  // Find unlinked current shelf items
   const unlinkedItems = useMemo(() => {
     const linkedSourceIds = new Set(links.map(l => l.sourceItemId));
     return currentShelf.items.filter(item => !linkedSourceIds.has(item.id));
@@ -40,16 +42,22 @@ export function SankeyFlow({
 
     if (!hasContent) return;
 
+    // Match the shelf centering logic exactly
     const containerWidth = containerRef.current.offsetWidth;
     const currentContentWidth = currentShelf.items.length * CARD_SLOT_WIDTH;
     const futureContentWidth = futureShelf.items.length * CARD_SLOT_WIDTH;
-    const currentOffset = Math.max(0, (containerWidth - currentContentWidth) / 2);
-    const futureOffset = Math.max(0, (containerWidth - futureContentWidth) / 2);
 
-    const totalWidth = Math.max(containerWidth, currentContentWidth, futureContentWidth);
-    svg.attr('width', totalWidth).attr('height', FLOW_HEIGHT);
+    // Shelves use justify-content: center with gap:10 — the rail padding is 8px each side
+    // The centering offset matches what CSS flexbox does
+    const railPadding = 8;
+    const availableWidth = containerWidth - railPadding * 2;
+    const currentOffset = railPadding + Math.max(0, (availableWidth - currentContentWidth) / 2);
+    const futureOffset = railPadding + Math.max(0, (availableWidth - futureContentWidth) / 2);
 
-    // Calculate max volume for scaling line widths
+    // SVG fills the container width — no scrollbar
+    svg.attr('width', containerWidth).attr('height', FLOW_HEIGHT);
+
+    // Scale line widths
     const allVolumes = [
       ...links.map(l => l.volume),
       ...unlinkedItems.map(item => {
@@ -67,8 +75,9 @@ export function SankeyFlow({
       const targetIndex = futureShelf.items.findIndex((i) => i.id === link.targetItemId);
       if (sourceIndex === -1 || targetIndex === -1) return;
 
-      const sourceX = currentOffset + sourceIndex * CARD_SLOT_WIDTH + CARD_SLOT_WIDTH / 2;
-      const targetX = futureOffset + targetIndex * CARD_SLOT_WIDTH + CARD_SLOT_WIDTH / 2;
+      // Center of each card slot
+      const sourceX = currentOffset + sourceIndex * CARD_SLOT_WIDTH + CARD_WIDTH / 2;
+      const targetX = futureOffset + targetIndex * CARD_SLOT_WIDTH + CARD_WIDTH / 2;
       const strokeWidth = minWidth + ((link.volume / maxVolume) * (maxWidth - minWidth));
 
       const color =
@@ -116,10 +125,9 @@ export function SankeyFlow({
       const volume = product?.volume || 0;
       if (volume === 0) return;
 
-      const sourceX = currentOffset + sourceIndex * CARD_SLOT_WIDTH + CARD_SLOT_WIDTH / 2;
+      const sourceX = currentOffset + sourceIndex * CARD_SLOT_WIDTH + CARD_WIDTH / 2;
       const strokeWidth = minWidth + ((volume / maxVolume) * (maxWidth - minWidth));
 
-      // Flow that tapers to nothing
       const path = d3.path();
       path.moveTo(sourceX, 0);
       path.bezierCurveTo(
@@ -160,6 +168,19 @@ export function SankeyFlow({
         .text(`-${volume.toLocaleString()}`);
     });
   }, [currentShelf, futureShelf, links, catalogue, onRemoveLink, unlinkedItems, hasContent]);
+
+  // Re-render on container resize
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      // Force re-render by triggering the main effect
+      if (svgRef.current) {
+        svgRef.current.dispatchEvent(new Event('resize'));
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   if (!hasContent) {
     return (

@@ -25,10 +25,16 @@
   box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.3);
 }
 
+/* Placeholder = New product — blue/cyan theme */
 .product-card.placeholder {
-  background: #fff8e1;
-  border-color: #ffb74d;
-  border-style: dashed;
+  background: #e8f6fd;
+  border-color: #0097a7;
+  border-style: solid;
+}
+
+.product-card.placeholder:hover {
+  border-color: #00838f;
+  box-shadow: 0 2px 8px rgba(0, 151, 167, 0.2);
 }
 
 .product-card.link-mode {
@@ -48,6 +54,26 @@
 .product-card.overlay {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   cursor: grabbing;
+}
+
+/* New badge */
+.card-new-badge {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #0097a7;
+  color: white;
+  font-size: 8px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  letter-spacing: -0.2px;
+  box-shadow: 0 1px 4px rgba(0, 151, 167, 0.4);
 }
 
 .card-remove {
@@ -102,6 +128,11 @@
   border-radius: 4px;
 }
 
+.card-image-placeholder.new-product {
+  background: #b2ebf2;
+  color: #00838f;
+}
+
 .card-name {
   font-size: 10px;
   font-weight: 600;
@@ -135,6 +166,6 @@
 
 .card-placeholder-tag {
   font-size: 8px;
-  color: #f57c00;
-  font-weight: 500;
+  color: #0097a7;
+  font-weight: 600;
 }

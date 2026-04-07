@@ -63,6 +63,10 @@ export function ProductCard({
       {...attributes}
       {...listeners}
     >
+      {/* New badge for placeholders */}
+      {item.isPlaceholder && (
+        <div className="card-new-badge">New</div>
+      )}
       {onRemove && (
         <button
           className="card-remove"
@@ -78,7 +82,7 @@ export function ProductCard({
         {product?.imageUrl ? (
           <img src={product.imageUrl} alt={name} />
         ) : (
-          <div className="card-image-placeholder">
+          <div className={`card-image-placeholder ${item.isPlaceholder ? 'new-product' : ''}`}>
             {item.isPlaceholder ? '＋' : name.charAt(0)}
           </div>
         )}
@@ -94,7 +98,7 @@ export function ProductCard({
       )}
       {item.isPlaceholder && (
         <div className="card-stats">
-          <span className="card-placeholder-tag">Placeholder</span>
+          <span className="card-placeholder-tag">Planned</span>
         </div>
       )}
     </div>

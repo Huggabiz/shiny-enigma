@@ -8,11 +8,41 @@ interface CatalogueProps {
   onImport: () => void;
 }
 
-function CatalogueItem({ product }: { product: Product }) {
+function CatalogueItem({ product, expanded }: { product: Product; expanded: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `catalogue-${product.id}`,
     data: { product, type: 'catalogue-item' },
   });
+
+  if (expanded) {
+    return (
+      <div
+        ref={setNodeRef}
+        className={`catalogue-item-expanded ${isDragging ? 'dragging' : ''}`}
+        {...attributes}
+        {...listeners}
+      >
+        <div className="catalogue-item-image-large">
+          {product.imageUrl ? (
+            <img src={product.imageUrl} alt={product.name} />
+          ) : (
+            <div className="catalogue-item-placeholder-large">{product.name.charAt(0)}</div>
+          )}
+        </div>
+        <div className="catalogue-item-info-expanded">
+          <div className="catalogue-item-name-expanded">{product.name}</div>
+          <div className="catalogue-item-sku-expanded">{product.sku}</div>
+          <div className="catalogue-item-details">
+            <span>Vol: {product.volume.toLocaleString()}</span>
+            {product.rrp > 0 && <span>RRP: {product.rrp}</span>}
+          </div>
+          {product.productFamily && (
+            <div className="catalogue-item-family">{product.productFamily}</div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -36,19 +66,46 @@ function CatalogueItem({ product }: { product: Product }) {
           <span>{product.sku}</span>
           <span>Vol: {product.volume.toLocaleString()}</span>
         </div>
-        <div className="catalogue-item-meta">
-          <span>{product.category}</span>
-          {product.subCategory && <span>{product.subCategory}</span>}
-        </div>
       </div>
     </div>
   );
+}
+
+interface GroupedProducts {
+  category: string;
+  subCategories: {
+    subCategory: string;
+    products: Product[];
+  }[];
+}
+
+function groupByCategory(products: Product[]): GroupedProducts[] {
+  const catMap = new Map<string, Map<string, Product[]>>();
+  for (const p of products) {
+    const cat = p.category || 'Uncategorised';
+    const sub = p.subCategory || 'General';
+    if (!catMap.has(cat)) catMap.set(cat, new Map());
+    const subMap = catMap.get(cat)!;
+    if (!subMap.has(sub)) subMap.set(sub, []);
+    subMap.get(sub)!.push(p);
+  }
+  return Array.from(catMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([category, subMap]) => ({
+      category,
+      subCategories: Array.from(subMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([subCategory, products]) => ({ subCategory, products })),
+    }));
 }
 
 export function Catalogue({ products, onImport }: CatalogueProps) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [familyFilter, setFamilyFilter] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [collapsedSubCats, setCollapsedSubCats] = useState<Set<string>>(new Set());
 
   const categories = useMemo(
     () => [...new Set(products.map((p) => p.category).filter(Boolean))].sort(),
@@ -72,13 +129,40 @@ export function Catalogue({ products, onImport }: CatalogueProps) {
     });
   }, [products, search, categoryFilter, familyFilter]);
 
+  const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
+
+  const toggleCategory = (cat: string) => {
+    setCollapsedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  };
+
+  const toggleSubCat = (key: string) => {
+    setCollapsedSubCats(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   return (
-    <div className="catalogue-panel">
+    <div className={`catalogue-panel ${expanded ? 'expanded' : ''}`}>
       <div className="catalogue-header">
         <h3>Catalogue</h3>
-        <button className="import-btn" onClick={onImport}>
-          Import Data
-        </button>
+        <div className="catalogue-header-actions">
+          <button
+            className={`catalogue-expand-btn ${expanded ? 'active' : ''}`}
+            onClick={() => setExpanded(!expanded)}
+            title={expanded ? 'Compact view' : 'Expanded view with larger images'}
+          >
+            {expanded ? '◀' : '▶'}
+          </button>
+          <button className="import-btn" onClick={onImport}>
+            Import Data
+          </button>
+        </div>
       </div>
 
       <div className="catalogue-filters">
@@ -118,9 +202,52 @@ export function Catalogue({ products, onImport }: CatalogueProps) {
       <div className="catalogue-count">{filtered.length} of {products.length} products</div>
 
       <div className="catalogue-list">
-        {filtered.map((product) => (
-          <CatalogueItem key={product.id} product={product} />
-        ))}
+        {grouped.map((group) => {
+          const isCatCollapsed = collapsedCategories.has(group.category);
+          const catProductCount = group.subCategories.reduce((sum, sc) => sum + sc.products.length, 0);
+
+          return (
+            <div key={group.category} className="catalogue-group">
+              <div
+                className="catalogue-category-header"
+                onClick={() => toggleCategory(group.category)}
+              >
+                <span className="catalogue-collapse-icon">{isCatCollapsed ? '▸' : '▾'}</span>
+                <span className="catalogue-category-name">{group.category}</span>
+                <span className="catalogue-category-count">{catProductCount}</span>
+              </div>
+
+              {!isCatCollapsed && group.subCategories.map((subGroup) => {
+                const subKey = `${group.category}::${subGroup.subCategory}`;
+                const isSubCollapsed = collapsedSubCats.has(subKey);
+
+                return (
+                  <div key={subKey} className="catalogue-subgroup">
+                    {group.subCategories.length > 1 && (
+                      <div
+                        className="catalogue-subcategory-header"
+                        onClick={() => toggleSubCat(subKey)}
+                      >
+                        <span className="catalogue-collapse-icon small">{isSubCollapsed ? '▸' : '▾'}</span>
+                        <span className="catalogue-subcategory-name">{subGroup.subCategory}</span>
+                        <span className="catalogue-category-count">{subGroup.products.length}</span>
+                      </div>
+                    )}
+
+                    {!isSubCollapsed && (
+                      <div className={expanded ? 'catalogue-items-expanded' : ''}>
+                        {subGroup.products.map((product) => (
+                          <CatalogueItem key={product.id} product={product} expanded={expanded} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+
         {filtered.length === 0 && (
           <div className="catalogue-empty">
             {products.length === 0

@@ -4,9 +4,9 @@ import {
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { ProductCard } from './ProductCard';
-import type { Product, Shelf as ShelfType, ShelfItem } from '../types';
+import type { Product, Shelf as ShelfType, ShelfItem, ShelfLabel } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import './Shelf.css';
 
 interface ShelfProps {
@@ -15,7 +15,34 @@ interface ShelfProps {
   onAddPlaceholder: () => void;
 }
 
-const CARD_SLOT_WIDTH = 110; // card width + gap
+const CARD_WIDTH = 100; // actual card width
+const CARD_GAP = 10;    // gap between cards
+const CARD_SLOT_WIDTH = CARD_WIDTH + CARD_GAP; // 110
+
+// Pack labels into rows, compacting where possible (non-overlapping labels share a row)
+function packLabelsIntoRows(labels: ShelfLabel[]): ShelfLabel[][] {
+  if (labels.length === 0) return [];
+  const sorted = [...labels].sort((a, b) => a.startPosition - b.startPosition);
+  const rows: ShelfLabel[][] = [];
+
+  for (const label of sorted) {
+    let placed = false;
+    for (const row of rows) {
+      const overlaps = row.some(
+        (existing) => label.startPosition <= existing.endPosition && label.endPosition >= existing.startPosition
+      );
+      if (!overlaps) {
+        row.push(label);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      rows.push([label]);
+    }
+  }
+  return rows;
+}
 
 export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
   const {
@@ -149,7 +176,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
     };
   }, [draggingLabel, resizingLabel, shelf.id, shelf.items.length, shelf.labels, updateLabel]);
 
-  // Track rail width via ResizeObserver to calculate label offset
+  // Track rail width via ResizeObserver
   const [railWidth, setRailWidth] = useState(0);
   useEffect(() => {
     const el = railRef.current;
@@ -165,6 +192,10 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
   const contentWidth = totalItems * CARD_SLOT_WIDTH;
   const offsetLeft = Math.max(0, (railWidth - contentWidth) / 2);
 
+  // Pack labels into rows for multi-row display
+  const labelRows = useMemo(() => packLabelsIntoRows(shelf.labels), [shelf.labels]);
+  const LABEL_ROW_HEIGHT = 26;
+
   return (
     <div className={`shelf-container ${isOver ? 'shelf-over' : ''}`}>
       <div className="shelf-header">
@@ -179,61 +210,71 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
         </div>
       </div>
 
-      {/* Labels bar */}
-      {shelf.labels.length > 0 && (
-        <div className="shelf-labels-bar">
-          {shelf.labels.map((label) => (
-            <div
-              key={label.id}
-              className="shelf-label"
-              style={{
-                left: `${offsetLeft + label.startPosition * CARD_SLOT_WIDTH}px`,
-                width: `${(label.endPosition - label.startPosition + 1) * CARD_SLOT_WIDTH - 10}px`,
-                backgroundColor: label.color || '#e8e0d4',
-                cursor: draggingLabel === label.id ? 'grabbing' : 'grab',
-              }}
-              onMouseDown={(e) => handleLabelDragStart(e, label.id)}
-              onTouchStart={(e) => handleLabelDragStart(e, label.id)}
-            >
-              <div className="label-resize-handle left"
-                onMouseDown={(e) => handleLabelResizeStart(e, label.id, 'left')}
-                onTouchStart={(e) => handleLabelResizeStart(e, label.id, 'left')}
-              />
-              {editingLabel === label.id ? (
-                <input
-                  className="label-input"
-                  defaultValue={label.text}
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onBlur={(e) => {
-                    updateLabel(shelf.id, label.id, { text: e.target.value });
-                    setEditingLabel(null);
+      {/* Labels bar — multi-row with compaction */}
+      {labelRows.length > 0 && (
+        <div className="shelf-labels-bar" style={{ height: labelRows.length * LABEL_ROW_HEIGHT }}>
+          {labelRows.map((row, rowIndex) =>
+            row.map((label) => {
+              // Left edge: align to left edge of first card in range
+              const left = offsetLeft + label.startPosition * CARD_SLOT_WIDTH;
+              // Width: from left edge of first card to right edge of last card
+              const width = (label.endPosition - label.startPosition) * CARD_SLOT_WIDTH + CARD_WIDTH;
+
+              return (
+                <div
+                  key={label.id}
+                  className="shelf-label"
+                  style={{
+                    left: `${left}px`,
+                    width: `${width}px`,
+                    top: `${rowIndex * LABEL_ROW_HEIGHT}px`,
+                    backgroundColor: label.color || '#e8e0d4',
+                    cursor: draggingLabel === label.id ? 'grabbing' : 'grab',
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      updateLabel(shelf.id, label.id, {
-                        text: (e.target as HTMLInputElement).value,
-                      });
-                      setEditingLabel(null);
-                    }
-                  }}
-                />
-              ) : (
-                <span className="label-text" onDoubleClick={() => setEditingLabel(label.id)}>{label.text}</span>
-              )}
-              <button
-                className="label-remove"
-                onClick={(e) => { e.stopPropagation(); removeLabel(shelf.id, label.id); }}
-              >
-                ×
-              </button>
-              <div className="label-resize-handle right"
-                onMouseDown={(e) => handleLabelResizeStart(e, label.id, 'right')}
-                onTouchStart={(e) => handleLabelResizeStart(e, label.id, 'right')}
-              />
-            </div>
-          ))}
+                  onMouseDown={(e) => handleLabelDragStart(e, label.id)}
+                  onTouchStart={(e) => handleLabelDragStart(e, label.id)}
+                >
+                  <div className="label-resize-handle left"
+                    onMouseDown={(e) => handleLabelResizeStart(e, label.id, 'left')}
+                    onTouchStart={(e) => handleLabelResizeStart(e, label.id, 'left')}
+                  />
+                  {editingLabel === label.id ? (
+                    <input
+                      className="label-input"
+                      defaultValue={label.text}
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onBlur={(e) => {
+                        updateLabel(shelf.id, label.id, { text: e.target.value });
+                        setEditingLabel(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          updateLabel(shelf.id, label.id, {
+                            text: (e.target as HTMLInputElement).value,
+                          });
+                          setEditingLabel(null);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="label-text" onDoubleClick={() => setEditingLabel(label.id)}>{label.text}</span>
+                  )}
+                  <button
+                    className="label-remove"
+                    onClick={(e) => { e.stopPropagation(); removeLabel(shelf.id, label.id); }}
+                  >
+                    ×
+                  </button>
+                  <div className="label-resize-handle right"
+                    onMouseDown={(e) => handleLabelResizeStart(e, label.id, 'right')}
+                    onTouchStart={(e) => handleLabelResizeStart(e, label.id, 'right')}
+                  />
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
