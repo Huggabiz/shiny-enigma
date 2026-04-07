@@ -22,6 +22,8 @@ export interface ShelfItem {
   position: number;
   isPlaceholder: boolean;
   placeholderName?: string;
+  // SKU-level growth/decline percentage (e.g. +10 = 10% growth, -15 = 15% decline)
+  growthPercent?: number;
 }
 
 // A labelled section on a shelf
@@ -41,11 +43,12 @@ export interface Shelf {
   labels: ShelfLabel[];
 }
 
-// A flow link between current and future items
+// A flow link between current and future items — percentage-based
 export interface SankeyLink {
   sourceItemId: string;
   targetItemId: string;
-  volume: number;
+  percent: number; // percentage of source volume allocated to this target
+  volume: number;  // computed: source volume * percent / 100
   type: 'transfer' | 'growth' | 'loss';
 }
 

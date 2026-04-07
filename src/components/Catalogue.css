@@ -361,3 +361,51 @@
   font-size: 12px;
   padding: 30px 10px;
 }
+
+/* Usage badges */
+.catalogue-usage-badges {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: flex;
+  gap: 2px;
+  z-index: 2;
+}
+
+.usage-badge {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.usage-badge.current {
+  background: #7b1fa2;
+}
+
+.usage-badge.future {
+  background: #0097a7;
+}
+
+/* Dim used items slightly */
+.catalogue-item.used,
+.catalogue-item-expanded.used {
+  opacity: 0.6;
+}
+
+.catalogue-item.used:hover,
+.catalogue-item-expanded.used:hover {
+  opacity: 0.85;
+}
+
+/* Make items position:relative for badge positioning */
+.catalogue-item,
+.catalogue-item-expanded {
+  position: relative;
+}

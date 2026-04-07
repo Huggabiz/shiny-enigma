@@ -11,7 +11,7 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ onImport }: ToolbarProps) {
-  const { project, loadProject, linkMode, setLinkMode, setLinkSource } = useProjectStore();
+  const { project, loadProject, linkMode, setLinkMode, setLinkSource, autoLinkMatchingProducts } = useProjectStore();
   const loadRef = useRef<HTMLInputElement>(null);
 
   const handleSave = () => {
@@ -70,18 +70,26 @@ export function Toolbar({ onImport }: ToolbarProps) {
               {linkMode ? 'Exit Link Mode' : 'Link Mode'}
             </button>
 
+            <button
+              className="toolbar-btn"
+              onClick={autoLinkMatchingProducts}
+              title="Auto-link products that appear in both current and future ranges"
+            >
+              Auto-Link
+            </button>
+
             <div className="toolbar-divider" />
 
             <button className="toolbar-btn" onClick={handleSave} title="Save project">
-              Save Project
+              Save
             </button>
 
             <button className="toolbar-btn" onClick={handleExportPptx} title="Export to PowerPoint">
-              Export PPT
+              PPT
             </button>
 
             <button className="toolbar-btn" onClick={handleExportExcel} title="Export to Excel">
-              Export Excel
+              Excel
             </button>
           </>
         )}
@@ -98,7 +106,7 @@ export function Toolbar({ onImport }: ToolbarProps) {
           onClick={() => loadRef.current?.click()}
           title="Load saved project"
         >
-          Load Project
+          Load
         </button>
       </div>
     </div>

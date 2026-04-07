@@ -1,9 +1,6 @@
 import { create } from 'zustand';
 import type { Product, Project, Shelf, ShelfItem, ShelfLabel, SankeyLink } from '../types';
 
-// We'll use zustand for simple state management - install it
-// npm install zustand
-
 interface ProjectStore {
   project: Project | null;
   selectedItemId: string | null;
@@ -34,6 +31,8 @@ interface ProjectStore {
   removeLink: (sourceId: string, targetId: string) => void;
   updateLink: (sourceId: string, targetId: string, updates: Partial<SankeyLink>) => void;
   clearLinks: () => void;
+  autoLinkMatchingProducts: () => void;
+  recalculateLinkVolumes: () => void;
 
   // Selection
   setSelectedItem: (id: string | null) => void;
@@ -194,7 +193,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   addLink: (link) => {
     const { project } = get();
     if (!project) return;
-    // Prevent duplicate links
     const exists = project.sankeyLinks.some(
       (l) => l.sourceItemId === link.sourceItemId && l.targetItemId === link.targetItemId
     );
@@ -241,6 +239,61 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!project) return;
     set({
       project: { ...project, sankeyLinks: [], updatedAt: new Date().toISOString() },
+    });
+  },
+
+  // Auto-link: if a productId exists in both current and future, create a 100% transfer link
+  autoLinkMatchingProducts: () => {
+    const { project } = get();
+    if (!project) return;
+    const newLinks: SankeyLink[] = [...project.sankeyLinks];
+
+    for (const currentItem of project.currentShelf.items) {
+      if (!currentItem.productId) continue;
+      const futureItem = project.futureShelf.items.find(
+        (fi) => fi.productId === currentItem.productId
+      );
+      if (!futureItem) continue;
+      // Skip if link already exists
+      const exists = newLinks.some(
+        (l) => l.sourceItemId === currentItem.id && l.targetItemId === futureItem.id
+      );
+      if (exists) continue;
+
+      const product = project.catalogue.find((p) => p.id === currentItem.productId);
+      const volume = product?.volume || 0;
+      newLinks.push({
+        sourceItemId: currentItem.id,
+        targetItemId: futureItem.id,
+        percent: 100,
+        volume,
+        type: 'transfer',
+      });
+    }
+
+    set({
+      project: { ...project, sankeyLinks: newLinks, updatedAt: new Date().toISOString() },
+    });
+  },
+
+  // Recalculate all link volumes based on source product volume and link percentage
+  recalculateLinkVolumes: () => {
+    const { project } = get();
+    if (!project) return;
+
+    const updatedLinks = project.sankeyLinks.map((link) => {
+      const sourceItem = project.currentShelf.items.find((i) => i.id === link.sourceItemId);
+      if (!sourceItem) return link;
+      const product = project.catalogue.find((p) => p.id === sourceItem.productId);
+      const baseVolume = product?.volume || 0;
+      return {
+        ...link,
+        volume: Math.round(baseVolume * (link.percent ?? 100) / 100),
+      };
+    });
+
+    set({
+      project: { ...project, sankeyLinks: updatedLinks, updatedAt: new Date().toISOString() },
     });
   },
 

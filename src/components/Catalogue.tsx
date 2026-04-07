@@ -6,22 +6,51 @@ import './Catalogue.css';
 interface CatalogueProps {
   products: Product[];
   onImport: () => void;
+  currentProductIds: Set<string>;
+  futureProductIds: Set<string>;
 }
 
-function CatalogueItem({ product, expanded }: { product: Product; expanded: boolean }) {
+function UsageBadges({ productId, currentProductIds, futureProductIds }: {
+  productId: string;
+  currentProductIds: Set<string>;
+  futureProductIds: Set<string>;
+}) {
+  const inCurrent = currentProductIds.has(productId);
+  const inFuture = futureProductIds.has(productId);
+  if (!inCurrent && !inFuture) return null;
+
+  return (
+    <div className="catalogue-usage-badges">
+      {inCurrent && <span className="usage-badge current" title="In Current Range">C</span>}
+      {inFuture && <span className="usage-badge future" title="In Future Range">F</span>}
+    </div>
+  );
+}
+
+function CatalogueItem({ product, expanded, currentProductIds, futureProductIds }: {
+  product: Product;
+  expanded: boolean;
+  currentProductIds: Set<string>;
+  futureProductIds: Set<string>;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `catalogue-${product.id}`,
     data: { product, type: 'catalogue-item' },
   });
 
+  const inCurrent = currentProductIds.has(product.id);
+  const inFuture = futureProductIds.has(product.id);
+  const usedClass = (inCurrent || inFuture) ? 'used' : '';
+
   if (expanded) {
     return (
       <div
         ref={setNodeRef}
-        className={`catalogue-item-expanded ${isDragging ? 'dragging' : ''}`}
+        className={`catalogue-item-expanded ${isDragging ? 'dragging' : ''} ${usedClass}`}
         {...attributes}
         {...listeners}
       >
+        <UsageBadges productId={product.id} currentProductIds={currentProductIds} futureProductIds={futureProductIds} />
         <div className="catalogue-item-image-large">
           {product.imageUrl ? (
             <img src={product.imageUrl} alt={product.name} />
@@ -47,10 +76,11 @@ function CatalogueItem({ product, expanded }: { product: Product; expanded: bool
   return (
     <div
       ref={setNodeRef}
-      className={`catalogue-item ${isDragging ? 'dragging' : ''}`}
+      className={`catalogue-item ${isDragging ? 'dragging' : ''} ${usedClass}`}
       {...attributes}
       {...listeners}
     >
+      <UsageBadges productId={product.id} currentProductIds={currentProductIds} futureProductIds={futureProductIds} />
       <div className="catalogue-item-image">
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} />
@@ -99,7 +129,7 @@ function groupByCategory(products: Product[]): GroupedProducts[] {
     }));
 }
 
-export function Catalogue({ products, onImport }: CatalogueProps) {
+export function Catalogue({ products, onImport, currentProductIds, futureProductIds }: CatalogueProps) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [familyFilter, setFamilyFilter] = useState('');
@@ -237,7 +267,13 @@ export function Catalogue({ products, onImport }: CatalogueProps) {
                     {!isSubCollapsed && (
                       <div className={expanded ? 'catalogue-items-expanded' : ''}>
                         {subGroup.products.map((product) => (
-                          <CatalogueItem key={product.id} product={product} expanded={expanded} />
+                          <CatalogueItem
+                            key={product.id}
+                            product={product}
+                            expanded={expanded}
+                            currentProductIds={currentProductIds}
+                            futureProductIds={futureProductIds}
+                          />
                         ))}
                       </div>
                     )}

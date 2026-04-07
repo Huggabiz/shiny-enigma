@@ -9,6 +9,8 @@ interface ProductCardProps {
   isSelected?: boolean;
   isLinkMode?: boolean;
   isLinkSource?: boolean;
+  isDimmed?: boolean;
+  isLinkHighlight?: boolean;
   onClick?: () => void;
   onRemove?: () => void;
   overlay?: boolean;
@@ -21,6 +23,8 @@ export function ProductCard({
   isSelected,
   isLinkMode,
   isLinkSource,
+  isDimmed,
+  isLinkHighlight,
   onClick,
   onRemove,
   overlay,
@@ -54,6 +58,8 @@ export function ProductCard({
     isSelected ? 'selected' : '',
     isLinkMode ? 'link-mode' : '',
     isLinkSource ? 'link-source' : '',
+    isDimmed ? 'dimmed' : '',
+    isLinkHighlight ? 'link-highlight' : '',
     overlay ? 'overlay' : '',
     isCompact ? 'compact' : '',
   ]
@@ -72,7 +78,7 @@ export function ProductCard({
       {item.isPlaceholder && (
         <div className={`card-new-badge ${isCompact ? 'compact' : ''}`}>New</div>
       )}
-      {onRemove && (
+      {onRemove && !isDimmed && (
         <button
           className="card-remove"
           onClick={(e) => {

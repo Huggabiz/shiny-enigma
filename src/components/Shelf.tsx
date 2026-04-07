@@ -7,18 +7,15 @@ import { ProductCard } from './ProductCard';
 import type { Product, Shelf as ShelfType, ShelfItem, ShelfLabel } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { computeShelfLayout } from '../utils/layout';
 import './Shelf.css';
 
 interface ShelfProps {
   shelf: ShelfType;
   catalogue: Product[];
   onAddPlaceholder: () => void;
+  onRailWidthChange?: (width: number) => void;
 }
-
-const BASE_CARD_WIDTH = 100;
-const CARD_GAP = 10;
-const MIN_CARD_WIDTH = 54;
-const RAIL_PADDING = 8;
 
 // Pack labels into rows, compacting where possible
 function packLabelsIntoRows(labels: ShelfLabel[]): ShelfLabel[][] {
@@ -44,7 +41,7 @@ function packLabelsIntoRows(labels: ShelfLabel[]): ShelfLabel[][] {
   return rows;
 }
 
-export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
+export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange }: ShelfProps) {
   const {
     selectedItemId,
     setSelectedItem,
@@ -83,10 +80,18 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
         const sourceProduct = sourceItem
           ? catalogue.find((p) => p.id === sourceItem.productId)
           : null;
+        // Calculate remaining unallocated percentage
+        const existingLinks = useProjectStore.getState().project?.sankeyLinks.filter(
+          (l) => l.sourceItemId === linkSource
+        ) || [];
+        const usedPercent = existingLinks.reduce((sum, l) => sum + (l.percent ?? 100), 0);
+        const remaining = Math.max(0, 100 - usedPercent);
+        const sourceVolume = sourceProduct?.volume || 0;
         addLink({
           sourceItemId: linkSource,
           targetItemId: item.id,
-          volume: sourceProduct?.volume || 0,
+          percent: remaining,
+          volume: Math.round(sourceVolume * remaining / 100),
           type: 'transfer',
         });
         setLinkSource(null);
@@ -115,27 +120,20 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
     const el = railRef.current;
     if (!el) return;
     const observer = new ResizeObserver(([entry]) => {
-      setRailWidth(entry.contentRect.width);
+      const w = entry.contentRect.width;
+      setRailWidth(w);
+      onRailWidthChange?.(w);
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [onRailWidthChange]);
 
-  // Calculate dynamic card width — shrink when items overflow
-  const totalItems = shelf.items.length;
-  const availableWidth = railWidth - RAIL_PADDING * 2;
-  const naturalContentWidth = totalItems * (BASE_CARD_WIDTH + CARD_GAP) - (totalItems > 0 ? CARD_GAP : 0);
-  const needsShrink = totalItems > 0 && naturalContentWidth > availableWidth;
-
-  const cardWidth = needsShrink
-    ? Math.max(MIN_CARD_WIDTH, Math.floor((availableWidth - (totalItems - 1) * CARD_GAP) / totalItems))
-    : BASE_CARD_WIDTH;
-  const slotWidth = cardWidth + CARD_GAP;
-  const contentWidth = totalItems * slotWidth - (totalItems > 0 ? CARD_GAP : 0);
-  const offsetLeft = needsShrink ? RAIL_PADDING : Math.max(0, (railWidth - contentWidth) / 2);
-
-  // Compute dynamic slot width for label drag deltas
-  const currentSlotWidth = slotWidth;
+  // Compute layout using shared utility
+  const layout = useMemo(
+    () => computeShelfLayout(shelf.items.length, railWidth),
+    [shelf.items.length, railWidth]
+  );
+  const { cardWidth, slotWidth, offsetLeft, needsShrink } = layout;
 
   // Label dragging (reposition)
   const handleLabelDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, labelId: string) => {
@@ -165,7 +163,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
     const handleMove = (e: MouseEvent | TouchEvent) => {
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const dx = clientX - dragStartRef.current.x;
-      const slotDelta = Math.round(dx / currentSlotWidth);
+      const slotDelta = Math.round(dx / slotWidth);
       const maxPos = Math.max(shelf.items.length - 1, 0);
 
       if (draggingLabel) {
@@ -202,7 +200,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleUp);
     };
-  }, [draggingLabel, resizingLabel, shelf.id, shelf.items.length, shelf.labels, updateLabel, currentSlotWidth]);
+  }, [draggingLabel, resizingLabel, shelf.id, shelf.items.length, shelf.labels, updateLabel, slotWidth]);
 
   // Pack labels into rows
   const labelRows = useMemo(() => packLabelsIntoRows(shelf.labels), [shelf.labels]);
@@ -298,19 +296,31 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
           items={shelf.items.map((i) => i.id)}
           strategy={horizontalListSortingStrategy}
         >
-          {shelf.items.map((item) => (
-            <ProductCard
-              key={item.id}
-              item={item}
-              product={getProduct(item)}
-              isSelected={selectedItemId === item.id}
-              isLinkMode={linkMode}
-              isLinkSource={linkSource === item.id}
-              onClick={() => handleCardClick(item)}
-              onRemove={() => removeItemFromShelf(shelf.id, item.id)}
-              cardWidth={cardWidth}
-            />
-          ))}
+          {shelf.items.map((item) => {
+            // In link mode with a source selected, dim unrelated current shelf items
+            const isSourceSelected = linkMode && linkSource;
+            const isDimmed = isSourceSelected
+              ? shelf.id === 'current' && item.id !== linkSource
+              : false;
+            // Highlight linked future targets
+            const isLinkHighlight = isSourceSelected && shelf.id === 'future';
+
+            return (
+              <ProductCard
+                key={item.id}
+                item={item}
+                product={getProduct(item)}
+                isSelected={selectedItemId === item.id}
+                isLinkMode={linkMode}
+                isLinkSource={linkSource === item.id}
+                isDimmed={isDimmed}
+                isLinkHighlight={isLinkHighlight}
+                onClick={() => handleCardClick(item)}
+                onRemove={() => removeItemFromShelf(shelf.id, item.id)}
+                cardWidth={cardWidth}
+              />
+            );
+          })}
         </SortableContext>
 
         {shelf.items.length === 0 && (
