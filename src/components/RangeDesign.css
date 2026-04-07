@@ -98,12 +98,11 @@
   display: block;
 }
 
-/* Grid rows — flex:1 distributes height equally */
+/* Grid rows — explicit height from JS */
 .matrix-row {
   display: grid;
   gap: 3px;
   margin-bottom: 3px;
-  flex: 1;
   min-height: 0;
 }
 
