@@ -12,6 +12,7 @@ interface ProductCardProps {
   isDimmed?: boolean;
   isLinkHighlight?: boolean;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   onRemove?: () => void;
   overlay?: boolean;
   cardWidth?: number;
@@ -26,6 +27,7 @@ export function ProductCard({
   isDimmed,
   isLinkHighlight,
   onClick,
+  onDoubleClick,
   onRemove,
   overlay,
   cardWidth,
@@ -72,6 +74,7 @@ export function ProductCard({
       style={style}
       className={cardClass}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       {...attributes}
       {...listeners}
     >

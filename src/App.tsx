@@ -31,6 +31,7 @@ function findShelfForItem(project: NonNullable<ReturnType<typeof useProjectStore
 
 function getTargetShelfId(overId: string, project: NonNullable<ReturnType<typeof useProjectStore.getState>['project']>): string | null {
   if (overId.startsWith('shelf-')) return overId.replace('shelf-', '');
+  if (overId === 'catalogue-drop-zone') return null; // catalogue is not a shelf
   if (project.currentShelf.items.some((i) => i.id === overId)) return 'current';
   if (project.futureShelf.items.some((i) => i.id === overId)) return 'future';
   return null;
@@ -48,11 +49,13 @@ function App() {
     createProject,
     setCatalogue,
     addItemToShelf,
+    removeItemFromShelf,
     reorderShelfItems,
-    removeLink,
     addLink,
     linkMode,
     linkSource,
+    setLinkMode,
+    setLinkSource,
     assumeContinuity,
   } = useProjectStore();
 
@@ -76,7 +79,6 @@ function App() {
     project?.futureShelf.items.map((i) => i.productId).filter(Boolean) || []
   ), [project?.futureShelf.items]);
 
-  // Link panel source data
   const linkSourceItem = useMemo(() => {
     if (!linkMode || !linkSource || !project) return null;
     return project.currentShelf.items.find((i) => i.id === linkSource) || null;
@@ -111,14 +113,13 @@ function App() {
     (shelfId: string) => {
       const name = prompt('Placeholder name (e.g. "New Premium SKU"):');
       if (name === null) return;
-      const item: ShelfItem = {
+      addItemToShelf(shelfId, {
         id: `placeholder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         productId: '',
         position: project?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length || 0,
         isPlaceholder: true,
         placeholderName: name || 'New SKU',
-      };
-      addItemToShelf(shelfId, item);
+      });
     },
     [project, addItemToShelf]
   );
@@ -131,6 +132,17 @@ function App() {
   const handleRailWidthChange = useCallback((width: number) => {
     setShelfRailWidth(width);
   }, []);
+
+  // Enter link mode for a specific current shelf item
+  const enterLinkModeFor = useCallback((itemId: string) => {
+    setLinkMode(true);
+    setLinkSource(itemId);
+  }, [setLinkMode, setLinkSource]);
+
+  // Sankey click: enter link mode for the source product
+  const handleSankeyClick = useCallback((sourceItemId: string) => {
+    enterLinkModeFor(sourceItemId);
+  }, [enterLinkModeFor]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -160,7 +172,12 @@ function App() {
   const handleDragOver = (event: DragOverEvent) => {
     const { over } = event;
     if (!over || !project) { setOverShelfId(null); return; }
-    setOverShelfId(getTargetShelfId(String(over.id), project));
+    const overId = String(over.id);
+    if (overId === 'catalogue-drop-zone') {
+      setOverShelfId('catalogue');
+    } else {
+      setOverShelfId(getTargetShelfId(overId, project));
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -172,8 +189,16 @@ function App() {
 
     const activeId = String(active.id);
     const overId = String(over.id);
+
+    // Dropping a shelf item onto the catalogue = remove from shelf
+    if (overId === 'catalogue-drop-zone' && draggedItem?.sourceShelf && draggedItem.item) {
+      removeItemFromShelf(draggedItem.sourceShelf, draggedItem.item.id);
+      return;
+    }
+
     const targetShelfId = getTargetShelfId(overId, project);
 
+    // Dropping a catalogue item onto a shelf
     if (activeId.startsWith('catalogue-')) {
       const data = active.data.current as { product: Product };
       if (!data?.product || !targetShelfId) return;
@@ -188,7 +213,6 @@ function App() {
         isPlaceholder: false,
       });
 
-      // Range continuity: if adding to current shelf, also add to future + auto-link
       if (targetShelfId === 'current' && assumeContinuity && !isProductOnShelf(project, data.product.id, 'future')) {
         const futureItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
         addItemToShelf('future', {
@@ -208,6 +232,7 @@ function App() {
       return;
     }
 
+    // Cross-shelf drag: duplicate
     const sourceShelf = draggedItem?.sourceShelf;
     if (sourceShelf && targetShelfId && sourceShelf !== targetShelfId) {
       const sourceItem = draggedItem?.item;
@@ -225,6 +250,7 @@ function App() {
       return;
     }
 
+    // Reordering within same shelf
     if (sourceShelf && targetShelfId === sourceShelf) {
       const shelfKey = sourceShelf === 'current' ? 'currentShelf' : 'futureShelf';
       const items = project[shelfKey].items;
@@ -272,9 +298,9 @@ function App() {
               <>
                 <Shelf shelf={project.currentShelf} catalogue={project.catalogue}
                   onAddPlaceholder={() => handleAddPlaceholder('current')}
-                  onRailWidthChange={handleRailWidthChange} />
+                  onRailWidthChange={handleRailWidthChange}
+                  onDoubleClickItem={enterLinkModeFor} />
 
-                {/* Link panel — shown when a source is selected in link mode */}
                 {linkMode && linkSourceItem && (
                   <LinkPanel
                     sourceItem={linkSourceItem}
@@ -288,12 +314,17 @@ function App() {
                 <SankeyFlow
                   currentShelf={project.currentShelf} futureShelf={project.futureShelf}
                   links={project.sankeyLinks} catalogue={project.catalogue}
-                  railWidth={shelfRailWidth} onRemoveLink={removeLink} />
+                  railWidth={shelfRailWidth} onClickFlow={handleSankeyClick} />
 
                 <Shelf shelf={project.futureShelf} catalogue={project.catalogue}
                   onAddPlaceholder={() => handleAddPlaceholder('future')} />
 
-                {activeItem?.sourceShelf && overShelfId && overShelfId !== activeItem.sourceShelf && (
+                {activeItem?.sourceShelf && overShelfId === 'catalogue' && (
+                  <div className="cross-shelf-hint remove-hint">
+                    Drop to remove from range
+                  </div>
+                )}
+                {activeItem?.sourceShelf && overShelfId && overShelfId !== 'catalogue' && overShelfId !== activeItem.sourceShelf && (
                   <div className="cross-shelf-hint">
                     Drop to duplicate into {overShelfId === 'current' ? 'Current' : 'Future'} Range
                   </div>
@@ -304,7 +335,8 @@ function App() {
           </div>
 
           <Catalogue products={project?.catalogue || []} onImport={() => setShowImport(true)}
-            currentProductIds={currentProductIds} futureProductIds={futureProductIds} />
+            currentProductIds={currentProductIds} futureProductIds={futureProductIds}
+            isDropTarget={!!activeItem?.sourceShelf} />
 
           <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
             {activeItem && <ProductCard item={activeItem.item} product={activeItem.product} overlay />}

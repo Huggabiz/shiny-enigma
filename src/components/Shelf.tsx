@@ -15,6 +15,7 @@ interface ShelfProps {
   catalogue: Product[];
   onAddPlaceholder: () => void;
   onRailWidthChange?: (width: number) => void;
+  onDoubleClickItem?: (itemId: string) => void;
 }
 
 // Pack labels into rows, compacting where possible
@@ -41,7 +42,7 @@ function packLabelsIntoRows(labels: ShelfLabel[]): ShelfLabel[][] {
   return rows;
 }
 
-export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange }: ShelfProps) {
+export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem }: ShelfProps) {
   const {
     selectedItemId,
     setSelectedItem,
@@ -69,21 +70,22 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange }:
 
   const handleCardClick = (item: ShelfItem) => {
     if (linkMode) {
-      if (!linkSource) {
-        if (shelf.id === 'current') {
-          setLinkSource(item.id);
-        }
-      } else if (shelf.id === 'future' && linkSource !== item.id) {
+      // In link mode: click current SKU to select it as source
+      if (shelf.id === 'current') {
+        setLinkSource(item.id);
+      } else if (shelf.id === 'future' && linkSource) {
+        // Click future SKU to add connection from selected source
         const sourceItem = useProjectStore
           .getState()
           .project?.currentShelf.items.find((i) => i.id === linkSource);
         const sourceProduct = sourceItem
           ? catalogue.find((p) => p.id === sourceItem.productId)
           : null;
-        // Calculate remaining unallocated percentage
         const existingLinks = useProjectStore.getState().project?.sankeyLinks.filter(
           (l) => l.sourceItemId === linkSource
         ) || [];
+        // Check if already linked
+        if (existingLinks.some((l) => l.targetItemId === item.id)) return;
         const usedPercent = existingLinks.reduce((sum, l) => sum + (l.percent ?? 100), 0);
         const remaining = Math.max(0, 100 - usedPercent);
         const sourceVolume = sourceProduct?.volume || 0;
@@ -300,8 +302,8 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange }:
             // In link mode with a source selected, dim unrelated current shelf items
             const isSourceSelected = !!(linkMode && linkSource);
             const isDimmed = isSourceSelected && shelf.id === 'current' && item.id !== linkSource;
-            // Highlight linked future targets
-            const isLinkHighlight = isSourceSelected && shelf.id === 'future';
+            // Only the selected source gets the purple highlight
+            const isLinkHighlight = isSourceSelected && item.id === linkSource;
 
             return (
               <ProductCard
@@ -314,6 +316,9 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange }:
                 isDimmed={isDimmed}
                 isLinkHighlight={isLinkHighlight}
                 onClick={() => handleCardClick(item)}
+                onDoubleClick={() => {
+                  if (shelf.id === 'current' && onDoubleClickItem) onDoubleClickItem(item.id);
+                }}
                 onRemove={() => removeItemFromShelf(shelf.id, item.id)}
                 cardWidth={cardWidth}
               />

@@ -10,7 +10,7 @@ interface SankeyFlowProps {
   links: SankeyLink[];
   catalogue: Product[];
   railWidth: number;
-  onRemoveLink?: (sourceId: string, targetId: string) => void;
+  onClickFlow?: (sourceItemId: string) => void;
 }
 
 const FLOW_HEIGHT = 120;
@@ -31,7 +31,7 @@ export function SankeyFlow({
   links,
   catalogue,
   railWidth,
-  onRemoveLink,
+  onClickFlow,
 }: SankeyFlowProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -217,7 +217,7 @@ export function SankeyFlow({
           .style('cursor', 'pointer')
           .on('mouseenter', function () { d3.select(this).attr('stroke-opacity', 0.75); })
           .on('mouseleave', function () { d3.select(this).attr('stroke-opacity', 0.45); })
-          .on('click', () => { onRemoveLink?.(flow.link.sourceItemId, flow.link.targetItemId); });
+          .on('click', () => { onClickFlow?.(flow.link.sourceItemId); });
 
         // Label at midpoint
         const midX = (sx + tx) / 2;
@@ -231,7 +231,7 @@ export function SankeyFlow({
           .text(`${pct}% (${flow.volume.toLocaleString()})`);
       }
     }
-  }, [flows, hasContent, railWidth, currentLayout, futureLayout, onRemoveLink]);
+  }, [flows, hasContent, railWidth, currentLayout, futureLayout, onClickFlow]);
 
   if (!hasContent) {
     return (

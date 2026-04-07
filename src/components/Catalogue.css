@@ -10,6 +10,11 @@
   transition: width 0.25s ease, min-width 0.25s ease;
 }
 
+.catalogue-panel.drop-active {
+  background: #ffebee;
+  border-left-color: #f44336;
+}
+
 .catalogue-panel.expanded {
   width: 55vw;
   min-width: 480px;

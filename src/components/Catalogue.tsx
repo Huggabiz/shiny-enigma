@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useDraggable } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import type { Product } from '../types';
 import './Catalogue.css';
 
@@ -8,6 +8,7 @@ interface CatalogueProps {
   onImport: () => void;
   currentProductIds: Set<string>;
   futureProductIds: Set<string>;
+  isDropTarget?: boolean;
 }
 
 function UsageBadges({ productId, currentProductIds, futureProductIds }: {
@@ -129,7 +130,8 @@ function groupByCategory(products: Product[]): GroupedProducts[] {
     }));
 }
 
-export function Catalogue({ products, onImport, currentProductIds, futureProductIds }: CatalogueProps) {
+export function Catalogue({ products, onImport, currentProductIds, futureProductIds, isDropTarget }: CatalogueProps) {
+  const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({ id: 'catalogue-drop-zone' });
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [subCategoryFilter, setSubCategoryFilter] = useState('');
@@ -188,7 +190,7 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   };
 
   return (
-    <div className={`catalogue-panel ${expanded ? 'expanded' : ''}`}>
+    <div ref={setDropRef} className={`catalogue-panel ${expanded ? 'expanded' : ''} ${isDropTarget && isDropOver ? 'drop-active' : ''}`}>
       <div className="catalogue-header">
         <h3>Catalogue</h3>
         <div className="catalogue-header-actions">

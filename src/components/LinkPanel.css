@@ -174,43 +174,45 @@
   font-weight: 600;
 }
 
-/* Add connections */
-.link-panel-add {
-  margin-bottom: 8px;
+.link-panel-empty {
+  text-align: center;
+  color: #aaa;
+  font-size: 12px;
+  padding: 16px 10px;
+  border: 1px dashed #ddd;
+  border-radius: 6px;
+  margin-bottom: 10px;
 }
 
-.link-panel-add-label {
-  font-size: 10px;
-  color: #888;
-  display: block;
-  margin-bottom: 4px;
+.link-alloc-percent-value.growth {
+  color: #4CAF50;
 }
 
-.link-panel-add-targets {
+.link-panel-footer {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.link-add-btn {
-  padding: 3px 8px;
-  font-size: 10px;
-  border: 1px solid #ddd;
-  background: #fafafa;
-  border-radius: 12px;
-  cursor: pointer;
-  color: #555;
-  white-space: nowrap;
-}
-
-.link-add-btn:hover {
-  background: #e3f2fd;
-  border-color: #90caf9;
-  color: #1976d2;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
 }
 
 .link-panel-hint {
   font-size: 10px;
   color: #bbb;
-  text-align: center;
+}
+
+.link-panel-done {
+  padding: 6px 20px;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.link-panel-done:hover {
+  background: #1565c0;
 }

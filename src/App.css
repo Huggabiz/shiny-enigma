@@ -94,6 +94,11 @@
   animation: fadeIn 0.15s ease;
 }
 
+.cross-shelf-hint.remove-hint {
+  background: #f44336;
+  box-shadow: 0 4px 16px rgba(244, 67, 54, 0.4);
+}
+
 .duplicate-warning {
   position: fixed;
   bottom: 24px;
