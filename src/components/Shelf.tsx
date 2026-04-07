@@ -298,10 +298,8 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange }:
         >
           {shelf.items.map((item) => {
             // In link mode with a source selected, dim unrelated current shelf items
-            const isSourceSelected = linkMode && linkSource;
-            const isDimmed = isSourceSelected
-              ? shelf.id === 'current' && item.id !== linkSource
-              : false;
+            const isSourceSelected = !!(linkMode && linkSource);
+            const isDimmed = isSourceSelected && shelf.id === 'current' && item.id !== linkSource;
             // Highlight linked future targets
             const isLinkHighlight = isSourceSelected && shelf.id === 'future';
 
