@@ -27,53 +27,84 @@ const GAP = 3;
 const CARD_GAP = 4;
 const CELL_PADDING = 4;
 const MAX_CARD_WIDTH = 90;
-const MIN_CARD_WIDTH = 46;
-const CARD_ASPECT = 1.4; // height/width ratio for cards
+const MIN_CARD_WIDTH = 40;
+const CARD_ASPECT = 1.4;
 const HEADER_ROW_HEIGHT = 28;
 const ADD_ROW_HEIGHT = 28;
 
-// For a cell with `n` products and given cell width/height, find the best cols count
-// that maximizes card size while fitting everything
-function bestGridLayout(n: number, cellW: number, cellH: number): { cols: number; cardW: number } {
-  if (n === 0) return { cols: 1, cardW: MAX_CARD_WIDTH };
-  let bestCardW = 0;
-  let bestCols = 1;
-
-  for (let cols = 1; cols <= n; cols++) {
-    const rows = Math.ceil(n / cols);
-    const cardW = Math.min(MAX_CARD_WIDTH, (cellW - CELL_PADDING * 2 - (cols - 1) * CARD_GAP) / cols);
-    const cardH = cardW * CARD_ASPECT;
-    const totalH = rows * cardH + (rows - 1) * CARD_GAP + CELL_PADDING * 2;
-    if (totalH <= cellH && cardW >= MIN_CARD_WIDTH && cardW > bestCardW) {
-      bestCardW = cardW;
-      bestCols = cols;
-    }
-  }
-
-  // If nothing fit within height, fall back to single row (horizontal)
-  if (bestCardW === 0) {
-    const cardW = Math.max(MIN_CARD_WIDTH, (cellW - CELL_PADDING * 2 - (n - 1) * CARD_GAP) / n);
-    return { cols: n, cardW };
-  }
-
-  return { cols: bestCols, cardW: bestCardW };
+// For n products at a given card width, how many columns and rows needed in a cell?
+function cellGridForCardWidth(n: number, cardW: number, cellW: number): { cols: number; rows: number } {
+  if (n === 0) return { cols: 0, rows: 0 };
+  const maxCols = Math.max(1, Math.floor((cellW - CELL_PADDING * 2 + CARD_GAP) / (cardW + CARD_GAP)));
+  const cols = Math.min(n, maxCols);
+  const rows = Math.ceil(n / cols);
+  return { cols, rows };
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, cellWidth, cellHeight }: {
+// Check if a given card width fits all cells within available space
+function layoutFits(
+  cardW: number,
+  cellCounts: number[][], // [row][col] = product count
+  numCols: number,
+  numRows: number,
+  availW: number,
+  availH: number,
+): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
+  const cardH = cardW * CARD_ASPECT;
+
+  // For each column, find the max horizontal slots needed across all rows
+  const colSlots = Array.from({ length: numCols }, (_, col) => {
+    let maxCols = 1;
+    for (let row = 0; row < numRows; row++) {
+      const n = cellCounts[row][col];
+      if (n === 0) continue;
+      // With unlimited width, how many cols would this cell use?
+      // We want to allow wrapping, so compute cols for this card width
+      // given that the column width = maxCols * (cardW + gap)
+      // Start with a single row (cols = n) and see if we need fewer
+      const cols = Math.min(n, Math.max(1, Math.ceil(Math.sqrt(n / CARD_ASPECT))));
+      if (cols > maxCols) maxCols = cols;
+    }
+    return maxCols;
+  });
+
+  // Column widths
+  const colWidths = colSlots.map((slots) => slots * (cardW + CARD_GAP) - CARD_GAP + CELL_PADDING * 2);
+  const totalW = colWidths.reduce((sum, w) => sum + w, 0) + (numCols - 1) * GAP;
+
+  if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
+
+  // For each row, find the max vertical slots needed
+  const rowSlots = Array.from({ length: numRows }, (_, row) => {
+    let maxRows = 1;
+    for (let col = 0; col < numCols; col++) {
+      const n = cellCounts[row][col];
+      if (n === 0) continue;
+      const { rows } = cellGridForCardWidth(n, cardW, colWidths[col]);
+      if (rows > maxRows) maxRows = rows;
+    }
+    return maxRows;
+  });
+
+  const rowHeights = rowSlots.map((slots) => slots * (cardH + CARD_GAP) - CARD_GAP + CELL_PADDING * 2);
+  const totalH = rowHeights.reduce((sum, h) => sum + h, 0) + (numRows - 1) * GAP;
+
+  return { fits: totalH <= availH, colWidths, rowHeights };
+}
+
+function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth }: {
   row: number; col: number; itemIds: string[];
   shelf: Shelf; catalogue: Product[];
-  cellWidth: number; cellHeight: number;
+  cardWidth: number;
 }) {
   const cellId = `matrix-cell-${row}-${col}`;
   const { setNodeRef, isOver } = useDroppable({ id: cellId });
   const items = itemIds.map((id) => shelf.items.find((i) => i.id === id)).filter(Boolean);
   const { removeItemFromShelf, removeMatrixAssignment } = useProjectStore();
 
-  const { cardW } = bestGridLayout(items.length, cellWidth, cellHeight);
-
   return (
     <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''}`}
-      style={{ '--matrix-card-width': `${Math.floor(cardW)}px` } as React.CSSProperties}>
+      style={{ '--matrix-card-width': `${Math.floor(cardWidth)}px` } as React.CSSProperties}>
       {items.map((item) => {
         if (!item) return null;
         const product = catalogue.find((p) => p.id === item.productId);
@@ -142,7 +173,6 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
     project?.futureShelf.items.map((i) => i.productId).filter(Boolean) || []
   ), [project?.futureShelf.items]);
 
-  // Track wrapper dimensions
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
@@ -153,41 +183,64 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
     return () => observer.disconnect();
   }, []);
 
-  // Compute column widths considering both X and Y space
-  const { columnWidths, rowHeight } = useMemo(() => {
+  // Build cell counts grid and compute uniform card size
+  const { columnWidths, rowHeights, cardWidth } = useMemo(() => {
     const numCols = layout.xLabels.length;
     const numRows = layout.yLabels.length;
     if (numCols === 0 || numRows === 0 || wrapperSize.w === 0 || wrapperSize.h === 0) {
-      return { columnWidths: [], rowHeight: 0 };
+      return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH };
     }
 
-    const padding = 24; // wrapper padding
-    const availW = wrapperSize.w - padding - ROW_HEADER_WIDTH - ADD_BTN_WIDTH - (numCols + 1) * GAP;
-    const availH = wrapperSize.h - padding - HEADER_ROW_HEIGHT - ADD_ROW_HEIGHT - (numRows + 1) * GAP;
-    const cellH = Math.max(60, availH / numRows);
+    const wPad = 24;
+    const availW = wrapperSize.w - wPad - ROW_HEADER_WIDTH - ADD_BTN_WIDTH - (numCols + 1) * GAP;
+    const availH = wrapperSize.h - wPad - HEADER_ROW_HEIGHT - ADD_ROW_HEIGHT - (numRows + 1) * GAP;
 
-    // For each column, find the max products in any cell and compute how many
-    // horizontal slots that needs given the available cell height
-    const colSlots = layout.xLabels.map((_, col) => {
-      let maxSlots = 1;
-      for (let row = 0; row < numRows; row++) {
-        const count = layout.assignments.filter((a) => a.col === col && a.row === row).length;
-        if (count === 0) continue;
-        // How many columns needed in this cell given cell height?
-        const { cols } = bestGridLayout(count, 999, cellH); // unlimited width to get ideal cols
-        // But we need at least this many horizontal slots
-        if (cols > maxSlots) maxSlots = cols;
+    // Cell counts: [row][col]
+    const cellCounts: number[][] = [];
+    for (let row = 0; row < numRows; row++) {
+      cellCounts.push([]);
+      for (let col = 0; col < numCols; col++) {
+        cellCounts[row].push(
+          layout.assignments.filter((a) => a.row === row && a.col === col).length
+        );
       }
-      return maxSlots;
-    });
+    }
 
-    const totalSlots = colSlots.reduce((sum, n) => sum + n, 0) || numCols;
+    // Binary search for the largest card width that fits
+    let lo = MIN_CARD_WIDTH;
+    let hi = MAX_CARD_WIDTH;
+    let bestCW = MIN_CARD_WIDTH;
+    let bestColWidths: number[] = [];
+    let bestRowHeights: number[] = [];
 
-    // Distribute available width proportionally to slots
-    const slotWidth = availW / totalSlots;
-    const colWidths = colSlots.map((slots) => Math.max(slots * slotWidth, 60));
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const result = layoutFits(mid, cellCounts, numCols, numRows, availW, availH);
+      if (result.fits) {
+        bestCW = mid;
+        bestColWidths = result.colWidths;
+        bestRowHeights = result.rowHeights;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
 
-    return { columnWidths: colWidths, rowHeight: cellH };
+    // If extra space, distribute it to columns and rows proportionally
+    const totalColW = bestColWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * GAP;
+    if (totalColW < availW) {
+      const extra = availW - totalColW;
+      const perCol = extra / numCols;
+      bestColWidths = bestColWidths.map((w) => w + perCol);
+    }
+    const totalRowH = bestRowHeights.reduce((s, h) => s + h, 0) + (numRows - 1) * GAP;
+    if (totalRowH < availH) {
+      const extra = availH - totalRowH;
+      const perRow = extra / numRows;
+      bestRowHeights = bestRowHeights.map((h) => h + perRow);
+    }
+
+    return { columnWidths: bestColWidths, rowHeights: bestRowHeights, cardWidth: bestCW };
   }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize]);
 
   const gridCols = `${ROW_HEADER_WIDTH}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${ADD_BTN_WIDTH}px`;
@@ -319,7 +372,8 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
               </div>
 
               {layout.yLabels.map((yLabel, row) => (
-                <div key={row} className="matrix-row" style={{ gridTemplateColumns: gridCols, height: `${rowHeight}px` }}>
+                <div key={row} className="matrix-row"
+                  style={{ gridTemplateColumns: gridCols, height: `${rowHeights[row] || 80}px` }}>
                   <div className="matrix-row-header" onDoubleClick={() => setEditingAxis({ axis: 'y', index: row })}>
                     {editingAxis?.axis === 'y' && editingAxis.index === row ? (
                       <input className="matrix-label-input" defaultValue={yLabel} autoFocus
@@ -332,8 +386,7 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
                     <MatrixCell key={`${row}-${col}`} row={row} col={col}
                       itemIds={cellMap.get(`${row}-${col}`) || []}
                       shelf={shelf} catalogue={catalogue}
-                      cellWidth={columnWidths[col] || 100}
-                      cellHeight={rowHeight} />
+                      cardWidth={cardWidth} />
                   ))}
                   <div />
                 </div>
