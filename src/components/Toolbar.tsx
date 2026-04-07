@@ -13,7 +13,7 @@ interface ToolbarProps {
 export function Toolbar({ onImport }: ToolbarProps) {
   const {
     project, loadProject, linkMode, setLinkMode, setLinkSource,
-    assumeContinuity, setAssumeContinuity, clearCatalogue,
+    assumeContinuity, setAssumeContinuity, clearCatalogue, clearRanges,
   } = useProjectStore();
   const loadRef = useRef<HTMLInputElement>(null);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
@@ -109,6 +109,12 @@ export function Toolbar({ onImport }: ToolbarProps) {
                   <button onClick={handleSave}>Save Full Project</button>
                   <button onClick={handleSaveStructure}>Save Range Structure</button>
                   <hr />
+                  <button onClick={() => {
+                    if (confirm('Clear all ranges? Products will be removed from both shelves but the catalogue and matrix labels will be kept.')) {
+                      clearRanges();
+                    }
+                    setShowSaveMenu(false);
+                  }} className="danger">Clear Ranges</button>
                   <button onClick={handleClearCatalogue} className="danger">Clear Catalogue</button>
                 </div>
               )}

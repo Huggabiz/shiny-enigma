@@ -16,6 +16,7 @@ interface ProjectStore {
   // Catalogue actions
   setCatalogue: (products: Product[]) => void;
   clearCatalogue: () => void;
+  clearRanges: () => void;
 
   // Shelf actions
   addItemToShelf: (shelfId: string, item: ShelfItem) => void;
@@ -144,6 +145,34 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const { project } = get();
     if (!project) return;
     set({ project: { ...project, catalogue: [], updatedAt: new Date().toISOString() } });
+  },
+
+  clearRanges: () => {
+    const { project } = get();
+    if (!project) return;
+    const preserveLayout = (shelfId: string, name: string) => ({
+      id: shelfId,
+      name,
+      items: [],
+      labels: [],
+      matrixLayout: project[shelfId === 'current' ? 'currentShelf' : 'futureShelf'].matrixLayout
+        ? {
+            ...project[shelfId === 'current' ? 'currentShelf' : 'futureShelf'].matrixLayout!,
+            assignments: [],
+          }
+        : undefined,
+    });
+    set({
+      project: {
+        ...project,
+        currentShelf: preserveLayout('current', project.currentShelf.name),
+        futureShelf: preserveLayout('future', project.futureShelf.name),
+        sankeyLinks: [],
+        updatedAt: new Date().toISOString(),
+      },
+      linkMode: false,
+      linkSource: null,
+    });
   },
 
   addItemToShelf: (shelfId, item) => {
