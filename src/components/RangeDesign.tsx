@@ -31,8 +31,10 @@ const MIN_CARD_WIDTH = 40;
 const CARD_ASPECT = 1.4;
 const HEADER_ROW_HEIGHT = 28;
 const ADD_ROW_HEIGHT = 28;
+const EMPTY_COL_WIDTH = 30; // narrow width for columns with no products
 
-// For n products at a given card width, how many columns and rows needed in a cell?
+// For n products at a given card width within a cell of given width,
+// compute the grid: how many columns fit, and how many rows result
 function cellGridForCardWidth(n: number, cardW: number, cellW: number): { cols: number; rows: number } {
   if (n === 0) return { cols: 0, rows: 0 };
   const maxCols = Math.max(1, Math.floor((cellW - CELL_PADDING * 2 + CARD_GAP) / (cardW + CARD_GAP)));
@@ -41,10 +43,22 @@ function cellGridForCardWidth(n: number, cardW: number, cellW: number): { cols: 
   return { cols, rows };
 }
 
-// Check if a given card width fits all cells within available space
+// For n products, find the fewest horizontal columns needed such that
+// the resulting rows fit within the available cell height at the given card size
+function minColsForHeight(n: number, cardW: number, availCellH: number): number {
+  if (n === 0) return 0;
+  const cardH = cardW * CARD_ASPECT;
+  const maxRows = Math.max(1, Math.floor((availCellH - CELL_PADDING * 2 + CARD_GAP) / (cardH + CARD_GAP)));
+  // Minimum columns = ceil(n / maxRows)
+  return Math.max(1, Math.ceil(n / maxRows));
+}
+
+// Check if a given card width fits all cells within available space.
+// Strategy: use available height to determine minimum cols per cell (prefer vertical stacking),
+// then compute column widths from the max cols needed across rows in each column.
 function layoutFits(
   cardW: number,
-  cellCounts: number[][], // [row][col] = product count
+  cellCounts: number[][],
   numCols: number,
   numRows: number,
   availW: number,
@@ -52,31 +66,35 @@ function layoutFits(
 ): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
   const cardH = cardW * CARD_ASPECT;
 
-  // For each column, find the max horizontal slots needed across all rows
+  // First pass: estimate row height assuming equal distribution
+  const estRowH = availH / numRows;
+
+  // For each column, find the minimum horizontal slots needed
+  // by checking each cell and using the fewest cols that fit vertically
   const colSlots = Array.from({ length: numCols }, (_, col) => {
-    let maxCols = 1;
+    let maxCols = 0;
     for (let row = 0; row < numRows; row++) {
       const n = cellCounts[row][col];
       if (n === 0) continue;
-      // With unlimited width, how many cols would this cell use?
-      // We want to allow wrapping, so compute cols for this card width
-      // given that the column width = maxCols * (cardW + gap)
-      // Start with a single row (cols = n) and see if we need fewer
-      const cols = Math.min(n, Math.max(1, Math.ceil(Math.sqrt(n / CARD_ASPECT))));
+      const cols = minColsForHeight(n, cardW, estRowH);
       if (cols > maxCols) maxCols = cols;
     }
     return maxCols;
   });
 
-  // Column widths
-  const colWidths = colSlots.map((slots) => slots * (cardW + CARD_GAP) - CARD_GAP + CELL_PADDING * 2);
+  // Column widths: empty columns get minimal width
+  const colWidths = colSlots.map((slots) =>
+    slots === 0
+      ? EMPTY_COL_WIDTH
+      : slots * (cardW + CARD_GAP) - CARD_GAP + CELL_PADDING * 2
+  );
   const totalW = colWidths.reduce((sum, w) => sum + w, 0) + (numCols - 1) * GAP;
 
   if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
 
-  // For each row, find the max vertical slots needed
+  // Second pass: compute actual row heights given the real column widths
   const rowSlots = Array.from({ length: numRows }, (_, row) => {
-    let maxRows = 1;
+    let maxRows = 0;
     for (let col = 0; col < numCols; col++) {
       const n = cellCounts[row][col];
       if (n === 0) continue;
@@ -86,7 +104,11 @@ function layoutFits(
     return maxRows;
   });
 
-  const rowHeights = rowSlots.map((slots) => slots * (cardH + CARD_GAP) - CARD_GAP + CELL_PADDING * 2);
+  const rowHeights = rowSlots.map((slots) =>
+    slots === 0
+      ? EMPTY_COL_WIDTH // narrow for empty rows too
+      : slots * (cardH + CARD_GAP) - CARD_GAP + CELL_PADDING * 2
+  );
   const totalH = rowHeights.reduce((sum, h) => sum + h, 0) + (numRows - 1) * GAP;
 
   return { fits: totalH <= availH, colWidths, rowHeights };
@@ -226,18 +248,20 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
       }
     }
 
-    // If extra space, distribute it to columns and rows proportionally
+    // Distribute extra space only to non-empty columns/rows
     const totalColW = bestColWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * GAP;
     if (totalColW < availW) {
+      const nonEmptyCols = bestColWidths.filter((w) => w > EMPTY_COL_WIDTH).length || 1;
       const extra = availW - totalColW;
-      const perCol = extra / numCols;
-      bestColWidths = bestColWidths.map((w) => w + perCol);
+      const perCol = extra / nonEmptyCols;
+      bestColWidths = bestColWidths.map((w) => w > EMPTY_COL_WIDTH ? w + perCol : w);
     }
     const totalRowH = bestRowHeights.reduce((s, h) => s + h, 0) + (numRows - 1) * GAP;
     if (totalRowH < availH) {
+      const nonEmptyRows = bestRowHeights.filter((h) => h > EMPTY_COL_WIDTH).length || 1;
       const extra = availH - totalRowH;
-      const perRow = extra / numRows;
-      bestRowHeights = bestRowHeights.map((h) => h + perRow);
+      const perRow = extra / nonEmptyRows;
+      bestRowHeights = bestRowHeights.map((h) => h > EMPTY_COL_WIDTH ? h + perRow : h);
     }
 
     return { columnWidths: bestColWidths, rowHeights: bestRowHeights, cardWidth: bestCW };
