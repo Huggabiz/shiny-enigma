@@ -174,6 +174,31 @@
   border-color: #90caf9;
 }
 
+.matrix-cell-add-ph {
+  width: 22px;
+  height: 22px;
+  border: 1.5px dashed #0097a7;
+  background: transparent;
+  border-radius: 4px;
+  color: #0097a7;
+  font-size: 14px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.matrix-cell:hover .matrix-cell-add-ph {
+  display: flex;
+}
+
+.matrix-cell-add-ph:hover {
+  background: #e0f7fa;
+  opacity: 1;
+}
+
 /* Product card — uses CSS variable for responsive sizing */
 .matrix-card {
   width: var(--matrix-card-width, 80px);

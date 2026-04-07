@@ -114,10 +114,11 @@ function layoutFits(
   return { fits: totalH <= availH, colWidths, rowHeights };
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth }: {
+function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder }: {
   row: number; col: number; itemIds: string[];
   shelf: Shelf; catalogue: Product[];
   cardWidth: number;
+  onAddPlaceholder: (row: number, col: number) => void;
 }) {
   const cellId = `matrix-cell-${row}-${col}`;
   const { setNodeRef, isOver } = useDroppable({ id: cellId });
@@ -139,6 +140,7 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth }: {
             }} />
         );
       })}
+      <button className="matrix-cell-add-ph" onClick={() => onAddPlaceholder(row, col)} title="Add placeholder SKU">+</button>
     </div>
   );
 }
@@ -323,6 +325,21 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
     }
   };
 
+  const handleAddPlaceholder = useCallback((row: number, col: number) => {
+    if (!shelf) return;
+    const name = prompt('Placeholder name (e.g. "New Premium SKU"):');
+    if (name === null) return;
+    const newItemId = `placeholder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    addItemToShelf(shelfId, {
+      id: newItemId,
+      productId: '',
+      position: shelf.items.length,
+      isPlaceholder: true,
+      placeholderName: name || 'New SKU',
+    });
+    setTimeout(() => setMatrixAssignment(shelfId, newItemId, row, col), 0);
+  }, [shelf, shelfId, addItemToShelf, setMatrixAssignment]);
+
   const addLabel = useCallback((axis: 'x' | 'y') => {
     const text = prompt(`New ${axis === 'x' ? 'column' : 'row'} label:`);
     if (!text) return;
@@ -410,7 +427,8 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
                     <MatrixCell key={`${row}-${col}`} row={row} col={col}
                       itemIds={cellMap.get(`${row}-${col}`) || []}
                       shelf={shelf} catalogue={catalogue}
-                      cardWidth={cardWidth} />
+                      cardWidth={cardWidth}
+                      onAddPlaceholder={handleAddPlaceholder} />
                   ))}
                   <div />
                 </div>
