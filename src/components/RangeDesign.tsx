@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -10,98 +10,111 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { useDroppable } from '@dnd-kit/core';
-import { useDraggable } from '@dnd-kit/core';
+import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Catalogue } from './Catalogue';
 import { useProjectStore } from '../store/useProjectStore';
-import type { Product, ShelfItem, ShelfLabel } from '../types';
+import type { Product, Shelf, MatrixLayout } from '../types';
+import { useState } from 'react';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
+  shelfId: 'current' | 'future';
   onImport: () => void;
 }
 
-export interface MatrixItem {
-  id: string;
-  productId: string;
+function MatrixCell({ row, col, itemIds, shelf, catalogue, onRemoveItem }: {
   row: number;
   col: number;
-}
-
-export interface RangeDesignState {
-  title: string;
-  xLabels: string[];
-  yLabels: string[];
-  items: MatrixItem[];
-}
-
-function MatrixCell({ row, col, items, catalogue, onRemoveItem }: {
-  row: number;
-  col: number;
-  items: MatrixItem[];
+  itemIds: string[];
+  shelf: Shelf;
   catalogue: Product[];
   onRemoveItem: (itemId: string) => void;
 }) {
   const cellId = `matrix-cell-${row}-${col}`;
   const { setNodeRef, isOver } = useDroppable({ id: cellId });
+  const items = itemIds.map((id) => shelf.items.find((i) => i.id === id)).filter(Boolean);
 
   return (
-    <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''} ${items.length > 0 ? 'cell-filled' : ''}`}>
-      <div className="matrix-cell-products">
-        {items.map((item) => (
-          <MatrixProduct key={item.id} item={item} catalogue={catalogue} onRemove={() => onRemoveItem(item.id)} />
-        ))}
-      </div>
+    <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''}`}>
+      {items.map((item) => {
+        if (!item) return null;
+        const product = catalogue.find((p) => p.id === item.productId);
+        return (
+          <MatrixProductCard key={item.id} itemId={item.id} product={product}
+            isPlaceholder={item.isPlaceholder} placeholderName={item.placeholderName}
+            onRemove={() => onRemoveItem(item.id)} />
+        );
+      })}
     </div>
   );
 }
 
-function MatrixProduct({ item, catalogue, onRemove }: { item: MatrixItem; catalogue: Product[]; onRemove: () => void }) {
-  const product = catalogue.find((p) => p.id === item.productId);
+function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, onRemove }: {
+  itemId: string;
+  product?: Product;
+  isPlaceholder: boolean;
+  placeholderName?: string;
+  onRemove: () => void;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `matrix-item-${item.id}`,
-    data: { matrixItem: item },
+    id: `matrix-item-${itemId}`,
+    data: { itemId },
   });
+  const name = isPlaceholder ? (placeholderName || 'New SKU') : (product?.name || 'Unknown');
 
   return (
-    <div
-      ref={setNodeRef}
-      className={`matrix-product ${isDragging ? 'dragging' : ''}`}
-      {...attributes}
-      {...listeners}
-    >
-      <button className="matrix-product-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>×</button>
-      <div className="matrix-product-image">
+    <div ref={setNodeRef} className={`matrix-card ${isDragging ? 'dragging' : ''} ${isPlaceholder ? 'placeholder' : ''}`}
+      {...attributes} {...listeners}>
+      <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>×</button>
+      <div className="matrix-card-image">
         {product?.imageUrl ? (
-          <img src={product.imageUrl} alt={product.name} />
+          <img src={product.imageUrl} alt={name} />
         ) : (
-          <div className="matrix-product-placeholder">{product?.name?.charAt(0) || '?'}</div>
+          <div className="matrix-card-image-ph">{isPlaceholder ? '+' : name.charAt(0)}</div>
         )}
       </div>
-      <div className="matrix-product-name">{product?.name || 'Unknown'}</div>
-      <div className="matrix-product-sku">{product?.sku || ''}</div>
+      <div className="matrix-card-name" title={name}>{name}</div>
+      {product && <div className="matrix-card-sku">{product.sku}</div>}
+      {product && <div className="matrix-card-vol">Vol: {product.volume.toLocaleString()}</div>}
     </div>
   );
 }
 
-export function RangeDesign({ onImport }: RangeDesignProps) {
-  const { project, addItemToShelf, addLabel: addShelfLabel } = useProjectStore();
-  const [title, setTitle] = useState('Range Design');
+export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
+  const {
+    project, addItemToShelf, removeItemFromShelf,
+    updateMatrixLayout, setMatrixAssignment, removeMatrixAssignment,
+  } = useProjectStore();
+
   const [editingTitle, setEditingTitle] = useState(false);
-  const [xLabels, setXLabels] = useState<string[]>(['Entry', 'Core', 'Premium', 'Luxury']);
-  const [yLabels, setYLabels] = useState<string[]>(['Skincare', 'Haircare', 'Bodycare']);
-  const [matrixItems, setMatrixItems] = useState<MatrixItem[]>([]);
   const [editingAxis, setEditingAxis] = useState<{ axis: 'x' | 'y'; index: number } | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
-  const [activeDragType, setActiveDragType] = useState<'catalogue' | 'matrix' | null>(null);
+
+  const shelf = project?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'];
+  const catalogue = project?.catalogue || [];
+  const layout: MatrixLayout = useMemo(() =>
+    shelf?.matrixLayout || { title: shelf?.name || '', xLabels: [], yLabels: [], assignments: [] },
+    [shelf?.matrixLayout, shelf?.name]
+  );
 
   const currentProductIds = useMemo(() => new Set(
     project?.currentShelf.items.map((i) => i.productId).filter(Boolean) || []
   ), [project?.currentShelf.items]);
-
   const futureProductIds = useMemo(() => new Set(
     project?.futureShelf.items.map((i) => i.productId).filter(Boolean) || []
   ), [project?.futureShelf.items]);
+
+  // Build cell lookup: row,col -> list of item IDs
+  const cellMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const a of layout.assignments) {
+      const key = `${a.row}-${a.col}`;
+      const arr = map.get(key) || [];
+      arr.push(a.itemId);
+      map.set(key, arr);
+    }
+    return map;
+  }, [layout.assignments]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -109,239 +122,186 @@ export function RangeDesign({ onImport }: RangeDesignProps) {
   );
 
   const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const activeId = String(active.id);
+    const activeId = String(event.active.id);
     if (activeId.startsWith('catalogue-')) {
-      const data = active.data.current as { product: Product };
-      if (data?.product) {
-        setActiveProduct(data.product);
-        setActiveDragType('catalogue');
-      }
-    } else if (activeId.startsWith('matrix-item-')) {
-      setActiveDragType('matrix');
+      const data = event.active.data.current as { product: Product };
+      if (data?.product) setActiveProduct(data.product);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveProduct(null);
-    setActiveDragType(null);
     const { active, over } = event;
-    if (!over) return;
+    if (!over || !shelf) return;
 
     const overId = String(over.id);
     const activeId = String(active.id);
-
-    // Parse target cell
     const cellMatch = overId.match(/^matrix-cell-(\d+)-(\d+)$/);
     if (!cellMatch) return;
     const row = parseInt(cellMatch[1]);
     const col = parseInt(cellMatch[2]);
 
-    // Catalogue item dropped on matrix — add to cell (allow multiple)
+    // Catalogue item → add to shelf + assign to cell
     if (activeId.startsWith('catalogue-')) {
       const data = active.data.current as { product: Product };
       if (!data?.product) return;
-      // Don't add duplicate product to same cell
-      const alreadyInCell = matrixItems.some((i) => i.row === row && i.col === col && i.productId === data.product.id);
-      if (alreadyInCell) return;
-      setMatrixItems((prev) => [...prev, {
-        id: `mi-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      // Check not already on shelf
+      if (shelf.items.some((i) => i.productId === data.product.id)) return;
+      const newItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      addItemToShelf(shelfId, {
+        id: newItemId,
         productId: data.product.id,
-        row,
-        col,
-      }]);
+        position: shelf.items.length,
+        isPlaceholder: false,
+      });
+      // Use setTimeout so the store has updated
+      setTimeout(() => setMatrixAssignment(shelfId, newItemId, row, col), 0);
+      return;
     }
 
-    // Matrix item moved to new cell
+    // Matrix item → move to new cell
     if (activeId.startsWith('matrix-item-')) {
-      const data = active.data.current as { matrixItem: MatrixItem };
-      if (!data?.matrixItem) return;
-      setMatrixItems((prev) =>
-        prev.map((i) => i.id === data.matrixItem.id ? { ...i, row, col } : i)
-      );
+      const data = active.data.current as { itemId: string };
+      if (data?.itemId) {
+        setMatrixAssignment(shelfId, data.itemId, row, col);
+      }
     }
   };
 
-  const removeItem = useCallback((itemId: string) => {
-    setMatrixItems((prev) => prev.filter((i) => i.id !== itemId));
-  }, []);
+  const handleRemoveItem = useCallback((itemId: string) => {
+    removeItemFromShelf(shelfId, itemId);
+    removeMatrixAssignment(shelfId, itemId);
+  }, [shelfId, removeItemFromShelf, removeMatrixAssignment]);
 
   const addLabel = useCallback((axis: 'x' | 'y') => {
     const text = prompt(`New ${axis === 'x' ? 'column' : 'row'} label:`);
     if (!text) return;
-    if (axis === 'x') setXLabels((prev) => [...prev, text]);
-    else setYLabels((prev) => [...prev, text]);
-  }, []);
+    if (axis === 'x') updateMatrixLayout(shelfId, { xLabels: [...layout.xLabels, text] });
+    else updateMatrixLayout(shelfId, { yLabels: [...layout.yLabels, text] });
+  }, [shelfId, layout, updateMatrixLayout]);
 
   const removeLabel = useCallback((axis: 'x' | 'y', index: number) => {
     if (axis === 'x') {
-      setXLabels((prev) => prev.filter((_, i) => i !== index));
-      setMatrixItems((prev) => prev.filter((i) => i.col !== index).map((i) => i.col > index ? { ...i, col: i.col - 1 } : i));
+      updateMatrixLayout(shelfId, {
+        xLabels: layout.xLabels.filter((_, i) => i !== index),
+        assignments: layout.assignments
+          .filter((a) => a.col !== index)
+          .map((a) => a.col > index ? { ...a, col: a.col - 1 } : a),
+      });
     } else {
-      setYLabels((prev) => prev.filter((_, i) => i !== index));
-      setMatrixItems((prev) => prev.filter((i) => i.row !== index).map((i) => i.row > index ? { ...i, row: i.row - 1 } : i));
+      updateMatrixLayout(shelfId, {
+        yLabels: layout.yLabels.filter((_, i) => i !== index),
+        assignments: layout.assignments
+          .filter((a) => a.row !== index)
+          .map((a) => a.row > index ? { ...a, row: a.row - 1 } : a),
+      });
     }
-  }, []);
+  }, [shelfId, layout, updateMatrixLayout]);
 
   const updateLabel = useCallback((axis: 'x' | 'y', index: number, text: string) => {
-    if (axis === 'x') setXLabels((prev) => prev.map((l, i) => i === index ? text : l));
-    else setYLabels((prev) => prev.map((l, i) => i === index ? text : l));
+    if (axis === 'x') updateMatrixLayout(shelfId, { xLabels: layout.xLabels.map((l, i) => i === index ? text : l) });
+    else updateMatrixLayout(shelfId, { yLabels: layout.yLabels.map((l, i) => i === index ? text : l) });
     setEditingAxis(null);
-  }, []);
+  }, [shelfId, layout, updateMatrixLayout]);
 
-  // Pull design into a shelf (current or future) with X>Y label grouping
-  const pullToShelf = useCallback((shelfId: 'current' | 'future') => {
-    if (!project) return;
+  const updateTitle = useCallback((text: string) => {
+    updateMatrixLayout(shelfId, { title: text || layout.title });
+    setEditingTitle(false);
+  }, [shelfId, layout, updateMatrixLayout]);
 
-    // Build items ordered: for each X label (column), then each Y label (row)
-    let position = 0;
-    const newItems: ShelfItem[] = [];
-    const newLabels: ShelfLabel[] = [];
+  if (!shelf || !project) return null;
 
-    for (let col = 0; col < xLabels.length; col++) {
-      const xLabel = xLabels[col];
-      const colStart = position;
-
-      for (let row = 0; row < yLabels.length; row++) {
-        const cellItems = matrixItems.filter((i) => i.row === row && i.col === col);
-        if (cellItems.length === 0) continue;
-
-        for (const mi of cellItems) {
-          // Check not already on shelf
-          const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-          const alreadyOnShelf = project[shelfKey].items.some((si) => si.productId === mi.productId);
-          if (alreadyOnShelf) continue;
-
-          newItems.push({
-            id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-            productId: mi.productId,
-            position: position++,
-            isPlaceholder: false,
-          });
-        }
-      }
-
-      // Create X label spanning from colStart to position-1
-      if (position > colStart) {
-        newLabels.push({
-          id: `label-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          text: xLabel,
-          startPosition: colStart,
-          endPosition: position - 1,
-          color: '#dce6f0',
-        });
-      }
-    }
-
-    // Add all items and labels to the shelf
-    for (const item of newItems) {
-      addItemToShelf(shelfId, item);
-    }
-    for (const label of newLabels) {
-      addShelfLabel(shelfId, label);
-    }
-
-    const count = newItems.length;
-    if (count > 0) {
-      alert(`Added ${count} products to ${shelfId === 'current' ? 'Current' : 'Future'} Range with ${newLabels.length} section labels.`);
-    } else {
-      alert('No new products to add (all already on shelf or no products in design).');
-    }
-  }, [project, matrixItems, xLabels, yLabels, addItemToShelf, addShelfLabel]);
+  // Products on shelf but not assigned to any cell
+  const assignedItemIds = new Set(layout.assignments.map((a) => a.itemId));
+  const unassigned = shelf.items.filter((i) => !assignedItemIds.has(i.id));
 
   return (
     <div className="range-design">
       <DndContext sensors={sensors} collisionDetection={closestCenter}
         onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="range-design-canvas">
-          {/* Title */}
           <div className="range-design-title-bar">
             {editingTitle ? (
-              <input
-                className="range-design-title-input"
-                defaultValue={title}
-                autoFocus
-                onBlur={(e) => { setTitle(e.target.value || 'Range Design'); setEditingTitle(false); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { setTitle((e.target as HTMLInputElement).value || 'Range Design'); setEditingTitle(false); }
-                }}
-              />
+              <input className="range-design-title-input" defaultValue={layout.title} autoFocus
+                onBlur={(e) => updateTitle(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && updateTitle((e.target as HTMLInputElement).value)} />
             ) : (
               <h2 className="range-design-title" onDoubleClick={() => setEditingTitle(true)} title="Double-click to edit">
-                {title}
+                {layout.title}
+                <span className="range-design-shelf-tag">{shelfId === 'current' ? 'Current Range' : 'Future Range'}</span>
               </h2>
             )}
-            <div className="range-design-actions">
-              <button className="rd-action-btn" onClick={() => pullToShelf('current')}>
-                Pull to Current Range
-              </button>
-              <button className="rd-action-btn" onClick={() => pullToShelf('future')}>
-                Pull to Future Range
-              </button>
-            </div>
           </div>
 
-          <div className="matrix-wrapper">
-            {/* Top header row with X labels */}
-            <div className="matrix-header-row" style={{ gridTemplateColumns: `80px repeat(${xLabels.length}, 1fr) 32px` }}>
-              <div className="matrix-corner" />
-              {xLabels.map((label, i) => (
-                <div key={i} className="matrix-col-header" onDoubleClick={() => setEditingAxis({ axis: 'x', index: i })}>
-                  {editingAxis?.axis === 'x' && editingAxis.index === i ? (
-                    <input className="matrix-label-input" defaultValue={label} autoFocus
-                      onBlur={(e) => updateLabel('x', i, e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && updateLabel('x', i, (e.target as HTMLInputElement).value)} />
-                  ) : (
-                    <span>{label}</span>
-                  )}
-                  <button className="matrix-label-remove" onClick={() => removeLabel('x', i)}>×</button>
+          <div className="matrix-16-9">
+            <div className="matrix-wrapper">
+              {/* X headers */}
+              <div className="matrix-header-row" style={{ gridTemplateColumns: `72px repeat(${layout.xLabels.length}, 1fr) 28px` }}>
+                <div />
+                {layout.xLabels.map((label, i) => (
+                  <div key={i} className="matrix-col-header" onDoubleClick={() => setEditingAxis({ axis: 'x', index: i })}>
+                    {editingAxis?.axis === 'x' && editingAxis.index === i ? (
+                      <input className="matrix-label-input" defaultValue={label} autoFocus
+                        onBlur={(e) => updateLabel('x', i, e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && updateLabel('x', i, (e.target as HTMLInputElement).value)} />
+                    ) : <span>{label}</span>}
+                    <button className="matrix-label-remove" onClick={() => removeLabel('x', i)}>×</button>
+                  </div>
+                ))}
+                <button className="matrix-add-btn" onClick={() => addLabel('x')}>+</button>
+              </div>
+
+              {/* Rows */}
+              {layout.yLabels.map((yLabel, row) => (
+                <div key={row} className="matrix-row" style={{ gridTemplateColumns: `72px repeat(${layout.xLabels.length}, 1fr) 28px` }}>
+                  <div className="matrix-row-header" onDoubleClick={() => setEditingAxis({ axis: 'y', index: row })}>
+                    {editingAxis?.axis === 'y' && editingAxis.index === row ? (
+                      <input className="matrix-label-input" defaultValue={yLabel} autoFocus
+                        onBlur={(e) => updateLabel('y', row, e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && updateLabel('y', row, (e.target as HTMLInputElement).value)} />
+                    ) : <span>{yLabel}</span>}
+                    <button className="matrix-label-remove" onClick={() => removeLabel('y', row)}>×</button>
+                  </div>
+                  {layout.xLabels.map((_, col) => (
+                    <MatrixCell key={`${row}-${col}`} row={row} col={col}
+                      itemIds={cellMap.get(`${row}-${col}`) || []}
+                      shelf={shelf} catalogue={catalogue}
+                      onRemoveItem={handleRemoveItem} />
+                  ))}
+                  <div />
                 </div>
               ))}
-              <button className="matrix-add-btn" onClick={() => addLabel('x')} title="Add column">+</button>
-            </div>
 
-            {/* Grid rows */}
-            {yLabels.map((yLabel, row) => (
-              <div key={row} className="matrix-row" style={{ gridTemplateColumns: `80px repeat(${xLabels.length}, 1fr) 32px` }}>
-                <div className="matrix-row-header" onDoubleClick={() => setEditingAxis({ axis: 'y', index: row })}>
-                  {editingAxis?.axis === 'y' && editingAxis.index === row ? (
-                    <input className="matrix-label-input" defaultValue={yLabel} autoFocus
-                      onBlur={(e) => updateLabel('y', row, e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && updateLabel('y', row, (e.target as HTMLInputElement).value)} />
-                  ) : (
-                    <span>{yLabel}</span>
-                  )}
-                  <button className="matrix-label-remove" onClick={() => removeLabel('y', row)}>×</button>
-                </div>
-                {xLabels.map((_, col) => (
-                  <MatrixCell
-                    key={`${row}-${col}`}
-                    row={row}
-                    col={col}
-                    items={matrixItems.filter((i) => i.row === row && i.col === col)}
-                    catalogue={project?.catalogue || []}
-                    onRemoveItem={removeItem}
-                  />
-                ))}
-                <div />
+              <div className="matrix-add-row">
+                <button className="matrix-add-btn wide" onClick={() => addLabel('y')}>+ Row</button>
               </div>
-            ))}
-
-            {/* Add row button */}
-            <div className="matrix-add-row">
-              <button className="matrix-add-btn wide" onClick={() => addLabel('y')} title="Add row">+ Row</button>
             </div>
           </div>
+
+          {/* Unassigned products tray */}
+          {unassigned.length > 0 && (
+            <div className="unassigned-tray">
+              <span className="unassigned-label">On shelf but not placed in matrix ({unassigned.length}):</span>
+              <div className="unassigned-items">
+                {unassigned.map((item) => {
+                  const product = catalogue.find((p) => p.id === item.productId);
+                  return (
+                    <span key={item.id} className="unassigned-item">
+                      {item.isPlaceholder ? item.placeholderName : product?.name || item.productId}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
-        <Catalogue products={project?.catalogue || []} onImport={onImport}
+        <Catalogue products={catalogue} onImport={onImport}
           currentProductIds={currentProductIds} futureProductIds={futureProductIds} />
 
         <DragOverlay>
-          {activeProduct && activeDragType === 'catalogue' && (
-            <div className="matrix-drag-preview">
-              <div className="matrix-product-name">{activeProduct.name}</div>
-            </div>
+          {activeProduct && (
+            <div className="matrix-drag-preview">{activeProduct.name}</div>
           )}
         </DragOverlay>
       </DndContext>

@@ -33,12 +33,27 @@ export interface ShelfLabel {
   color?: string;
 }
 
+// Matrix layout for design view — stored per shelf
+export interface MatrixCellAssignment {
+  itemId: string; // references ShelfItem.id
+  row: number;
+  col: number;
+}
+
+export interface MatrixLayout {
+  title: string;
+  xLabels: string[];
+  yLabels: string[];
+  assignments: MatrixCellAssignment[];
+}
+
 // A shelf (either current or future range)
 export interface Shelf {
   id: string;
   name: string;
   items: ShelfItem[];
   labels: ShelfLabel[];
+  matrixLayout?: MatrixLayout;
 }
 
 // A flow link between current and future items — percentage-based

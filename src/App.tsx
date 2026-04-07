@@ -65,6 +65,7 @@ function App() {
   const [showNewProject, setShowNewProject] = useState(!project);
   const [newProjectName, setNewProjectName] = useState('');
   const [activeView, setActiveView] = useState<ViewType>('transform');
+  const [designShelfId, setDesignShelfId] = useState<'current' | 'future'>('current');
   const [activeItem, setActiveItem] = useState<{
     item: ShelfItem;
     product?: Product;
@@ -293,7 +294,8 @@ function App() {
       <Toolbar onImport={() => setShowImport(true)} />
 
       <div className="workspace">
-        <NavSidebar activeView={activeView} onViewChange={setActiveView} />
+        <NavSidebar activeView={activeView} designShelfId={designShelfId}
+          onViewChange={setActiveView} onDesignShelfChange={setDesignShelfId} />
 
         {activeView === 'transform' ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter}
@@ -304,7 +306,8 @@ function App() {
                   <Shelf shelf={project.currentShelf} catalogue={project.catalogue}
                     onAddPlaceholder={() => handleAddPlaceholder('current')}
                     onRailWidthChange={handleRailWidthChange}
-                    onDoubleClickItem={enterLinkModeFor} />
+                    onDoubleClickItem={enterLinkModeFor}
+                    onViewDesign={() => { setDesignShelfId('current'); setActiveView('range-design'); }} />
 
                   {linkMode && linkSourceItem && (
                     <LinkPanel
@@ -322,7 +325,8 @@ function App() {
                     railWidth={shelfRailWidth} onClickFlow={handleSankeyClick} />
 
                   <Shelf shelf={project.futureShelf} catalogue={project.catalogue}
-                    onAddPlaceholder={() => handleAddPlaceholder('future')} />
+                    onAddPlaceholder={() => handleAddPlaceholder('future')}
+                    onViewDesign={() => { setDesignShelfId('future'); setActiveView('range-design'); }} />
 
                   {activeItem?.sourceShelf && overShelfId === 'catalogue' && (
                     <div className="cross-shelf-hint remove-hint">Drop to remove from range</div>
@@ -346,7 +350,7 @@ function App() {
             </DragOverlay>
           </DndContext>
         ) : (
-          <RangeDesign onImport={() => setShowImport(true)} />
+          <RangeDesign shelfId={designShelfId} onImport={() => setShowImport(true)} />
         )}
       </div>
 

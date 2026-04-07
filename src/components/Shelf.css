@@ -43,6 +43,15 @@
   border-color: #aaa;
 }
 
+.shelf-btn.view-design-btn {
+  color: #7b1fa2;
+  border-color: #ce93d8;
+}
+
+.shelf-btn.view-design-btn:hover {
+  background: #f3e5f5;
+}
+
 /* Labels bar */
 .shelf-labels-bar {
   position: relative;

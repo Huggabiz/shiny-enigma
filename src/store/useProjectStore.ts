@@ -36,6 +36,11 @@ interface ProjectStore {
   autoLinkMatchingProducts: () => void;
   recalculateLinkVolumes: () => void;
 
+  // Matrix layout
+  updateMatrixLayout: (shelfId: string, layout: Partial<import('../types').MatrixLayout>) => void;
+  setMatrixAssignment: (shelfId: string, itemId: string, row: number, col: number) => void;
+  removeMatrixAssignment: (shelfId: string, itemId: string) => void;
+
   // Selection
   setSelectedItem: (id: string | null) => void;
   setLinkMode: (enabled: boolean) => void;
@@ -48,6 +53,12 @@ const createEmptyShelf = (id: string, name: string): Shelf => ({
   name,
   items: [],
   labels: [],
+  matrixLayout: {
+    title: name,
+    xLabels: ['Entry', 'Core', 'Premium'],
+    yLabels: ['Category 1', 'Category 2'],
+    assignments: [],
+  },
 });
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -344,6 +355,59 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     set({
       project: { ...project, sankeyLinks: updatedLinks, updatedAt: new Date().toISOString() },
+    });
+  },
+
+  updateMatrixLayout: (shelfId, layoutUpdates) => {
+    const { project } = get();
+    if (!project) return;
+    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
+    const shelf = project[shelfKey];
+    const current = shelf.matrixLayout || { title: shelf.name, xLabels: [], yLabels: [], assignments: [] };
+    set({
+      project: {
+        ...project,
+        [shelfKey]: { ...shelf, matrixLayout: { ...current, ...layoutUpdates } },
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  setMatrixAssignment: (shelfId, itemId, row, col) => {
+    const { project } = get();
+    if (!project) return;
+    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
+    const shelf = project[shelfKey];
+    const layout = shelf.matrixLayout || { title: shelf.name, xLabels: [], yLabels: [], assignments: [] };
+    const filtered = layout.assignments.filter((a) => a.itemId !== itemId);
+    set({
+      project: {
+        ...project,
+        [shelfKey]: {
+          ...shelf,
+          matrixLayout: { ...layout, assignments: [...filtered, { itemId, row, col }] },
+        },
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  removeMatrixAssignment: (shelfId, itemId) => {
+    const { project } = get();
+    if (!project) return;
+    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
+    const shelf = project[shelfKey];
+    const layout = shelf.matrixLayout;
+    if (!layout) return;
+    set({
+      project: {
+        ...project,
+        [shelfKey]: {
+          ...shelf,
+          matrixLayout: { ...layout, assignments: layout.assignments.filter((a) => a.itemId !== itemId) },
+        },
+        updatedAt: new Date().toISOString(),
+      },
     });
   },
 

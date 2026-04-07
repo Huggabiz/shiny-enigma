@@ -16,6 +16,7 @@ interface ShelfProps {
   onAddPlaceholder: () => void;
   onRailWidthChange?: (width: number) => void;
   onDoubleClickItem?: (itemId: string) => void;
+  onViewDesign?: () => void;
 }
 
 // Pack labels into rows, compacting where possible
@@ -42,7 +43,7 @@ function packLabelsIntoRows(labels: ShelfLabel[]): ShelfLabel[][] {
   return rows;
 }
 
-export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem }: ShelfProps) {
+export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign }: ShelfProps) {
   const {
     selectedItemId,
     setSelectedItem,
@@ -225,6 +226,11 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
           <button className="shelf-btn" onClick={handleAddLabel} title="Add section label">
             + Label
           </button>
+          {onViewDesign && (
+            <button className="shelf-btn view-design-btn" onClick={onViewDesign} title="View in Design matrix">
+              View Design
+            </button>
+          )}
         </div>
       </div>
 
