@@ -76,6 +76,27 @@ export interface Project {
   updatedAt: string;
 }
 
+// Card display format options
+export interface CardFormat {
+  showImage: boolean;
+  showName: boolean;
+  showSku: boolean;
+  showVolume: boolean;
+  showRrp: boolean;
+  showRevenue: boolean;
+  showCategory: boolean;
+}
+
+export const DEFAULT_CARD_FORMAT: CardFormat = {
+  showImage: true,
+  showName: true,
+  showSku: true,
+  showVolume: true,
+  showRrp: true,
+  showRevenue: false,
+  showCategory: false,
+};
+
 // Column mapping for import flexibility
 export interface ColumnMapping {
   sku: string;

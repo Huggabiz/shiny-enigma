@@ -300,6 +300,11 @@
   color: #999;
 }
 
+.matrix-card-rrp {
+  font-size: 7px;
+  color: #2e7d32;
+}
+
 .matrix-card-vol {
   font-size: 7px;
   color: #666;

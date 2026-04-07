@@ -164,6 +164,23 @@
   font-weight: 500;
 }
 
+.card-rrp {
+  font-size: 9px;
+  color: #2e7d32;
+  font-weight: 500;
+}
+
+.card-revenue {
+  font-size: 8px;
+  color: #555;
+}
+
+.card-category {
+  font-size: 7px;
+  color: #999;
+  font-style: italic;
+}
+
 .card-placeholder-tag {
   font-size: 8px;
   color: #0097a7;

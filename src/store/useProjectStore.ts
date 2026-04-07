@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Product, Project, Shelf, ShelfItem, ShelfLabel, SankeyLink } from '../types';
+import type { Product, Project, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat } from '../types';
+import { DEFAULT_CARD_FORMAT } from '../types';
 
 interface ProjectStore {
   project: Project | null;
@@ -7,6 +8,8 @@ interface ProjectStore {
   linkMode: boolean;
   linkSource: string | null;
   assumeContinuity: boolean;
+  cardFormat: CardFormat;
+  setCardFormat: (format: Partial<CardFormat>) => void;
 
   // Project actions
   createProject: (name: string, catalogue: Product[]) => void;
@@ -70,6 +73,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   linkMode: false,
   linkSource: null,
   assumeContinuity: true,
+  cardFormat: { ...DEFAULT_CARD_FORMAT },
+  setCardFormat: (updates) => set((state) => ({ cardFormat: { ...state.cardFormat, ...updates } })),
 
   createProject: (name, catalogue) => {
     set({

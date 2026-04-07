@@ -13,27 +13,14 @@ interface ToolbarProps {
 export function Toolbar({ onImport }: ToolbarProps) {
   const {
     project, loadProject, linkMode, setLinkMode, setLinkSource,
-    assumeContinuity, setAssumeContinuity, clearCatalogue, clearRanges,
+    assumeContinuity, setAssumeContinuity,
+    clearCatalogue, clearRanges,
+    cardFormat, setCardFormat,
   } = useProjectStore();
   const loadRef = useRef<HTMLInputElement>(null);
-  const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const [openMenu, setOpenMenu] = useState<'save' | 'manage' | 'format' | null>(null);
 
-  const handleSave = () => {
-    if (project) saveProject(project);
-    setShowSaveMenu(false);
-  };
-
-  const handleSaveStructure = () => {
-    if (project) saveRangeStructure(project);
-    setShowSaveMenu(false);
-  };
-
-  const handleClearCatalogue = () => {
-    if (confirm('Clear the catalogue? Range structure will be kept but product data (volume, revenue) will be lost.')) {
-      clearCatalogue();
-    }
-    setShowSaveMenu(false);
-  };
+  const closeMenus = () => setOpenMenu(null);
 
   const handleLoad = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,92 +34,104 @@ export function Toolbar({ onImport }: ToolbarProps) {
     e.target.value = '';
   };
 
-  const handleExportPptx = () => {
-    if (project) exportToPptx(project);
-  };
-
-  const handleExportExcel = () => {
-    if (project) exportToExcel(project);
-  };
-
-  const toggleLinkMode = () => {
-    setLinkMode(!linkMode);
-    setLinkSource(null);
-  };
-
   return (
     <div className="toolbar">
       <div className="toolbar-brand">
         <span className="toolbar-logo">Range Planner</span>
         <span className="toolbar-version">v{APP_VERSION}</span>
-        {project && (
-          <span className="toolbar-project-name">{project.name}</span>
-        )}
+        {project && <span className="toolbar-project-name">{project.name}</span>}
       </div>
 
       <div className="toolbar-actions">
         {project && (
           <>
-            <button className="toolbar-btn" onClick={onImport} title="Import product data">
-              Import Data
-            </button>
+            <button className="toolbar-btn" onClick={onImport}>Import Data</button>
 
             <div className="toolbar-divider" />
 
-            <label className="toolbar-checkbox" title="Products added to current range are automatically added to future range">
-              <input
-                type="checkbox"
-                checked={assumeContinuity}
-                onChange={(e) => setAssumeContinuity(e.target.checked)}
-              />
+            <label className="toolbar-checkbox" title="Products added to current range auto-add to future">
+              <input type="checkbox" checked={assumeContinuity}
+                onChange={(e) => setAssumeContinuity(e.target.checked)} />
               <span>Range continuity</span>
             </label>
 
             <div className="toolbar-divider" />
 
-            <button
-              className={`toolbar-btn ${linkMode ? 'active' : ''}`}
-              onClick={toggleLinkMode}
-            >
+            <button className={`toolbar-btn ${linkMode ? 'active' : ''}`}
+              onClick={() => { setLinkMode(!linkMode); setLinkSource(null); }}>
               {linkMode ? 'Exit Link Mode' : 'Link Mode'}
             </button>
 
             <div className="toolbar-divider" />
 
-            {/* Save dropdown */}
+            {/* Card Format dropdown */}
             <div className="toolbar-dropdown-wrapper">
-              <button className="toolbar-btn" onClick={() => setShowSaveMenu(!showSaveMenu)}>
-                Save ▾
+              <button className="toolbar-btn" onClick={() => setOpenMenu(openMenu === 'format' ? null : 'format')}>
+                Card Format ▾
               </button>
-              {showSaveMenu && (
-                <div className="toolbar-dropdown" onMouseLeave={() => setShowSaveMenu(false)}>
-                  <button onClick={handleSave}>Save Full Project</button>
-                  <button onClick={handleSaveStructure}>Save Range Structure</button>
-                  <hr />
-                  <button onClick={() => {
-                    if (confirm('Clear all ranges? Products will be removed from both shelves but the catalogue and matrix labels will be kept.')) {
-                      clearRanges();
-                    }
-                    setShowSaveMenu(false);
-                  }} className="danger">Clear Ranges</button>
-                  <button onClick={handleClearCatalogue} className="danger">Clear Catalogue</button>
+              {openMenu === 'format' && (
+                <div className="toolbar-dropdown format-dropdown" onMouseLeave={closeMenus}>
+                  <div className="dropdown-title">Show on cards</div>
+                  {([
+                    ['showImage', 'Image'],
+                    ['showName', 'Product Name'],
+                    ['showSku', 'SKU Code'],
+                    ['showVolume', 'Volume'],
+                    ['showRrp', 'RRP'],
+                    ['showRevenue', 'Revenue'],
+                    ['showCategory', 'Category'],
+                  ] as const).map(([key, label]) => (
+                    <label key={key} className="dropdown-checkbox">
+                      <input type="checkbox" checked={cardFormat[key]}
+                        onChange={(e) => setCardFormat({ [key]: e.target.checked })} />
+                      <span>{label}</span>
+                    </label>
+                  ))}
                 </div>
               )}
             </div>
 
-            <button className="toolbar-btn" onClick={handleExportPptx} title="Export to PowerPoint">
-              PPT
-            </button>
-            <button className="toolbar-btn" onClick={handleExportExcel} title="Export to Excel">
-              Excel
-            </button>
+            <div className="toolbar-divider" />
+
+            {/* Save/Export dropdown */}
+            <div className="toolbar-dropdown-wrapper">
+              <button className="toolbar-btn" onClick={() => setOpenMenu(openMenu === 'save' ? null : 'save')}>
+                Save / Export ▾
+              </button>
+              {openMenu === 'save' && (
+                <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
+                  <button onClick={() => { if (project) saveProject(project); closeMenus(); }}>Save Full Project</button>
+                  <button onClick={() => { if (project) saveRangeStructure(project); closeMenus(); }}>Save Range Structure</button>
+                  <hr />
+                  <button onClick={() => { if (project) exportToPptx(project); closeMenus(); }}>Export PowerPoint</button>
+                  <button onClick={() => { if (project) exportToExcel(project); closeMenus(); }}>Export Excel</button>
+                </div>
+              )}
+            </div>
+
+            {/* Manage dropdown */}
+            <div className="toolbar-dropdown-wrapper">
+              <button className="toolbar-btn" onClick={() => setOpenMenu(openMenu === 'manage' ? null : 'manage')}>
+                Manage ▾
+              </button>
+              {openMenu === 'manage' && (
+                <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
+                  <button onClick={() => {
+                    if (confirm('Clear all ranges? Products removed from both shelves. Catalogue and matrix labels kept.')) clearRanges();
+                    closeMenus();
+                  }} className="danger">Clear Ranges</button>
+                  <button onClick={() => {
+                    if (confirm('Clear the catalogue? Range structure kept but product data lost.')) clearCatalogue();
+                    closeMenus();
+                  }} className="danger">Clear Catalogue</button>
+                </div>
+              )}
+            </div>
           </>
         )}
 
         <input ref={loadRef} type="file" accept=".json" onChange={handleLoad} hidden />
-        <button className="toolbar-btn" onClick={() => loadRef.current?.click()}>
-          Load
-        </button>
+        <button className="toolbar-btn" onClick={() => loadRef.current?.click()}>Load</button>
       </div>
     </div>
   );

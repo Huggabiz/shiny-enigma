@@ -149,6 +149,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, on
   itemId: string; product?: Product; isPlaceholder: boolean;
   placeholderName?: string; onRemove: () => void;
 }) {
+  const cardFormat = useProjectStore((s) => s.cardFormat);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `matrix-item-${itemId}`, data: { itemId },
   });
@@ -158,15 +159,19 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, on
     <div ref={setNodeRef} className={`matrix-card ${isDragging ? 'dragging' : ''} ${isPlaceholder ? 'placeholder' : ''}`}
       {...attributes} {...listeners}>
       <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>×</button>
-      <div className="matrix-card-image">
-        {product?.imageUrl ? (
-          <img src={product.imageUrl} alt={name} />
-        ) : (
-          <div className="matrix-card-image-ph">{isPlaceholder ? '+' : name.charAt(0)}</div>
-        )}
-      </div>
-      <div className="matrix-card-name" title={name}>{name}</div>
-      {product && <div className="matrix-card-sku">{product.sku}</div>}
+      {cardFormat.showImage && (
+        <div className="matrix-card-image">
+          {product?.imageUrl ? (
+            <img src={product.imageUrl} alt={name} />
+          ) : (
+            <div className="matrix-card-image-ph">{isPlaceholder ? '+' : name.charAt(0)}</div>
+          )}
+        </div>
+      )}
+      {cardFormat.showName && <div className="matrix-card-name" title={name}>{name}</div>}
+      {product && cardFormat.showSku && <div className="matrix-card-sku">{product.sku}</div>}
+      {product && cardFormat.showRrp && product.rrp > 0 && <div className="matrix-card-rrp">RRP: {product.rrp}</div>}
+      {product && cardFormat.showVolume && <div className="matrix-card-vol">Vol: {product.volume.toLocaleString()}</div>}
     </div>
   );
 }
@@ -230,6 +235,18 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
       }
     }
 
+    // If no products assigned, distribute space evenly
+    const totalProducts = cellCounts.flat().reduce((s, n) => s + n, 0);
+    if (totalProducts === 0) {
+      const colW = (availW - (numCols - 1) * GAP) / numCols;
+      const rowH = (availH - (numRows - 1) * GAP) / numRows;
+      return {
+        columnWidths: Array(numCols).fill(colW),
+        rowHeights: Array(numRows).fill(rowH),
+        cardWidth: MAX_CARD_WIDTH,
+      };
+    }
+
     // Binary search for the largest card width that fits
     let lo = MIN_CARD_WIDTH;
     let hi = MAX_CARD_WIDTH;
@@ -250,20 +267,18 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
       }
     }
 
-    // Distribute extra space only to non-empty columns/rows
+    // Distribute extra space evenly to all columns/rows
     const totalColW = bestColWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * GAP;
     if (totalColW < availW) {
-      const nonEmptyCols = bestColWidths.filter((w) => w > EMPTY_COL_WIDTH).length || 1;
       const extra = availW - totalColW;
-      const perCol = extra / nonEmptyCols;
-      bestColWidths = bestColWidths.map((w) => w > EMPTY_COL_WIDTH ? w + perCol : w);
+      const perCol = extra / numCols;
+      bestColWidths = bestColWidths.map((w) => w + perCol);
     }
     const totalRowH = bestRowHeights.reduce((s, h) => s + h, 0) + (numRows - 1) * GAP;
     if (totalRowH < availH) {
-      const nonEmptyRows = bestRowHeights.filter((h) => h > EMPTY_COL_WIDTH).length || 1;
       const extra = availH - totalRowH;
-      const perRow = extra / nonEmptyRows;
-      bestRowHeights = bestRowHeights.map((h) => h > EMPTY_COL_WIDTH ? h + perRow : h);
+      const perRow = extra / numRows;
+      bestRowHeights = bestRowHeights.map((h) => h + perRow);
     }
 
     return { columnWidths: bestColWidths, rowHeights: bestRowHeights, cardWidth: bestCW };

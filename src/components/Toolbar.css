@@ -131,3 +131,35 @@
   border: none;
   border-top: 1px solid #eee;
 }
+
+.dropdown-title {
+  padding: 6px 14px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dropdown-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: #333;
+  cursor: pointer;
+}
+
+.dropdown-checkbox:hover {
+  background: #f5f5f5;
+}
+
+.dropdown-checkbox input {
+  accent-color: #1976d2;
+  cursor: pointer;
+}
+
+.format-dropdown {
+  min-width: 180px;
+}

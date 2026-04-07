@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Product, ShelfItem } from '../types';
+import { useProjectStore } from '../store/useProjectStore';
 import './ProductCard.css';
 
 interface ProductCardProps {
@@ -32,6 +33,7 @@ export function ProductCard({
   overlay,
   cardWidth,
 }: ProductCardProps) {
+  const cardFormat = useProjectStore((s) => s.cardFormat);
   const {
     attributes,
     listeners,
@@ -82,37 +84,37 @@ export function ProductCard({
         <div className={`card-new-badge ${isCompact ? 'compact' : ''}`}>New</div>
       )}
       {onRemove && !isDimmed && (
-        <button
-          className="card-remove"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-        >
-          ×
-        </button>
+        <button className="card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>×</button>
       )}
-      <div className="card-image" style={isCompact ? { width: 36, height: 32 } : undefined}>
-        {product?.imageUrl ? (
-          <img src={product.imageUrl} alt={name} />
-        ) : (
-          <div className={`card-image-placeholder ${item.isPlaceholder ? 'new-product' : ''}`}>
-            {item.isPlaceholder ? '＋' : name.charAt(0)}
-          </div>
-        )}
-      </div>
-      <div className="card-name" title={name} style={isCompact ? { fontSize: 8 } : undefined}>
-        {name}
-      </div>
+      {cardFormat.showImage && (
+        <div className="card-image" style={isCompact ? { width: 36, height: 32 } : undefined}>
+          {product?.imageUrl ? (
+            <img src={product.imageUrl} alt={name} />
+          ) : (
+            <div className={`card-image-placeholder ${item.isPlaceholder ? 'new-product' : ''}`}>
+              {item.isPlaceholder ? '＋' : name.charAt(0)}
+            </div>
+          )}
+        </div>
+      )}
+      {cardFormat.showName && (
+        <div className="card-name" title={name} style={isCompact ? { fontSize: 8 } : undefined}>
+          {name}
+        </div>
+      )}
       {product && !isCompact && (
         <div className="card-stats">
-          <span className="card-sku">{product.sku}</span>
-          <span className="card-volume">Vol: {product.volume.toLocaleString()}</span>
+          {cardFormat.showSku && <span className="card-sku">{product.sku}</span>}
+          {cardFormat.showVolume && <span className="card-volume">Vol: {product.volume.toLocaleString()}</span>}
+          {cardFormat.showRrp && product.rrp > 0 && <span className="card-rrp">RRP: {product.rrp}</span>}
+          {cardFormat.showRevenue && product.revenue > 0 && <span className="card-revenue">Rev: {product.revenue.toLocaleString()}</span>}
+          {cardFormat.showCategory && product.category && <span className="card-category">{product.category}</span>}
         </div>
       )}
       {product && isCompact && (
         <div className="card-stats">
-          <span className="card-volume">{product.volume.toLocaleString()}</span>
+          {cardFormat.showVolume && <span className="card-volume">{product.volume.toLocaleString()}</span>}
+          {cardFormat.showRrp && product.rrp > 0 && <span className="card-rrp">{product.rrp}</span>}
         </div>
       )}
       {item.isPlaceholder && !isCompact && (
