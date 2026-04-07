@@ -43,24 +43,40 @@
   border-color: #aaa;
 }
 
-.shelf-labels {
+/* Labels bar */
+.shelf-labels-bar {
   position: relative;
-  height: 24px;
+  min-height: 26px;
   margin-bottom: 4px;
 }
 
 .shelf-label {
   position: absolute;
-  height: 22px;
-  border-radius: 4px;
+  top: 0;
+  height: 24px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
   font-weight: 600;
   color: #5d4e37;
-  padding: 0 6px;
-  gap: 4px;
+  cursor: grab;
+  user-select: none;
+  transition: left 0.2s, width 0.2s;
+}
+
+.shelf-label:hover {
+  filter: brightness(0.95);
+}
+
+.label-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+  flex: 1;
+  text-align: center;
 }
 
 .label-input {
@@ -70,6 +86,7 @@
   padding: 1px 4px;
   font-size: 10px;
   text-align: center;
+  background: #fff;
 }
 
 .label-remove {
@@ -79,28 +96,46 @@
   color: #999;
   cursor: pointer;
   font-size: 12px;
-  padding: 0;
+  padding: 0 2px;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .shelf-label:hover .label-remove {
   display: block;
 }
 
-.shelf-rail {
-  display: flex;
-  gap: 10px;
-  min-height: 140px;
-  padding: 10px 8px;
-  overflow-x: auto;
-  align-items: flex-end;
+.label-resize-handle {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
 }
 
-.shelf-surface {
-  height: 6px;
-  background: linear-gradient(to bottom, #8B7355, #A0896C);
-  border-radius: 3px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+.label-resize-handle.left {
+  left: -2px;
+}
+
+.label-resize-handle.right {
+  right: -2px;
+}
+
+/* Shelf rail — centered items with animated gaps */
+.shelf-rail {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  min-height: 150px;
+  padding: 10px 8px;
+  align-items: flex-end;
+  position: relative;
+  transition: gap 0.15s ease;
+}
+
+.shelf-rail .sortable-item {
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .shelf-empty {
@@ -110,14 +145,14 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 120px;
+  min-height: 130px;
   border: 2px dashed #ddd;
   border-radius: 8px;
 }
 
 .shelf-meta {
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 11px;
   color: #888;
-  text-align: right;
+  text-align: center;
 }

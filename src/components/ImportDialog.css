@@ -14,7 +14,7 @@
 .dialog {
   background: #fff;
   border-radius: 12px;
-  width: 600px;
+  width: 680px;
   max-width: 90vw;
   max-height: 85vh;
   display: flex;
@@ -59,6 +59,70 @@
   gap: 8px;
 }
 
+/* Expected format section */
+.import-format-hint {
+  background: #f8f9fb;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.import-format-hint h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #1a1a2e;
+}
+
+.import-format-hint > p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.expected-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.field-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.field-tag.required {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+}
+
+.field-tag.optional {
+  background: #f5f5f5;
+  color: #777;
+  border: 1px solid #e0e0e0;
+}
+
+.required-star {
+  color: #e53935;
+  font-weight: 700;
+  margin-left: 1px;
+}
+
+.format-note {
+  font-size: 11px !important;
+  color: #999 !important;
+  margin: 0 !important;
+}
+
+/* File picker */
 .file-picker {
   display: flex;
   align-items: center;
@@ -68,15 +132,17 @@
 
 .file-picker-btn {
   padding: 8px 16px;
-  background: #f5f5f5;
-  border: 1px solid #ddd;
+  background: #1976d2;
+  color: #fff;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
 }
 
 .file-picker-btn:hover {
-  background: #eee;
+  background: #1565c0;
 }
 
 .file-name {
@@ -84,43 +150,98 @@
   color: #666;
 }
 
+/* Mapping section */
+.mapping-section h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: #1a1a2e;
+}
+
 .mapping-hint {
   font-size: 12px;
   color: #888;
-  margin: 4px 0 12px;
+  margin: 4px 0 14px;
 }
 
 .mapping-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
 .mapping-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #fafafa;
 }
 
-.mapping-row label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #555;
-  width: 90px;
+.mapping-row.unmapped-required {
+  background: #fff3e0;
+  border: 1px solid #ffe0b2;
+}
+
+.mapping-label {
+  width: 200px;
   flex-shrink: 0;
 }
 
-.mapping-row select {
+.mapping-label label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  display: block;
+}
+
+.mapping-field-hint {
+  font-size: 10px;
+  color: #999;
+  display: block;
+  margin-top: 1px;
+}
+
+.mapping-select-wrapper {
   flex: 1;
-  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mapping-select-wrapper select {
+  flex: 1;
+  padding: 5px 8px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 12px;
+  background: #fff;
+}
+
+.mapping-select-wrapper select.mapped {
+  border-color: #4caf50;
+  background: #f1f8e9;
+}
+
+.mapping-check {
+  color: #4caf50;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Preview */
+.preview-section {
+  margin-top: 16px;
+}
+
+.preview-section h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #1a1a2e;
 }
 
 .preview-table-container {
   overflow-x: auto;
-  margin-top: 8px;
 }
 
 .preview-table {
@@ -142,6 +263,11 @@
   color: #555;
 }
 
+.empty-cell {
+  color: #ccc;
+}
+
+/* Buttons */
 .btn-primary {
   padding: 8px 20px;
   background: #1976d2;

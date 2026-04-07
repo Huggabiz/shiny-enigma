@@ -6,17 +6,18 @@ import {
 import { ProductCard } from './ProductCard';
 import type { Product, Shelf as ShelfType, ShelfItem } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import './Shelf.css';
 
 interface ShelfProps {
   shelf: ShelfType;
   catalogue: Product[];
   onAddPlaceholder: () => void;
-  onAddLabel: () => void;
 }
 
-export function Shelf({ shelf, catalogue, onAddPlaceholder, onAddLabel }: ShelfProps) {
+const CARD_SLOT_WIDTH = 110; // card width + gap
+
+export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
   const {
     selectedItemId,
     setSelectedItem,
@@ -25,11 +26,19 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onAddLabel }: ShelfP
     linkSource,
     setLinkSource,
     addLink,
+    updateLabel,
+    removeLabel,
+    addLabel,
   } = useProjectStore();
 
   const { setNodeRef, isOver } = useDroppable({ id: `shelf-${shelf.id}` });
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
-  const { updateLabel, removeLabel } = useProjectStore();
+  const railRef = useRef<HTMLDivElement>(null);
+
+  // Label drag state
+  const [draggingLabel, setDraggingLabel] = useState<string | null>(null);
+  const [resizingLabel, setResizingLabel] = useState<{ id: string; side: 'left' | 'right' } | null>(null);
+  const dragStartRef = useRef<{ x: number; startPos: number; endPos: number }>({ x: 0, startPos: 0, endPos: 0 });
 
   const getProduct = (item: ShelfItem): Product | undefined =>
     catalogue.find((p) => p.id === item.productId);
@@ -37,12 +46,10 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onAddLabel }: ShelfP
   const handleCardClick = (item: ShelfItem) => {
     if (linkMode) {
       if (!linkSource) {
-        // Set as source (must be from current shelf)
         if (shelf.id === 'current') {
           setLinkSource(item.id);
         }
       } else if (shelf.id === 'future' && linkSource !== item.id) {
-        // Complete the link
         const sourceItem = useProjectStore
           .getState()
           .project?.currentShelf.items.find((i) => i.id === linkSource);
@@ -62,6 +69,102 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onAddLabel }: ShelfP
     }
   };
 
+  const handleAddLabel = () => {
+    const text = prompt('Label text (e.g. "Good", "Better", "Best"):');
+    if (!text) return;
+    const itemCount = shelf.items.length;
+    addLabel(shelf.id, {
+      id: `label-${Date.now()}`,
+      text,
+      startPosition: 0,
+      endPosition: Math.max(itemCount - 1, 0),
+      color: '#e8e0d4',
+    });
+  };
+
+  // Label dragging (reposition)
+  const handleLabelDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, labelId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const label = shelf.labels.find(l => l.id === labelId);
+    if (!label) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    dragStartRef.current = { x: clientX, startPos: label.startPosition, endPos: label.endPosition };
+    setDraggingLabel(labelId);
+  }, [shelf.labels]);
+
+  // Label resizing
+  const handleLabelResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent, labelId: string, side: 'left' | 'right') => {
+    e.preventDefault();
+    e.stopPropagation();
+    const label = shelf.labels.find(l => l.id === labelId);
+    if (!label) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    dragStartRef.current = { x: clientX, startPos: label.startPosition, endPos: label.endPosition };
+    setResizingLabel({ id: labelId, side });
+  }, [shelf.labels]);
+
+  useEffect(() => {
+    if (!draggingLabel && !resizingLabel) return;
+
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const dx = clientX - dragStartRef.current.x;
+      const slotDelta = Math.round(dx / CARD_SLOT_WIDTH);
+      const maxPos = Math.max(shelf.items.length - 1, 0);
+
+      if (draggingLabel) {
+        const newStart = Math.max(0, Math.min(dragStartRef.current.startPos + slotDelta, maxPos));
+        const span = dragStartRef.current.endPos - dragStartRef.current.startPos;
+        const newEnd = Math.min(newStart + span, maxPos);
+        const adjustedStart = Math.max(0, newEnd - span);
+        updateLabel(shelf.id, draggingLabel, { startPosition: adjustedStart, endPosition: newEnd });
+      }
+
+      if (resizingLabel) {
+        if (resizingLabel.side === 'left') {
+          const newStart = Math.max(0, Math.min(dragStartRef.current.startPos + slotDelta, dragStartRef.current.endPos));
+          updateLabel(shelf.id, resizingLabel.id, { startPosition: newStart });
+        } else {
+          const newEnd = Math.max(dragStartRef.current.startPos, Math.min(dragStartRef.current.endPos + slotDelta, maxPos));
+          updateLabel(shelf.id, resizingLabel.id, { endPosition: newEnd });
+        }
+      }
+    };
+
+    const handleUp = () => {
+      setDraggingLabel(null);
+      setResizingLabel(null);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('touchend', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
+    };
+  }, [draggingLabel, resizingLabel, shelf.id, shelf.items.length, shelf.labels, updateLabel]);
+
+  // Track rail width via ResizeObserver to calculate label offset
+  const [railWidth, setRailWidth] = useState(0);
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setRailWidth(entry.contentRect.width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const totalItems = shelf.items.length;
+  const contentWidth = totalItems * CARD_SLOT_WIDTH;
+  const offsetLeft = Math.max(0, (railWidth - contentWidth) / 2);
+
   return (
     <div className={`shelf-container ${isOver ? 'shelf-over' : ''}`}>
       <div className="shelf-header">
@@ -70,30 +173,39 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onAddLabel }: ShelfP
           <button className="shelf-btn" onClick={onAddPlaceholder} title="Add placeholder SKU">
             + Placeholder
           </button>
-          <button className="shelf-btn" onClick={onAddLabel} title="Add section label">
+          <button className="shelf-btn" onClick={handleAddLabel} title="Add section label">
             + Label
           </button>
         </div>
       </div>
 
-      {/* Labels */}
+      {/* Labels bar */}
       {shelf.labels.length > 0 && (
-        <div className="shelf-labels">
+        <div className="shelf-labels-bar">
           {shelf.labels.map((label) => (
             <div
               key={label.id}
               className="shelf-label"
               style={{
-                left: `${label.startPosition * 115}px`,
-                width: `${(label.endPosition - label.startPosition + 1) * 115 - 15}px`,
+                left: `${offsetLeft + label.startPosition * CARD_SLOT_WIDTH}px`,
+                width: `${(label.endPosition - label.startPosition + 1) * CARD_SLOT_WIDTH - 10}px`,
                 backgroundColor: label.color || '#e8e0d4',
+                cursor: draggingLabel === label.id ? 'grabbing' : 'grab',
               }}
+              onMouseDown={(e) => handleLabelDragStart(e, label.id)}
+              onTouchStart={(e) => handleLabelDragStart(e, label.id)}
             >
+              <div className="label-resize-handle left"
+                onMouseDown={(e) => handleLabelResizeStart(e, label.id, 'left')}
+                onTouchStart={(e) => handleLabelResizeStart(e, label.id, 'left')}
+              />
               {editingLabel === label.id ? (
                 <input
                   className="label-input"
                   defaultValue={label.text}
                   autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   onBlur={(e) => {
                     updateLabel(shelf.id, label.id, { text: e.target.value });
                     setEditingLabel(null);
@@ -108,21 +220,25 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onAddLabel }: ShelfP
                   }}
                 />
               ) : (
-                <span onDoubleClick={() => setEditingLabel(label.id)}>{label.text}</span>
+                <span className="label-text" onDoubleClick={() => setEditingLabel(label.id)}>{label.text}</span>
               )}
               <button
                 className="label-remove"
-                onClick={() => removeLabel(shelf.id, label.id)}
+                onClick={(e) => { e.stopPropagation(); removeLabel(shelf.id, label.id); }}
               >
                 ×
               </button>
+              <div className="label-resize-handle right"
+                onMouseDown={(e) => handleLabelResizeStart(e, label.id, 'right')}
+                onTouchStart={(e) => handleLabelResizeStart(e, label.id, 'right')}
+              />
             </div>
           ))}
         </div>
       )}
 
-      {/* Shelf rail with products */}
-      <div ref={setNodeRef} className="shelf-rail">
+      {/* Shelf rail with products — centered */}
+      <div ref={(node) => { setNodeRef(node); (railRef as React.MutableRefObject<HTMLDivElement | null>).current = node; }} className="shelf-rail">
         <SortableContext
           items={shelf.items.map((i) => i.id)}
           strategy={horizontalListSortingStrategy}
@@ -143,16 +259,13 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onAddLabel }: ShelfP
 
         {shelf.items.length === 0 && (
           <div className="shelf-empty">
-            Drag products here from the catalogue, or drop between shelves to reorder
+            Drag products here from the catalogue or the shelf above
           </div>
         )}
       </div>
 
-      {/* The shelf surface */}
-      <div className="shelf-surface" />
-
       <div className="shelf-meta">
-        {shelf.items.length} SKUs • Total Volume:{' '}
+        {shelf.items.length} SKUs &middot; Total Volume:{' '}
         {shelf.items
           .reduce((sum, item) => {
             const p = getProduct(item);

@@ -10,6 +10,19 @@ interface ImportDialogProps {
   onClose: () => void;
 }
 
+const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: string; required: boolean }> = {
+  sku: { label: 'SKU', hint: 'Unique product identifier (e.g. "SKU-001")', required: true },
+  name: { label: 'Product Name', hint: 'Display name of the product', required: true },
+  category: { label: 'Category', hint: 'Top-level product category (e.g. "Skincare")', required: true },
+  subCategory: { label: 'Sub-Category', hint: 'Category subdivision (e.g. "Moisturisers")', required: false },
+  function: { label: 'Function', hint: 'Product function or purpose', required: false },
+  productFamily: { label: 'Product Family', hint: 'Product family grouping', required: false },
+  volume: { label: 'Volume', hint: 'Sales volume (numeric)', required: true },
+  rrp: { label: 'RRP', hint: 'Recommended retail price (numeric)', required: false },
+  revenue: { label: 'Revenue', hint: 'Total revenue (numeric)', required: false },
+  imageUrl: { label: 'Image URL', hint: 'Web URL to product image', required: false },
+};
+
 export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -17,6 +30,7 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
   const [fileData, setFileData] = useState<ArrayBuffer | null>(null);
   const [fileName, setFileName] = useState('');
   const [preview, setPreview] = useState<Product[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -29,6 +43,24 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
     const { products, headers: hdrs } = parseSpreadsheet(data, mapping);
     setHeaders(hdrs);
     setPreview(products.slice(0, 5));
+    setTotalCount(products.length);
+
+    // Auto-match headers to fields
+    const newMapping = { ...mapping };
+    const lowerHeaders = hdrs.map(h => h.toLowerCase().trim());
+    for (const [key, desc] of Object.entries(FIELD_DESCRIPTIONS)) {
+      const label = desc.label.toLowerCase();
+      const matchIndex = lowerHeaders.findIndex(h =>
+        h === label || h === key.toLowerCase() || h.includes(label) || label.includes(h)
+      );
+      if (matchIndex !== -1) {
+        (newMapping as Record<string, string>)[key] = hdrs[matchIndex];
+      }
+    }
+    setMapping(newMapping);
+    const { products: autoProducts } = parseSpreadsheet(data, newMapping);
+    setPreview(autoProducts.slice(0, 5));
+    setTotalCount(autoProducts.length);
   };
 
   const handleMappingChange = (field: keyof ColumnMapping, value: string) => {
@@ -38,6 +70,7 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
     if (fileData) {
       const { products } = parseSpreadsheet(fileData, newMapping);
       setPreview(products.slice(0, 5));
+      setTotalCount(products.length);
     }
   };
 
@@ -48,18 +81,11 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
     onClose();
   };
 
-  const mappingFields: { key: keyof ColumnMapping; label: string }[] = [
-    { key: 'sku', label: 'SKU' },
-    { key: 'name', label: 'Name' },
-    { key: 'category', label: 'Category' },
-    { key: 'subCategory', label: 'Sub-Category' },
-    { key: 'function', label: 'Function' },
-    { key: 'productFamily', label: 'Product Family' },
-    { key: 'volume', label: 'Volume' },
-    { key: 'rrp', label: 'RRP' },
-    { key: 'revenue', label: 'Revenue' },
-    { key: 'imageUrl', label: 'Image URL' },
-  ];
+  const mappingFields = Object.entries(FIELD_DESCRIPTIONS) as [keyof ColumnMapping, typeof FIELD_DESCRIPTIONS[keyof ColumnMapping]][];
+
+  const isMapped = (field: keyof ColumnMapping) => {
+    return mapping[field] && headers.includes(mapping[field]);
+  };
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
@@ -72,6 +98,21 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
         </div>
 
         <div className="dialog-body">
+          {/* Expected format hint */}
+          <div className="import-format-hint">
+            <h4>Expected Data Format</h4>
+            <p>Upload an Excel (.xlsx, .xls) or CSV file with your product catalogue. The tool needs the following columns:</p>
+            <div className="expected-fields">
+              {mappingFields.map(([key, desc]) => (
+                <span key={key} className={`field-tag ${desc.required ? 'required' : 'optional'}`}>
+                  {desc.label}
+                  {desc.required && <span className="required-star">*</span>}
+                </span>
+              ))}
+            </div>
+            <p className="format-note">Fields marked with * are required. You can map your column names to these fields after uploading.</p>
+          </div>
+
           <div className="file-picker">
             <input
               ref={fileRef}
@@ -88,33 +129,44 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
 
           {headers.length > 0 && (
             <>
-              <h4>Column Mapping</h4>
-              <p className="mapping-hint">
-                Map your file columns to the required fields. Select the column header that
-                matches each field.
-              </p>
-              <div className="mapping-grid">
-                {mappingFields.map(({ key, label }) => (
-                  <div key={key} className="mapping-row">
-                    <label>{label}</label>
-                    <select
-                      value={mapping[key]}
-                      onChange={(e) => handleMappingChange(key, e.target.value)}
-                    >
-                      <option value="">-- Not mapped --</option>
-                      {headers.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+              <div className="mapping-section">
+                <h4>Column Mapping</h4>
+                <p className="mapping-hint">
+                  We've auto-matched what we can. Review and adjust the mappings below — match each field to the corresponding column in your file.
+                </p>
+                <div className="mapping-grid">
+                  {mappingFields.map(([key, desc]) => (
+                    <div key={key} className={`mapping-row ${!isMapped(key) && desc.required ? 'unmapped-required' : ''}`}>
+                      <div className="mapping-label">
+                        <label>
+                          {desc.label}
+                          {desc.required && <span className="required-star">*</span>}
+                        </label>
+                        <span className="mapping-field-hint">{desc.hint}</span>
+                      </div>
+                      <div className="mapping-select-wrapper">
+                        <select
+                          value={mapping[key]}
+                          onChange={(e) => handleMappingChange(key, e.target.value)}
+                          className={isMapped(key) ? 'mapped' : ''}
+                        >
+                          <option value="">-- Not mapped --</option>
+                          {headers.map((h) => (
+                            <option key={h} value={h}>
+                              {h}
+                            </option>
+                          ))}
+                        </select>
+                        {isMapped(key) && <span className="mapping-check">✓</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {preview.length > 0 && (
-                <>
-                  <h4>Preview (first 5 rows)</h4>
+                <div className="preview-section">
+                  <h4>Preview ({totalCount} products found, showing first 5)</h4>
                   <div className="preview-table-container">
                     <table className="preview-table">
                       <thead>
@@ -129,17 +181,17 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
                       <tbody>
                         {preview.map((p, i) => (
                           <tr key={i}>
-                            <td>{p.sku}</td>
-                            <td>{p.name}</td>
-                            <td>{p.category}</td>
-                            <td>{p.volume.toLocaleString()}</td>
-                            <td>{p.rrp}</td>
+                            <td>{p.sku || <span className="empty-cell">—</span>}</td>
+                            <td>{p.name || <span className="empty-cell">—</span>}</td>
+                            <td>{p.category || <span className="empty-cell">—</span>}</td>
+                            <td>{p.volume ? p.volume.toLocaleString() : <span className="empty-cell">—</span>}</td>
+                            <td>{p.rrp || <span className="empty-cell">—</span>}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </>
+                </div>
               )}
             </>
           )}
@@ -150,7 +202,7 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
             Cancel
           </button>
           <button className="btn-primary" onClick={handleImport} disabled={!fileData}>
-            Import {preview.length > 0 ? `(${preview.length}+ products)` : ''}
+            Import {totalCount > 0 ? `${totalCount} Products` : ''}
           </button>
         </div>
       </div>

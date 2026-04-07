@@ -9,6 +9,7 @@ import {
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
+  type DragOverEvent,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Toolbar } from './components/Toolbar';
@@ -21,6 +22,19 @@ import { useProjectStore } from './store/useProjectStore';
 import type { Product, ShelfItem } from './types';
 import './App.css';
 
+function findShelfForItem(project: NonNullable<ReturnType<typeof useProjectStore.getState>['project']>, itemId: string): string | null {
+  if (project.currentShelf.items.some((i) => i.id === itemId)) return 'current';
+  if (project.futureShelf.items.some((i) => i.id === itemId)) return 'future';
+  return null;
+}
+
+function getTargetShelfId(overId: string, project: NonNullable<ReturnType<typeof useProjectStore.getState>['project']>): string | null {
+  if (overId.startsWith('shelf-')) return overId.replace('shelf-', '');
+  if (project.currentShelf.items.some((i) => i.id === overId)) return 'current';
+  if (project.futureShelf.items.some((i) => i.id === overId)) return 'future';
+  return null;
+}
+
 function App() {
   const {
     project,
@@ -28,7 +42,6 @@ function App() {
     setCatalogue,
     addItemToShelf,
     reorderShelfItems,
-    addLabel,
     removeLink,
   } = useProjectStore();
 
@@ -38,7 +51,9 @@ function App() {
   const [activeItem, setActiveItem] = useState<{
     item: ShelfItem;
     product?: Product;
+    sourceShelf?: string;
   } | null>(null);
+  const [overShelfId, setOverShelfId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -76,24 +91,6 @@ function App() {
     [project, addItemToShelf]
   );
 
-  const handleAddLabel = useCallback(
-    (shelfId: string) => {
-      const text = prompt('Label text (e.g. "Good", "Better", "Best"):');
-      if (!text) return;
-      const shelf = project?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'];
-      if (!shelf) return;
-      const itemCount = shelf.items.length;
-      addLabel(shelfId, {
-        id: `label-${Date.now()}`,
-        text,
-        startPosition: 0,
-        endPosition: Math.max(itemCount - 1, 0),
-        color: '#e8e0d4',
-      });
-    },
-    [project, addLabel]
-  );
-
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const activeId = String(active.id);
@@ -114,70 +111,75 @@ function App() {
       return;
     }
 
+    if (!project) return;
+    const sourceShelf = findShelfForItem(project, activeId);
     const allItems = [
-      ...(project?.currentShelf.items || []),
-      ...(project?.futureShelf.items || []),
+      ...project.currentShelf.items,
+      ...project.futureShelf.items,
     ];
     const item = allItems.find((i) => i.id === activeId);
     if (item) {
-      const product = project?.catalogue.find((p) => p.id === item.productId);
-      setActiveItem({ item, product });
+      const product = project.catalogue.find((p) => p.id === item.productId);
+      setActiveItem({ item, product, sourceShelf: sourceShelf || undefined });
     }
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (!over || !project) {
+      setOverShelfId(null);
+      return;
+    }
+    setOverShelfId(getTargetShelfId(String(over.id), project));
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    const draggedItem = activeItem;
     setActiveItem(null);
+    setOverShelfId(null);
     const { active, over } = event;
     if (!over || !project) return;
 
     const activeId = String(active.id);
     const overId = String(over.id);
+    const targetShelfId = getTargetShelfId(overId, project);
 
     // Dropping a catalogue item onto a shelf
     if (activeId.startsWith('catalogue-')) {
       const data = active.data.current as { product: Product };
-      if (!data?.product) return;
+      if (!data?.product || !targetShelfId) return;
 
-      let targetShelfId: string | null = null;
-      if (overId.startsWith('shelf-')) {
-        targetShelfId = overId.replace('shelf-', '');
-      } else {
-        if (project.currentShelf.items.some((i) => i.id === overId)) {
-          targetShelfId = 'current';
-        } else if (project.futureShelf.items.some((i) => i.id === overId)) {
-          targetShelfId = 'future';
-        }
-      }
-
-      if (targetShelfId) {
-        const newItem: ShelfItem = {
-          id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          productId: data.product.id,
-          position:
-            project[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length,
-          isPlaceholder: false,
-        };
-        addItemToShelf(targetShelfId, newItem);
-      }
+      const newItem: ShelfItem = {
+        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        productId: data.product.id,
+        position: project[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length,
+        isPlaceholder: false,
+      };
+      addItemToShelf(targetShelfId, newItem);
       return;
     }
 
-    // Reordering within a shelf
-    const currentItems = project.currentShelf.items;
-    const futureItems = project.futureShelf.items;
+    // Cross-shelf drag: duplicate item from current to future (or vice versa)
+    const sourceShelf = draggedItem?.sourceShelf;
+    if (sourceShelf && targetShelfId && sourceShelf !== targetShelfId) {
+      const sourceItem = draggedItem?.item;
+      if (!sourceItem) return;
 
-    let shelfId: string | null = null;
-    let items: ShelfItem[] = [];
-
-    if (currentItems.some((i) => i.id === activeId)) {
-      shelfId = 'current';
-      items = currentItems;
-    } else if (futureItems.some((i) => i.id === activeId)) {
-      shelfId = 'future';
-      items = futureItems;
+      const newItem: ShelfItem = {
+        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        productId: sourceItem.productId,
+        position: project[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length,
+        isPlaceholder: sourceItem.isPlaceholder,
+        placeholderName: sourceItem.placeholderName,
+      };
+      addItemToShelf(targetShelfId, newItem);
+      return;
     }
 
-    if (shelfId && items.length > 0) {
+    // Reordering within the same shelf
+    if (sourceShelf && targetShelfId === sourceShelf) {
+      const shelfKey = sourceShelf === 'current' ? 'currentShelf' : 'futureShelf';
+      const items = project[shelfKey].items;
       const oldIndex = items.findIndex((i) => i.id === activeId);
       const newIndex = items.findIndex((i) => i.id === overId);
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
@@ -185,7 +187,7 @@ function App() {
           ...item,
           position: idx,
         }));
-        reorderShelfItems(shelfId, reordered);
+        reorderShelfItems(sourceShelf, reordered);
       }
     }
   };
@@ -231,6 +233,7 @@ function App() {
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <div className="shelves-area">
@@ -240,7 +243,6 @@ function App() {
                   shelf={project.currentShelf}
                   catalogue={project.catalogue}
                   onAddPlaceholder={() => handleAddPlaceholder('current')}
-                  onAddLabel={() => handleAddLabel('current')}
                 />
 
                 <SankeyFlow
@@ -255,8 +257,14 @@ function App() {
                   shelf={project.futureShelf}
                   catalogue={project.catalogue}
                   onAddPlaceholder={() => handleAddPlaceholder('future')}
-                  onAddLabel={() => handleAddLabel('future')}
                 />
+
+                {/* Cross-shelf drag hint */}
+                {activeItem?.sourceShelf && overShelfId && overShelfId !== activeItem.sourceShelf && (
+                  <div className="cross-shelf-hint">
+                    Drop to duplicate into {overShelfId === 'current' ? 'Current' : 'Future'} Range
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -266,7 +274,10 @@ function App() {
             onImport={() => setShowImport(true)}
           />
 
-          <DragOverlay>
+          <DragOverlay dropAnimation={{
+            duration: 200,
+            easing: 'cubic-bezier(0.2, 0, 0, 1)',
+          }}>
             {activeItem && (
               <ProductCard
                 item={activeItem.item}
