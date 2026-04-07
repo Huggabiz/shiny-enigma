@@ -15,16 +15,16 @@ interface ShelfProps {
   onAddPlaceholder: () => void;
 }
 
-const CARD_WIDTH = 100; // actual card width
-const CARD_GAP = 10;    // gap between cards
-const CARD_SLOT_WIDTH = CARD_WIDTH + CARD_GAP; // 110
+const BASE_CARD_WIDTH = 100;
+const CARD_GAP = 10;
+const MIN_CARD_WIDTH = 54;
+const RAIL_PADDING = 8;
 
-// Pack labels into rows, compacting where possible (non-overlapping labels share a row)
+// Pack labels into rows, compacting where possible
 function packLabelsIntoRows(labels: ShelfLabel[]): ShelfLabel[][] {
   if (labels.length === 0) return [];
   const sorted = [...labels].sort((a, b) => a.startPosition - b.startPosition);
   const rows: ShelfLabel[][] = [];
-
   for (const label of sorted) {
     let placed = false;
     for (const row of rows) {
@@ -109,6 +109,34 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
     });
   };
 
+  // Track rail width via ResizeObserver
+  const [railWidth, setRailWidth] = useState(0);
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setRailWidth(entry.contentRect.width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Calculate dynamic card width — shrink when items overflow
+  const totalItems = shelf.items.length;
+  const availableWidth = railWidth - RAIL_PADDING * 2;
+  const naturalContentWidth = totalItems * (BASE_CARD_WIDTH + CARD_GAP) - (totalItems > 0 ? CARD_GAP : 0);
+  const needsShrink = totalItems > 0 && naturalContentWidth > availableWidth;
+
+  const cardWidth = needsShrink
+    ? Math.max(MIN_CARD_WIDTH, Math.floor((availableWidth - (totalItems - 1) * CARD_GAP) / totalItems))
+    : BASE_CARD_WIDTH;
+  const slotWidth = cardWidth + CARD_GAP;
+  const contentWidth = totalItems * slotWidth - (totalItems > 0 ? CARD_GAP : 0);
+  const offsetLeft = needsShrink ? RAIL_PADDING : Math.max(0, (railWidth - contentWidth) / 2);
+
+  // Compute dynamic slot width for label drag deltas
+  const currentSlotWidth = slotWidth;
+
   // Label dragging (reposition)
   const handleLabelDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, labelId: string) => {
     e.preventDefault();
@@ -137,7 +165,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
     const handleMove = (e: MouseEvent | TouchEvent) => {
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const dx = clientX - dragStartRef.current.x;
-      const slotDelta = Math.round(dx / CARD_SLOT_WIDTH);
+      const slotDelta = Math.round(dx / currentSlotWidth);
       const maxPos = Math.max(shelf.items.length - 1, 0);
 
       if (draggingLabel) {
@@ -174,25 +202,9 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
       window.removeEventListener('touchmove', handleMove);
       window.removeEventListener('touchend', handleUp);
     };
-  }, [draggingLabel, resizingLabel, shelf.id, shelf.items.length, shelf.labels, updateLabel]);
+  }, [draggingLabel, resizingLabel, shelf.id, shelf.items.length, shelf.labels, updateLabel, currentSlotWidth]);
 
-  // Track rail width via ResizeObserver
-  const [railWidth, setRailWidth] = useState(0);
-  useEffect(() => {
-    const el = railRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => {
-      setRailWidth(entry.contentRect.width);
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const totalItems = shelf.items.length;
-  const contentWidth = totalItems * CARD_SLOT_WIDTH;
-  const offsetLeft = Math.max(0, (railWidth - contentWidth) / 2);
-
-  // Pack labels into rows for multi-row display
+  // Pack labels into rows
   const labelRows = useMemo(() => packLabelsIntoRows(shelf.labels), [shelf.labels]);
   const LABEL_ROW_HEIGHT = 26;
 
@@ -215,10 +227,8 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
         <div className="shelf-labels-bar" style={{ height: labelRows.length * LABEL_ROW_HEIGHT }}>
           {labelRows.map((row, rowIndex) =>
             row.map((label) => {
-              // Left edge: align to left edge of first card in range
-              const left = offsetLeft + label.startPosition * CARD_SLOT_WIDTH;
-              // Width: from left edge of first card to right edge of last card
-              const width = (label.endPosition - label.startPosition) * CARD_SLOT_WIDTH + CARD_WIDTH;
+              const left = offsetLeft + label.startPosition * slotWidth;
+              const width = (label.endPosition - label.startPosition) * slotWidth + cardWidth;
 
               return (
                 <div
@@ -278,8 +288,12 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
         </div>
       )}
 
-      {/* Shelf rail with products — centered */}
-      <div ref={(node) => { setNodeRef(node); (railRef as React.MutableRefObject<HTMLDivElement | null>).current = node; }} className="shelf-rail">
+      {/* Shelf rail with products */}
+      <div
+        ref={(node) => { setNodeRef(node); (railRef as React.MutableRefObject<HTMLDivElement | null>).current = node; }}
+        className="shelf-rail"
+        style={needsShrink ? { justifyContent: 'flex-start' } : undefined}
+      >
         <SortableContext
           items={shelf.items.map((i) => i.id)}
           strategy={horizontalListSortingStrategy}
@@ -294,6 +308,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder }: ShelfProps) {
               isLinkSource={linkSource === item.id}
               onClick={() => handleCardClick(item)}
               onRemove={() => removeItemFromShelf(shelf.id, item.id)}
+              cardWidth={cardWidth}
             />
           ))}
         </SortableContext>

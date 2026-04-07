@@ -35,6 +35,13 @@ function getTargetShelfId(overId: string, project: NonNullable<ReturnType<typeof
   return null;
 }
 
+// Check if a product is already on a shelf
+function isProductOnShelf(project: NonNullable<ReturnType<typeof useProjectStore.getState>['project']>, productId: string, shelfId: string): boolean {
+  if (!productId) return false; // placeholders have no productId
+  const shelf = shelfId === 'current' ? project.currentShelf : project.futureShelf;
+  return shelf.items.some((item) => item.productId === productId);
+}
+
 function App() {
   const {
     project,
@@ -54,6 +61,7 @@ function App() {
     sourceShelf?: string;
   } | null>(null);
   const [overShelfId, setOverShelfId] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -90,6 +98,11 @@ function App() {
     },
     [project, addItemToShelf]
   );
+
+  const showDuplicateWarning = (productName: string) => {
+    setDuplicateWarning(`"${productName}" is already in this range`);
+    setTimeout(() => setDuplicateWarning(null), 2500);
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -149,6 +162,12 @@ function App() {
       const data = active.data.current as { product: Product };
       if (!data?.product || !targetShelfId) return;
 
+      // Prevent duplicate
+      if (isProductOnShelf(project, data.product.id, targetShelfId)) {
+        showDuplicateWarning(data.product.name);
+        return;
+      }
+
       const newItem: ShelfItem = {
         id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         productId: data.product.id,
@@ -164,6 +183,13 @@ function App() {
     if (sourceShelf && targetShelfId && sourceShelf !== targetShelfId) {
       const sourceItem = draggedItem?.item;
       if (!sourceItem) return;
+
+      // Prevent duplicate (skip check for placeholders)
+      if (sourceItem.productId && isProductOnShelf(project, sourceItem.productId, targetShelfId)) {
+        const productName = draggedItem?.product?.name || 'This product';
+        showDuplicateWarning(productName);
+        return;
+      }
 
       const newItem: ShelfItem = {
         id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -264,6 +290,11 @@ function App() {
                   <div className="cross-shelf-hint">
                     Drop to duplicate into {overShelfId === 'current' ? 'Current' : 'Future'} Range
                   </div>
+                )}
+
+                {/* Duplicate warning toast */}
+                {duplicateWarning && (
+                  <div className="duplicate-warning">{duplicateWarning}</div>
                 )}
               </>
             )}

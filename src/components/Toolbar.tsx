@@ -3,6 +3,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { saveProject, loadProjectFile } from '../utils/projectFile';
 import { exportToPptx } from '../utils/exportPptx';
 import { exportToExcel } from '../utils/exportExcel';
+import { APP_VERSION } from '../version';
 import './Toolbar.css';
 
 interface ToolbarProps {
@@ -46,6 +47,7 @@ export function Toolbar({ onImport }: ToolbarProps) {
     <div className="toolbar">
       <div className="toolbar-brand">
         <span className="toolbar-logo">Range Planner</span>
+        <span className="toolbar-version">v{APP_VERSION}</span>
         {project && (
           <span className="toolbar-project-name">{project.name}</span>
         )}

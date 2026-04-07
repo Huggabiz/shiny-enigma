@@ -169,3 +169,17 @@
   color: #0097a7;
   font-weight: 600;
 }
+
+/* Compact mode for shrunk cards */
+.product-card.compact {
+  min-height: 90px;
+  padding: 4px;
+}
+
+.card-new-badge.compact {
+  width: 20px;
+  height: 20px;
+  font-size: 7px;
+  top: -4px;
+  left: -4px;
+}

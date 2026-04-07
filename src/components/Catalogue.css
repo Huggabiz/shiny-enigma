@@ -11,8 +11,9 @@
 }
 
 .catalogue-panel.expanded {
-  width: 480px;
+  width: 55vw;
   min-width: 480px;
+  max-width: 900px;
 }
 
 .catalogue-header {
@@ -266,7 +267,7 @@
 /* Expanded item */
 .catalogue-items-expanded {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 8px;
   padding: 4px 8px;
 }

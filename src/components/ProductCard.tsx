@@ -12,6 +12,7 @@ interface ProductCardProps {
   onClick?: () => void;
   onRemove?: () => void;
   overlay?: boolean;
+  cardWidth?: number;
 }
 
 export function ProductCard({
@@ -23,6 +24,7 @@ export function ProductCard({
   onClick,
   onRemove,
   overlay,
+  cardWidth,
 }: ProductCardProps) {
   const {
     attributes,
@@ -33,15 +35,18 @@ export function ProductCard({
     isDragging,
   } = useSortable({ id: item.id, disabled: overlay });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
+    ...(cardWidth ? { width: `${cardWidth}px`, minWidth: `${cardWidth}px` } : {}),
   };
 
   const name = item.isPlaceholder
     ? item.placeholderName || 'New SKU'
     : product?.name || 'Unknown';
+
+  const isCompact = cardWidth !== undefined && cardWidth < 75;
 
   const cardClass = [
     'product-card',
@@ -50,6 +55,7 @@ export function ProductCard({
     isLinkMode ? 'link-mode' : '',
     isLinkSource ? 'link-source' : '',
     overlay ? 'overlay' : '',
+    isCompact ? 'compact' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -63,9 +69,8 @@ export function ProductCard({
       {...attributes}
       {...listeners}
     >
-      {/* New badge for placeholders */}
       {item.isPlaceholder && (
-        <div className="card-new-badge">New</div>
+        <div className={`card-new-badge ${isCompact ? 'compact' : ''}`}>New</div>
       )}
       {onRemove && (
         <button
@@ -78,7 +83,7 @@ export function ProductCard({
           ×
         </button>
       )}
-      <div className="card-image">
+      <div className="card-image" style={isCompact ? { width: 36, height: 32 } : undefined}>
         {product?.imageUrl ? (
           <img src={product.imageUrl} alt={name} />
         ) : (
@@ -87,16 +92,21 @@ export function ProductCard({
           </div>
         )}
       </div>
-      <div className="card-name" title={name}>
+      <div className="card-name" title={name} style={isCompact ? { fontSize: 8 } : undefined}>
         {name}
       </div>
-      {product && (
+      {product && !isCompact && (
         <div className="card-stats">
           <span className="card-sku">{product.sku}</span>
           <span className="card-volume">Vol: {product.volume.toLocaleString()}</span>
         </div>
       )}
-      {item.isPlaceholder && (
+      {product && isCompact && (
+        <div className="card-stats">
+          <span className="card-volume">{product.volume.toLocaleString()}</span>
+        </div>
+      )}
+      {item.isPlaceholder && !isCompact && (
         <div className="card-stats">
           <span className="card-placeholder-tag">Planned</span>
         </div>
