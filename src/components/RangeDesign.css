@@ -9,11 +9,67 @@
   padding: 20px;
   overflow: auto;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   background: #f5f5f5;
 }
 
+/* Title bar */
+.range-design-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1200px;
+  margin-bottom: 12px;
+}
+
+.range-design-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0;
+  cursor: default;
+  padding: 4px 0;
+}
+
+.range-design-title:hover {
+  color: #333;
+}
+
+.range-design-title-input {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+  border: 1px solid #1976d2;
+  border-radius: 4px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.range-design-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.rd-action-btn {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #555;
+}
+
+.rd-action-btn:hover {
+  background: #e3f2fd;
+  border-color: #90caf9;
+  color: #1976d2;
+}
+
+/* Matrix */
 .matrix-wrapper {
   background: #fff;
   border-radius: 10px;
@@ -103,15 +159,13 @@
   text-align: center;
 }
 
-/* Matrix cells */
+/* Matrix cells — hold multiple products */
 .matrix-cell {
   background: #fafafa;
   border: 2px dashed #e0e0e0;
   border-radius: 8px;
-  min-height: 90px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: 80px;
+  padding: 4px;
   transition: background 0.15s, border-color 0.15s;
 }
 
@@ -123,23 +177,64 @@
 
 .matrix-cell.cell-filled {
   border-style: solid;
-  border-color: #e0e0e0;
+  border-color: #e8e8e8;
   background: #fff;
 }
 
-/* Products in matrix */
+/* Products layout within a cell — wrap, uniform size */
+.matrix-cell-products {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* Uniform product card in matrix */
 .matrix-product {
+  width: 72px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 6px;
+  padding: 4px;
   cursor: grab;
   user-select: none;
-  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.matrix-product:hover {
+  border-color: #ddd;
+  background: #f8fbff;
 }
 
 .matrix-product.dragging {
   opacity: 0.3;
+}
+
+.matrix-product-remove {
+  display: none;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: #ef5350;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: pointer;
+  line-height: 1;
+  z-index: 2;
+}
+
+.matrix-product:hover .matrix-product-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .matrix-product-image {
@@ -150,7 +245,7 @@
   justify-content: center;
   border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .matrix-product-image img {
@@ -173,17 +268,18 @@
 }
 
 .matrix-product-name {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
   color: #333;
   text-align: center;
   line-height: 1.2;
   max-height: 2.4em;
   overflow: hidden;
+  width: 100%;
 }
 
 .matrix-product-sku {
-  font-size: 8px;
+  font-size: 7px;
   color: #999;
 }
 
@@ -200,6 +296,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.matrix-add-btn.wide {
+  width: auto;
+  padding: 0 12px;
+  font-size: 11px;
 }
 
 .matrix-add-btn:hover {
