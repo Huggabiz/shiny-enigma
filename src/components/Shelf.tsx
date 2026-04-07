@@ -4,9 +4,9 @@ import {
   horizontalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { ProductCard } from './ProductCard';
-import type { Product, Shelf as ShelfType, ShelfItem, ShelfLabel } from '../types';
+import type { Product, Shelf as ShelfType, ShelfItem } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { computeShelfLayout } from '../utils/layout';
 import './Shelf.css';
 
@@ -19,11 +19,19 @@ interface ShelfProps {
   onViewDesign?: () => void;
 }
 
-// Pack labels into rows, compacting where possible
-function packLabelsIntoRows(labels: ShelfLabel[]): ShelfLabel[][] {
+interface DerivedLabel {
+  text: string;
+  startPosition: number;
+  endPosition: number;
+  color: string;
+  level: 'x' | 'y';
+}
+
+// Pack labels into rows, compacting non-overlapping onto same row
+function packLabelsIntoRows(labels: DerivedLabel[]): DerivedLabel[][] {
   if (labels.length === 0) return [];
   const sorted = [...labels].sort((a, b) => a.startPosition - b.startPosition);
-  const rows: ShelfLabel[][] = [];
+  const rows: DerivedLabel[][] = [];
   for (const label of sorted) {
     let placed = false;
     for (const row of rows) {
@@ -43,6 +51,50 @@ function packLabelsIntoRows(labels: ShelfLabel[]): ShelfLabel[][] {
   return rows;
 }
 
+// Derive labels from matrix layout based on item order
+function deriveLabelsFromMatrix(shelf: ShelfType): { xLabels: DerivedLabel[]; yLabels: DerivedLabel[] } {
+  const layout = shelf.matrixLayout;
+  if (!layout || layout.assignments.length === 0) return { xLabels: [], yLabels: [] };
+
+  const xLabels: DerivedLabel[] = [];
+  const yLabels: DerivedLabel[] = [];
+
+  // Build a map of itemId -> position in the shelf
+  const posMap = new Map(shelf.items.map((item, idx) => [item.id, idx]));
+
+  // For each X label (column), find the min and max position of its assigned items
+  for (let col = 0; col < layout.xLabels.length; col++) {
+    const colAssignments = layout.assignments.filter((a) => a.col === col);
+    const positions = colAssignments.map((a) => posMap.get(a.itemId)).filter((p): p is number => p !== undefined);
+    if (positions.length === 0) continue;
+    xLabels.push({
+      text: layout.xLabels[col],
+      startPosition: Math.min(...positions),
+      endPosition: Math.max(...positions),
+      color: '#dce6f0',
+      level: 'x',
+    });
+  }
+
+  // For each Y label (row) within each X label, find positions
+  for (let col = 0; col < layout.xLabels.length; col++) {
+    for (let row = 0; row < layout.yLabels.length; row++) {
+      const cellAssignments = layout.assignments.filter((a) => a.col === col && a.row === row);
+      const positions = cellAssignments.map((a) => posMap.get(a.itemId)).filter((p): p is number => p !== undefined);
+      if (positions.length === 0) continue;
+      yLabels.push({
+        text: layout.yLabels[row],
+        startPosition: Math.min(...positions),
+        endPosition: Math.max(...positions),
+        color: '#f0e6d6',
+        level: 'y',
+      });
+    }
+  }
+
+  return { xLabels, yLabels };
+}
+
 export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign }: ShelfProps) {
   const {
     selectedItemId,
@@ -53,45 +105,28 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
     setLinkSource,
     addLink,
     removeLink,
-    updateLabel,
-    removeLabel,
-    addLabel,
   } = useProjectStore();
 
   const { setNodeRef, isOver } = useDroppable({ id: `shelf-${shelf.id}` });
-  const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const railRef = useRef<HTMLDivElement>(null);
-
-  // Label drag state
-  const [draggingLabel, setDraggingLabel] = useState<string | null>(null);
-  const [resizingLabel, setResizingLabel] = useState<{ id: string; side: 'left' | 'right' } | null>(null);
-  const dragStartRef = useRef<{ x: number; startPos: number; endPos: number }>({ x: 0, startPos: 0, endPos: 0 });
 
   const getProduct = (item: ShelfItem): Product | undefined =>
     catalogue.find((p) => p.id === item.productId);
 
   const handleCardClick = (item: ShelfItem) => {
     if (linkMode) {
-      // In link mode: click current SKU to select it as source
       if (shelf.id === 'current') {
         setLinkSource(item.id);
       } else if (shelf.id === 'future' && linkSource) {
-        // Click future SKU to toggle connection from selected source
         const existingLinks = useProjectStore.getState().project?.sankeyLinks.filter(
           (l) => l.sourceItemId === linkSource
         ) || [];
         const existingLink = existingLinks.find((l) => l.targetItemId === item.id);
         if (existingLink) {
-          // Already linked — remove it (toggle off)
           removeLink(linkSource, item.id);
         } else {
-          // Not linked — add connection with remaining %
-          const sourceItem = useProjectStore
-            .getState()
-            .project?.currentShelf.items.find((i) => i.id === linkSource);
-          const sourceProduct = sourceItem
-            ? catalogue.find((p) => p.id === sourceItem.productId)
-            : null;
+          const sourceItem = useProjectStore.getState().project?.currentShelf.items.find((i) => i.id === linkSource);
+          const sourceProduct = sourceItem ? catalogue.find((p) => p.id === sourceItem.productId) : null;
           const usedPercent = existingLinks.reduce((sum, l) => sum + (l.percent ?? 100), 0);
           const remaining = Math.max(0, 100 - usedPercent);
           const sourceVolume = sourceProduct?.volume || 0;
@@ -103,27 +138,14 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
             type: 'transfer',
           });
         }
-        setLinkSource(null);
+        setLinkSource(linkSource); // stay on same source
       }
     } else {
       setSelectedItem(item.id === selectedItemId ? null : item.id);
     }
   };
 
-  const handleAddLabel = () => {
-    const text = prompt('Label text (e.g. "Good", "Better", "Best"):');
-    if (!text) return;
-    const itemCount = shelf.items.length;
-    addLabel(shelf.id, {
-      id: `label-${Date.now()}`,
-      text,
-      startPosition: 0,
-      endPosition: Math.max(itemCount - 1, 0),
-      color: '#e8e0d4',
-    });
-  };
-
-  // Track rail width via ResizeObserver
+  // Track rail width
   const [railWidth, setRailWidth] = useState(0);
   useEffect(() => {
     const el = railRef.current;
@@ -137,83 +159,24 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
     return () => observer.disconnect();
   }, [onRailWidthChange]);
 
-  // Compute layout using shared utility
   const layout = useMemo(
     () => computeShelfLayout(shelf.items.length, railWidth),
     [shelf.items.length, railWidth]
   );
   const { cardWidth, slotWidth, offsetLeft, needsShrink } = layout;
 
-  // Label dragging (reposition)
-  const handleLabelDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, labelId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const label = shelf.labels.find(l => l.id === labelId);
-    if (!label) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    dragStartRef.current = { x: clientX, startPos: label.startPosition, endPos: label.endPosition };
-    setDraggingLabel(labelId);
-  }, [shelf.labels]);
+  // Derive labels from matrix layout
+  const { xLabels: derivedXLabels, yLabels: derivedYLabels } = useMemo(
+    () => deriveLabelsFromMatrix(shelf),
+    [shelf]
+  );
 
-  // Label resizing
-  const handleLabelResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent, labelId: string, side: 'left' | 'right') => {
-    e.preventDefault();
-    e.stopPropagation();
-    const label = shelf.labels.find(l => l.id === labelId);
-    if (!label) return;
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    dragStartRef.current = { x: clientX, startPos: label.startPosition, endPos: label.endPosition };
-    setResizingLabel({ id: labelId, side });
-  }, [shelf.labels]);
+  const hasMatrixLabels = derivedXLabels.length > 0 || derivedYLabels.length > 0;
 
-  useEffect(() => {
-    if (!draggingLabel && !resizingLabel) return;
-
-    const handleMove = (e: MouseEvent | TouchEvent) => {
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      const dx = clientX - dragStartRef.current.x;
-      const slotDelta = Math.round(dx / slotWidth);
-      const maxPos = Math.max(shelf.items.length - 1, 0);
-
-      if (draggingLabel) {
-        const newStart = Math.max(0, Math.min(dragStartRef.current.startPos + slotDelta, maxPos));
-        const span = dragStartRef.current.endPos - dragStartRef.current.startPos;
-        const newEnd = Math.min(newStart + span, maxPos);
-        const adjustedStart = Math.max(0, newEnd - span);
-        updateLabel(shelf.id, draggingLabel, { startPosition: adjustedStart, endPosition: newEnd });
-      }
-
-      if (resizingLabel) {
-        if (resizingLabel.side === 'left') {
-          const newStart = Math.max(0, Math.min(dragStartRef.current.startPos + slotDelta, dragStartRef.current.endPos));
-          updateLabel(shelf.id, resizingLabel.id, { startPosition: newStart });
-        } else {
-          const newEnd = Math.max(dragStartRef.current.startPos, Math.min(dragStartRef.current.endPos + slotDelta, maxPos));
-          updateLabel(shelf.id, resizingLabel.id, { endPosition: newEnd });
-        }
-      }
-    };
-
-    const handleUp = () => {
-      setDraggingLabel(null);
-      setResizingLabel(null);
-    };
-
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    window.addEventListener('touchmove', handleMove);
-    window.addEventListener('touchend', handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-      window.removeEventListener('touchmove', handleMove);
-      window.removeEventListener('touchend', handleUp);
-    };
-  }, [draggingLabel, resizingLabel, shelf.id, shelf.items.length, shelf.labels, updateLabel, slotWidth]);
-
-  // Pack labels into rows
-  const labelRows = useMemo(() => packLabelsIntoRows(shelf.labels), [shelf.labels]);
-  const LABEL_ROW_HEIGHT = 26;
+  // Pack X labels (top row) and Y labels (second row)
+  const xLabelRows = useMemo(() => packLabelsIntoRows(derivedXLabels), [derivedXLabels]);
+  const yLabelRows = useMemo(() => packLabelsIntoRows(derivedYLabels), [derivedYLabels]);
+  const LABEL_ROW_HEIGHT = 22;
 
   return (
     <div className={`shelf-container ${isOver ? 'shelf-over' : ''}`}>
@@ -223,9 +186,6 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
           <button className="shelf-btn" onClick={onAddPlaceholder} title="Add placeholder SKU">
             + Placeholder
           </button>
-          <button className="shelf-btn" onClick={handleAddLabel} title="Add section label">
-            + Label
-          </button>
           {onViewDesign && (
             <button className="shelf-btn view-design-btn" onClick={onViewDesign} title="View in Design matrix">
               View Design
@@ -234,87 +194,50 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
         </div>
       </div>
 
-      {/* Labels bar — multi-row with compaction */}
-      {labelRows.length > 0 && (
-        <div className="shelf-labels-bar" style={{ height: labelRows.length * LABEL_ROW_HEIGHT }}>
-          {labelRows.map((row, rowIndex) =>
-            row.map((label) => {
-              const left = offsetLeft + label.startPosition * slotWidth;
-              const width = (label.endPosition - label.startPosition) * slotWidth + cardWidth;
-
-              return (
-                <div
-                  key={label.id}
-                  className="shelf-label"
-                  style={{
-                    left: `${left}px`,
-                    width: `${width}px`,
-                    top: `${rowIndex * LABEL_ROW_HEIGHT}px`,
-                    backgroundColor: label.color || '#e8e0d4',
-                    cursor: draggingLabel === label.id ? 'grabbing' : 'grab',
-                  }}
-                  onMouseDown={(e) => handleLabelDragStart(e, label.id)}
-                  onTouchStart={(e) => handleLabelDragStart(e, label.id)}
-                >
-                  <div className="label-resize-handle left"
-                    onMouseDown={(e) => handleLabelResizeStart(e, label.id, 'left')}
-                    onTouchStart={(e) => handleLabelResizeStart(e, label.id, 'left')}
-                  />
-                  {editingLabel === label.id ? (
-                    <input
-                      className="label-input"
-                      defaultValue={label.text}
-                      autoFocus
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onBlur={(e) => {
-                        updateLabel(shelf.id, label.id, { text: e.target.value });
-                        setEditingLabel(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          updateLabel(shelf.id, label.id, {
-                            text: (e.target as HTMLInputElement).value,
-                          });
-                          setEditingLabel(null);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className="label-text" onDoubleClick={() => setEditingLabel(label.id)}>{label.text}</span>
-                  )}
-                  <button
-                    className="label-remove"
-                    onClick={(e) => { e.stopPropagation(); removeLabel(shelf.id, label.id); }}
-                  >
-                    ×
-                  </button>
-                  <div className="label-resize-handle right"
-                    onMouseDown={(e) => handleLabelResizeStart(e, label.id, 'right')}
-                    onTouchStart={(e) => handleLabelResizeStart(e, label.id, 'right')}
-                  />
-                </div>
-              );
-            })
-          )}
+      {/* Matrix-derived labels */}
+      {hasMatrixLabels && (
+        <div className="shelf-derived-labels">
+          {/* X labels (primary — blue) */}
+          {xLabelRows.map((row, rowIndex) => (
+            <div key={`x-${rowIndex}`} className="shelf-label-row" style={{ height: LABEL_ROW_HEIGHT }}>
+              {row.map((label, i) => {
+                const left = offsetLeft + label.startPosition * slotWidth;
+                const width = (label.endPosition - label.startPosition) * slotWidth + cardWidth;
+                return (
+                  <div key={i} className="shelf-derived-label x-label" style={{ left, width, backgroundColor: label.color }}>
+                    {label.text}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+          {/* Y labels (secondary — tan) */}
+          {yLabelRows.map((row, rowIndex) => (
+            <div key={`y-${rowIndex}`} className="shelf-label-row" style={{ height: LABEL_ROW_HEIGHT }}>
+              {row.map((label, i) => {
+                const left = offsetLeft + label.startPosition * slotWidth;
+                const width = (label.endPosition - label.startPosition) * slotWidth + cardWidth;
+                return (
+                  <div key={i} className="shelf-derived-label y-label" style={{ left, width, backgroundColor: label.color }}>
+                    {label.text}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Shelf rail with products */}
+      {/* Shelf rail */}
       <div
         ref={(node) => { setNodeRef(node); (railRef as React.MutableRefObject<HTMLDivElement | null>).current = node; }}
         className="shelf-rail"
         style={needsShrink ? { justifyContent: 'flex-start' } : undefined}
       >
-        <SortableContext
-          items={shelf.items.map((i) => i.id)}
-          strategy={horizontalListSortingStrategy}
-        >
+        <SortableContext items={shelf.items.map((i) => i.id)} strategy={horizontalListSortingStrategy}>
           {shelf.items.map((item) => {
-            // In link mode with a source selected, dim unrelated current shelf items
             const isSourceSelected = !!(linkMode && linkSource);
             const isDimmed = isSourceSelected && shelf.id === 'current' && item.id !== linkSource;
-            // Only the selected source gets the purple highlight
             const isLinkHighlight = isSourceSelected && item.id === linkSource;
 
             return (
@@ -340,19 +263,14 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
 
         {shelf.items.length === 0 && (
           <div className="shelf-empty">
-            Drag products here from the catalogue or the shelf above
+            Drag products here from the catalogue or use Design view
           </div>
         )}
       </div>
 
       <div className="shelf-meta">
         {shelf.items.length} SKUs &middot; Total Volume:{' '}
-        {shelf.items
-          .reduce((sum, item) => {
-            const p = getProduct(item);
-            return sum + (p?.volume || 0);
-          }, 0)
-          .toLocaleString()}
+        {shelf.items.reduce((sum, item) => sum + (getProduct(item)?.volume || 0), 0).toLocaleString()}
       </div>
     </div>
   );

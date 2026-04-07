@@ -52,99 +52,52 @@
   background: #f3e5f5;
 }
 
-/* Labels bar */
-.shelf-labels-bar {
-  position: relative;
-  min-height: 26px;
+/* Matrix-derived labels */
+.shelf-derived-labels {
   margin-bottom: 4px;
 }
 
-.shelf-label {
+.shelf-label-row {
+  position: relative;
+  margin-bottom: 2px;
+}
+
+.shelf-derived-label {
   position: absolute;
   top: 0;
-  height: 24px;
-  border-radius: 6px;
+  height: 100%;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: #5d4e37;
-  cursor: grab;
+  font-size: 9px;
+  font-weight: 700;
   user-select: none;
-  transition: left 0.2s, width 0.2s;
-}
-
-.shelf-label:hover {
-  filter: brightness(0.95);
-}
-
-.label-text {
-  white-space: nowrap;
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
   padding: 0 4px;
-  flex: 1;
-  text-align: center;
 }
 
-.label-input {
-  width: 80%;
-  border: 1px solid #aaa;
-  border-radius: 2px;
-  padding: 1px 4px;
-  font-size: 10px;
-  text-align: center;
-  background: #fff;
+.shelf-derived-label.x-label {
+  color: #2c3e50;
 }
 
-.label-remove {
-  display: none;
-  border: none;
-  background: none;
-  color: #999;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0 2px;
-  line-height: 1;
-  flex-shrink: 0;
+.shelf-derived-label.y-label {
+  color: #5d4e37;
+  font-weight: 600;
+  font-size: 8px;
 }
 
-.shelf-label:hover .label-remove {
-  display: block;
-}
-
-.label-resize-handle {
-  position: absolute;
-  top: 0;
-  width: 8px;
-  height: 100%;
-  cursor: col-resize;
-  z-index: 2;
-}
-
-.label-resize-handle.left {
-  left: -2px;
-}
-
-.label-resize-handle.right {
-  right: -2px;
-}
-
-/* Shelf rail — centered items with animated gaps */
+/* Shelf rail */
 .shelf-rail {
   display: flex;
   justify-content: center;
   gap: 10px;
-  min-height: 150px;
+  min-height: 140px;
   padding: 10px 8px;
   align-items: flex-end;
   position: relative;
-  transition: gap 0.15s ease;
-}
-
-.shelf-rail .sortable-item {
-  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .shelf-empty {

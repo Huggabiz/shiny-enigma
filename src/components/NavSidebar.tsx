@@ -13,20 +13,20 @@ export function NavSidebar({ activeView, designShelfId, onViewChange, onDesignSh
   return (
     <div className="nav-sidebar">
       <button
-        className={`nav-item ${activeView === 'transform' ? 'active' : ''}`}
-        onClick={() => onViewChange('transform')}
-        title="Range Transformation"
-      >
-        <span className="nav-icon">⇄</span>
-        <span className="nav-label">Transform</span>
-      </button>
-      <button
         className={`nav-item ${activeView === 'range-design' ? 'active' : ''}`}
         onClick={() => onViewChange('range-design')}
         title="Range Design Matrix"
       >
         <span className="nav-icon">▦</span>
         <span className="nav-label">Design</span>
+      </button>
+      <button
+        className={`nav-item ${activeView === 'transform' ? 'active' : ''}`}
+        onClick={() => onViewChange('transform')}
+        title="Range Transformation"
+      >
+        <span className="nav-icon">⇄</span>
+        <span className="nav-label">Transform</span>
       </button>
 
       {activeView === 'range-design' && (

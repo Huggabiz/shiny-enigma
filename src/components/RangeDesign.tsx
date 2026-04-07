@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -14,7 +14,6 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Catalogue } from './Catalogue';
 import { useProjectStore } from '../store/useProjectStore';
 import type { Product, Shelf, MatrixLayout } from '../types';
-import { useState } from 'react';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
@@ -22,27 +21,40 @@ interface RangeDesignProps {
   onImport: () => void;
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, onRemoveItem }: {
+const ROW_HEADER_WIDTH = 60;
+const ADD_BTN_WIDTH = 28;
+const GAP = 3;
+const CARD_GAP = 3;
+const CARD_PADDING = 3; // cell padding
+const MAX_CARD_WIDTH = 90;
+const MIN_CARD_WIDTH = 50;
+
+function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth }: {
   row: number;
   col: number;
   itemIds: string[];
   shelf: Shelf;
   catalogue: Product[];
-  onRemoveItem: (itemId: string) => void;
+  cardWidth: number;
 }) {
   const cellId = `matrix-cell-${row}-${col}`;
   const { setNodeRef, isOver } = useDroppable({ id: cellId });
   const items = itemIds.map((id) => shelf.items.find((i) => i.id === id)).filter(Boolean);
+  const { removeItemFromShelf, removeMatrixAssignment } = useProjectStore();
 
   return (
-    <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''}`}>
+    <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''}`}
+      style={{ '--matrix-card-width': `${cardWidth}px` } as React.CSSProperties}>
       {items.map((item) => {
         if (!item) return null;
         const product = catalogue.find((p) => p.id === item.productId);
         return (
           <MatrixProductCard key={item.id} itemId={item.id} product={product}
             isPlaceholder={item.isPlaceholder} placeholderName={item.placeholderName}
-            onRemove={() => onRemoveItem(item.id)} />
+            onRemove={() => {
+              removeItemFromShelf(shelf.id, item.id);
+              removeMatrixAssignment(shelf.id, item.id);
+            }} />
         );
       })}
     </div>
@@ -75,20 +87,21 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, on
       </div>
       <div className="matrix-card-name" title={name}>{name}</div>
       {product && <div className="matrix-card-sku">{product.sku}</div>}
-      {product && <div className="matrix-card-vol">Vol: {product.volume.toLocaleString()}</div>}
     </div>
   );
 }
 
 export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
   const {
-    project, addItemToShelf, removeItemFromShelf,
-    updateMatrixLayout, setMatrixAssignment, removeMatrixAssignment,
+    project, addItemToShelf,
+    updateMatrixLayout, setMatrixAssignment,
   } = useProjectStore();
 
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingAxis, setEditingAxis] = useState<{ axis: 'x' | 'y'; index: number } | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [wrapperWidth, setWrapperWidth] = useState(0);
 
   const shelf = project?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'];
   const catalogue = project?.catalogue || [];
@@ -104,7 +117,67 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
     project?.futureShelf.items.map((i) => i.productId).filter(Boolean) || []
   ), [project?.futureShelf.items]);
 
-  // Build cell lookup: row,col -> list of item IDs
+  // Track wrapper width for responsive sizing
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setWrapperWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Compute max products in any cell per column, then derive column widths
+  const { columnWidths, cardWidth } = useMemo(() => {
+    if (layout.xLabels.length === 0 || wrapperWidth === 0) {
+      return { columnWidths: [], cardWidth: MAX_CARD_WIDTH };
+    }
+
+    // Count max products in any cell of each column
+    const maxPerCol = layout.xLabels.map((_, col) => {
+      let max = 1;
+      for (let row = 0; row < layout.yLabels.length; row++) {
+        const count = layout.assignments.filter((a) => a.col === col && a.row === row).length;
+        if (count > max) max = count;
+      }
+      return max;
+    });
+
+    // Available width for grid columns
+    const availableWidth = wrapperWidth - 24 - ROW_HEADER_WIDTH - ADD_BTN_WIDTH - (layout.xLabels.length + 1) * GAP;
+
+    // Try to fit at MAX_CARD_WIDTH first, then shrink if needed
+    const totalUnitsNeeded = maxPerCol.reduce((sum, n) => sum + n, 0);
+
+    // Each column needs: maxProducts * (cardWidth + cardGap) + cellPadding*2
+    // Try max card width and see if it fits
+    let cw = MAX_CARD_WIDTH;
+    const calcColWidths = (cardW: number) =>
+      maxPerCol.map((n) => n * (cardW + CARD_GAP) + CARD_PADDING * 2);
+    let colWidths = calcColWidths(cw);
+    let totalNeeded = colWidths.reduce((sum, w) => sum + w, 0);
+
+    if (totalNeeded > availableWidth && totalUnitsNeeded > 0) {
+      // Shrink card width to fit
+      cw = Math.max(MIN_CARD_WIDTH,
+        Math.floor((availableWidth - layout.xLabels.length * CARD_PADDING * 2 - totalUnitsNeeded * CARD_GAP) / totalUnitsNeeded)
+      );
+      colWidths = calcColWidths(cw);
+      totalNeeded = colWidths.reduce((sum, w) => sum + w, 0);
+    }
+
+    // If still room, distribute extra proportionally
+    if (totalNeeded < availableWidth) {
+      const extra = availableWidth - totalNeeded;
+      const perCol = Math.floor(extra / layout.xLabels.length);
+      colWidths = colWidths.map((w) => w + perCol);
+    }
+
+    return { columnWidths: colWidths, cardWidth: cw };
+  }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperWidth]);
+
+  const gridCols = `${ROW_HEADER_WIDTH}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${ADD_BTN_WIDTH}px`;
+
+  // Cell map
   const cellMap = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const a of layout.assignments) {
@@ -141,11 +214,9 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
     const row = parseInt(cellMatch[1]);
     const col = parseInt(cellMatch[2]);
 
-    // Catalogue item → add to shelf + assign to cell
     if (activeId.startsWith('catalogue-')) {
       const data = active.data.current as { product: Product };
       if (!data?.product) return;
-      // Check not already on shelf
       if (shelf.items.some((i) => i.productId === data.product.id)) return;
       const newItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       addItemToShelf(shelfId, {
@@ -154,12 +225,10 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
         position: shelf.items.length,
         isPlaceholder: false,
       });
-      // Use setTimeout so the store has updated
       setTimeout(() => setMatrixAssignment(shelfId, newItemId, row, col), 0);
       return;
     }
 
-    // Matrix item → move to new cell
     if (activeId.startsWith('matrix-item-')) {
       const data = active.data.current as { itemId: string };
       if (data?.itemId) {
@@ -167,11 +236,6 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
       }
     }
   };
-
-  const handleRemoveItem = useCallback((itemId: string) => {
-    removeItemFromShelf(shelfId, itemId);
-    removeMatrixAssignment(shelfId, itemId);
-  }, [shelfId, removeItemFromShelf, removeMatrixAssignment]);
 
   const addLabel = useCallback((axis: 'x' | 'y') => {
     const text = prompt(`New ${axis === 'x' ? 'column' : 'row'} label:`);
@@ -184,16 +248,12 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
     if (axis === 'x') {
       updateMatrixLayout(shelfId, {
         xLabels: layout.xLabels.filter((_, i) => i !== index),
-        assignments: layout.assignments
-          .filter((a) => a.col !== index)
-          .map((a) => a.col > index ? { ...a, col: a.col - 1 } : a),
+        assignments: layout.assignments.filter((a) => a.col !== index).map((a) => a.col > index ? { ...a, col: a.col - 1 } : a),
       });
     } else {
       updateMatrixLayout(shelfId, {
         yLabels: layout.yLabels.filter((_, i) => i !== index),
-        assignments: layout.assignments
-          .filter((a) => a.row !== index)
-          .map((a) => a.row > index ? { ...a, row: a.row - 1 } : a),
+        assignments: layout.assignments.filter((a) => a.row !== index).map((a) => a.row > index ? { ...a, row: a.row - 1 } : a),
       });
     }
   }, [shelfId, layout, updateMatrixLayout]);
@@ -211,7 +271,6 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
 
   if (!shelf || !project) return null;
 
-  // Products on shelf but not assigned to any cell
   const assignedItemIds = new Set(layout.assignments.map((a) => a.itemId));
   const unassigned = shelf.items.filter((i) => !assignedItemIds.has(i.id));
 
@@ -228,15 +287,15 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
             ) : (
               <h2 className="range-design-title" onDoubleClick={() => setEditingTitle(true)} title="Double-click to edit">
                 {layout.title}
-                <span className="range-design-shelf-tag">{shelfId === 'current' ? 'Current Range' : 'Future Range'}</span>
+                <span className="range-design-shelf-tag">{shelfId === 'current' ? 'Current' : 'Future'}</span>
               </h2>
             )}
           </div>
 
           <div className="matrix-16-9">
-            <div className="matrix-wrapper">
+            <div className="matrix-wrapper" ref={wrapperRef}>
               {/* X headers */}
-              <div className="matrix-header-row" style={{ gridTemplateColumns: `72px repeat(${layout.xLabels.length}, 1fr) 28px` }}>
+              <div className="matrix-header-row" style={{ gridTemplateColumns: gridCols }}>
                 <div />
                 {layout.xLabels.map((label, i) => (
                   <div key={i} className="matrix-col-header" onDoubleClick={() => setEditingAxis({ axis: 'x', index: i })}>
@@ -253,7 +312,7 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
 
               {/* Rows */}
               {layout.yLabels.map((yLabel, row) => (
-                <div key={row} className="matrix-row" style={{ gridTemplateColumns: `72px repeat(${layout.xLabels.length}, 1fr) 28px` }}>
+                <div key={row} className="matrix-row" style={{ gridTemplateColumns: gridCols }}>
                   <div className="matrix-row-header" onDoubleClick={() => setEditingAxis({ axis: 'y', index: row })}>
                     {editingAxis?.axis === 'y' && editingAxis.index === row ? (
                       <input className="matrix-label-input" defaultValue={yLabel} autoFocus
@@ -266,7 +325,7 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
                     <MatrixCell key={`${row}-${col}`} row={row} col={col}
                       itemIds={cellMap.get(`${row}-${col}`) || []}
                       shelf={shelf} catalogue={catalogue}
-                      onRemoveItem={handleRemoveItem} />
+                      cardWidth={cardWidth} />
                   ))}
                   <div />
                 </div>
@@ -278,7 +337,6 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
             </div>
           </div>
 
-          {/* Unassigned products tray */}
           {unassigned.length > 0 && (
             <div className="unassigned-tray">
               <span className="unassigned-label">On shelf but not placed in matrix ({unassigned.length}):</span>

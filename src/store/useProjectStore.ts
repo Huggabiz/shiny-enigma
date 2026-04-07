@@ -48,13 +48,13 @@ interface ProjectStore {
   setAssumeContinuity: (enabled: boolean) => void;
 }
 
-const createEmptyShelf = (id: string, name: string): Shelf => ({
+const createEmptyShelf = (id: string, name: string, projectName: string): Shelf => ({
   id,
   name,
   items: [],
   labels: [],
   matrixLayout: {
-    title: name,
+    title: projectName,
     xLabels: ['Entry', 'Core', 'Premium'],
     yLabels: ['Category 1', 'Category 2'],
     assignments: [],
@@ -72,8 +72,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({
       project: {
         name,
-        currentShelf: createEmptyShelf('current', 'Current Range'),
-        futureShelf: createEmptyShelf('future', 'Future Range'),
+        currentShelf: createEmptyShelf('current', 'Current Range', name),
+        futureShelf: createEmptyShelf('future', 'Future Range', name),
         sankeyLinks: [],
         catalogue,
         createdAt: new Date().toISOString(),
