@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import * as d3 from 'd3';
 import type { Shelf, SankeyLink, Product } from '../types';
 import { computeShelfLayout } from '../utils/layout';
@@ -45,18 +45,8 @@ export function SankeyFlow({
 }: SankeyFlowProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  // Use self-measured width, falling back to railWidth prop
-  const effectiveWidth = containerWidth || railWidth;
+  // Use the shelf's railWidth directly — the SVG is positioned to match
+  const effectiveWidth = railWidth;
 
   // Build all flow specs including loss flows
   const { flows, hasContent } = useMemo(() => {
@@ -335,7 +325,7 @@ export function SankeyFlow({
   }
 
   return (
-    <div className="sankey-container" ref={containerRef}>
+    <div className="sankey-container" style={{ width: railWidth, marginLeft: 16 }}>
       <svg ref={svgRef} className="sankey-svg" />
     </div>
   );
