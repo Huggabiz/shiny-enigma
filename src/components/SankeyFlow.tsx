@@ -119,17 +119,14 @@ export function SankeyFlow({
     [futureShelf.items, variantFutureIds, showGhostedProp]
   );
 
-  // Include discontinued items in future layout when shown
-  const discCount = (showDiscontinued && discontinuedItems?.length) || 0;
-  const futureVisibleCount = visibleFutureItems.length + (discCount > 0 ? 1 + discCount : 0); // +1 for separator gap
-
+  // Layout based on visible regular items only (matching Shelf's explicit positioning)
   const currentLayout = useMemo(
     () => computeShelfLayout(visibleCurrentItems.length, railWidth),
     [visibleCurrentItems.length, railWidth]
   );
   const futureLayout = useMemo(
-    () => computeShelfLayout(futureVisibleCount, railWidth),
-    [futureVisibleCount, railWidth]
+    () => computeShelfLayout(visibleFutureItems.length, railWidth),
+    [visibleFutureItems.length, railWidth]
   );
 
   useEffect(() => {
@@ -226,8 +223,10 @@ export function SankeyFlow({
 
         if (discIdx >= 0) {
           // Draw red curve to the discontinued ghost card in future shelf
-          const targetPos = visibleFutureItems.length + 1 + discIdx; // +1 for separator gap
-          const tx = futureLayout.offsetLeft + targetPos * futureLayout.slotWidth + futureLayout.cardWidth / 2;
+          // Position: after regular items + separator gap + disc item index
+          const regularEndX = futureLayout.offsetLeft + visibleFutureItems.length * futureLayout.slotWidth;
+          const separatorWidth = 20; // separator div + gaps
+          const tx = regularEndX + separatorWidth + discIdx * futureLayout.slotWidth + futureLayout.cardWidth / 2;
 
           const path = d3.path();
           path.moveTo(sx, 0);

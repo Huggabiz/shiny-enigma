@@ -92,7 +92,7 @@
 /* Shelf rail */
 .shelf-rail {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 10px;
   min-height: 140px;
   padding: 10px 8px;

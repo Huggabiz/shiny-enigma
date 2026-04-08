@@ -173,13 +173,21 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
     return () => observer.disconnect();
   }, [onRailWidthChange]);
 
-  const discExtra = (showDiscontinued && discontinuedItems?.length) ? discontinuedItems.length + 1 : 0; // +1 for separator
-  const totalDisplayItems = shelf.items.length + discExtra;
-  const layout = useMemo(
-    () => computeShelfLayout(totalDisplayItems, railWidth),
-    [totalDisplayItems, railWidth]
+  // Compute visible regular items (excluding discontinued)
+  const visibleRegularItems = useMemo(() =>
+    shelf.items.filter((item) => {
+      if (!variantIncludedIds) return true;
+      return variantIncludedIds.has(item.id) || showGhostedProp;
+    }),
+    [shelf.items, variantIncludedIds, showGhostedProp]
   );
-  const { cardWidth, slotWidth, offsetLeft, needsShrink } = layout;
+
+  // Layout based on visible regular items only — used for card sizing, labels, and sankey
+  const layout = useMemo(
+    () => computeShelfLayout(visibleRegularItems.length, railWidth),
+    [visibleRegularItems.length, railWidth]
+  );
+  const { cardWidth, slotWidth, offsetLeft } = layout;
 
   // Compute visible item IDs for label derivation (respects variant filter)
   const visibleItemIds = useMemo(() => {
@@ -258,7 +266,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
       <div
         ref={(node) => { setNodeRef(node); (railRef as React.MutableRefObject<HTMLDivElement | null>).current = node; }}
         className="shelf-rail"
-        style={needsShrink ? { justifyContent: 'flex-start' } : undefined}
+        style={{ justifyContent: 'flex-start', paddingLeft: `${offsetLeft}px` }}
       >
         <SortableContext items={shelf.items.map((i) => i.id)} strategy={horizontalListSortingStrategy}>
           {shelf.items
