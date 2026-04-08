@@ -42,6 +42,25 @@
   gap: 6px;
 }
 
+.catalogue-collapse-all-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ddd;
+  background: #f8f8f8;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.catalogue-collapse-all-btn:hover {
+  background: #eee;
+}
+
 .catalogue-expand-btn {
   width: 28px;
   height: 28px;

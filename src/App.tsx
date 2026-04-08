@@ -133,7 +133,7 @@ function App() {
     if (name === null) return;
     addItemToShelf(shelfId, {
       id: `placeholder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      productId: '', position: activePlan?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length || 0,
+      productId: '', position: activePlan?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf']?.items?.length || 0,
       isPlaceholder: true, placeholderName: name || 'New SKU',
     });
   }, [activePlan, addItemToShelf]);
@@ -339,7 +339,8 @@ function App() {
             <Catalogue products={project?.catalogue || []} onImport={() => setShowImport(true)}
               currentProductIds={currentPlanProductIds} futureProductIds={futurePlanProductIds}
               otherCurrentIds={otherPlansCurrentIds} otherFutureIds={otherPlansFutureIds}
-              isDropTarget={!!activeItem?.sourceShelf} />
+              isDropTarget={!!activeItem?.sourceShelf}
+              dropZoneId="catalogue-drop-zone" />
 
             <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
               {activeItem && <ProductCard item={activeItem.item} product={activeItem.product} overlay />}

@@ -144,16 +144,24 @@ function computeLayout(
   return { fits: true, colWidths, rowHeights };
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder }: {
+function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder, variantIncludedIds, showGhostedProp }: {
   row: number; col: number; itemIds: string[];
   shelf: Shelf; catalogue: Product[];
   cardWidth: number;
   onAddPlaceholder: (row: number, col: number) => void;
+  variantIncludedIds: Set<string> | null;
+  showGhostedProp: boolean;
 }) {
   const cellId = `matrix-cell-${row}-${col}`;
   const { setNodeRef, isOver } = useDroppable({ id: cellId });
-  const items = itemIds.map((id) => shelf.items.find((i) => i.id === id)).filter(Boolean);
+  const allItems = itemIds.map((id) => shelf.items.find((i) => i.id === id)).filter(Boolean);
   const { removeItemFromShelf, removeMatrixAssignment } = useProjectStore();
+
+  // Filter items by variant
+  const items = allItems.filter((item) => {
+    if (!item || !variantIncludedIds) return true;
+    return variantIncludedIds.has(item.id) || showGhostedProp;
+  });
 
   return (
     <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''}`}
@@ -161,9 +169,11 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
       {items.map((item) => {
         if (!item) return null;
         const product = catalogue.find((p) => p.id === item.productId);
+        const isGhosted = variantIncludedIds ? !variantIncludedIds.has(item.id) : false;
         return (
           <MatrixProductCard key={item.id} itemId={item.id} product={product}
             isPlaceholder={item.isPlaceholder} placeholderName={item.placeholderName}
+            isGhosted={isGhosted}
             onRemove={() => {
               removeItemFromShelf(shelf.id, item.id);
               removeMatrixAssignment(shelf.id, item.id);
@@ -175,9 +185,9 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
   );
 }
 
-function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, onRemove }: {
+function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, isGhosted, onRemove }: {
   itemId: string; product?: Product; isPlaceholder: boolean;
-  placeholderName?: string; onRemove: () => void;
+  placeholderName?: string; isGhosted?: boolean; onRemove: () => void;
 }) {
   const cardFormat = useProjectStore((s) => s.cardFormat);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -186,7 +196,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, on
   const name = isPlaceholder ? (placeholderName || 'New SKU') : (product?.name || 'Unknown');
 
   return (
-    <div ref={setNodeRef} className={`matrix-card ${isDragging ? 'dragging' : ''} ${isPlaceholder ? 'placeholder' : ''}`}
+    <div ref={setNodeRef} className={`matrix-card ${isDragging ? 'dragging' : ''} ${isPlaceholder ? 'placeholder' : ''} ${isGhosted ? 'ghosted' : ''}`}
       {...attributes} {...listeners}>
       <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}><CloseIcon size={8} color="#fff" /></button>
       {cardFormat.showImage && (
@@ -222,6 +232,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const {
     project, addItemToShelf,
     updateMatrixLayout, setMatrixAssignment,
+    activeVariantId, showGhosted,
   } = useProjectStore();
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -254,6 +265,15 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     }
     return { currentProductIds: cur, futureProductIds: fut, otherCurrentIds: oCur, otherFutureIds: oFut };
   }, [project, activePlan]);
+
+  // Variant filter for the current shelf view
+  const variantIncludedIds = useMemo(() => {
+    if (!activeVariantId || !activePlan) return null;
+    const variant = activePlan.variants.find((v) => v.id === activeVariantId);
+    if (!variant) return null;
+    const key = shelfId === 'current' ? 'includedCurrentItemIds' : 'includedFutureItemIds';
+    return new Set(variant[key]);
+  }, [activeVariantId, activePlan, shelfId]);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -485,7 +505,9 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                       itemIds={cellMap.get(`${row}-${col}`) || []}
                       shelf={shelf} catalogue={catalogue}
                       cardWidth={cardWidth}
-                      onAddPlaceholder={handleAddPlaceholder} />
+                      onAddPlaceholder={handleAddPlaceholder}
+                      variantIncludedIds={variantIncludedIds}
+                      showGhostedProp={showGhosted} />
                   ))}
                   <div />
                 </div>
@@ -515,7 +537,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
         <Catalogue products={catalogue} onImport={onImport}
           currentProductIds={currentProductIds} futureProductIds={futureProductIds}
-          otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds} />
+          otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds}
+          dropZoneId="catalogue-drop-zone-design" />
 
         <DragOverlay>
           {activeProduct && (

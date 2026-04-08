@@ -233,6 +233,12 @@
   opacity: 0.3;
 }
 
+.matrix-card.ghosted {
+  opacity: 0.2;
+  filter: grayscale(0.8);
+  border-style: dashed;
+}
+
 .matrix-card-remove {
   position: absolute;
   top: -5px;

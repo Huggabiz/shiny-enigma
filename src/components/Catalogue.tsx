@@ -12,6 +12,7 @@ interface CatalogueProps {
   otherCurrentIds?: Set<string>;
   otherFutureIds?: Set<string>;
   isDropTarget?: boolean;
+  dropZoneId?: string;
 }
 
 function UsageBadges({ productId, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds }: {
@@ -141,8 +142,8 @@ function groupByCategory(products: Product[]): GroupedProducts[] {
     }));
 }
 
-export function Catalogue({ products, onImport, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds, isDropTarget }: CatalogueProps) {
-  const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({ id: 'catalogue-drop-zone' });
+export function Catalogue({ products, onImport, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds, isDropTarget, dropZoneId }: CatalogueProps) {
+  const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({ id: dropZoneId || 'catalogue-drop-zone' });
   const { catalogueFilters, setCatalogueFilters } = useProjectStore();
   const search = catalogueFilters.search;
   const categoryFilter = catalogueFilters.category;
@@ -210,6 +211,10 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
       <div className="catalogue-header">
         <h3>Catalogue</h3>
         <div className="catalogue-header-actions">
+          <button className="catalogue-collapse-all-btn" onClick={() => {
+            const allCats = grouped.map((g) => g.category);
+            setCollapsedCategories(new Set(allCats));
+          }} title="Collapse all">↕</button>
           <button
             className={`catalogue-expand-btn ${expanded ? 'active' : ''}`}
             onClick={() => setExpanded(!expanded)}
