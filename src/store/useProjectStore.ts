@@ -105,7 +105,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   linkSource: null,
   assumeContinuity: true,
   cardFormat: { ...DEFAULT_CARD_FORMAT },
-  showPlanTree: false,
+  showPlanTree: true,
   activeVariantId: null,
   showGhosted: true,
   catalogueFilters: { search: '', category: '', subCategory: '', family: '' },

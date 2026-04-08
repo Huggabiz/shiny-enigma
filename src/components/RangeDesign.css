@@ -245,9 +245,11 @@
 }
 
 .matrix-card.ghosted {
-  opacity: 0.2;
-  filter: grayscale(0.8);
+  opacity: 0.15;
+  filter: grayscale(1);
   border-style: dashed;
+  border-color: #ccc;
+  pointer-events: none;
 }
 
 .matrix-card-remove {

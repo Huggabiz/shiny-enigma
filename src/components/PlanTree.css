@@ -189,18 +189,25 @@
 }
 
 .plan-tree-add-variant {
-  padding: 2px 5px;
-  font-size: 9px;
+  width: 18px;
+  height: 18px;
+  font-size: 13px;
   font-weight: 700;
-  background: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
-  border-radius: 3px;
+  background: #4caf50;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .plan-tree-add-variant:hover {
-  background: #c8e6c9;
+  background: #388e3c;
 }
 
 .plan-tree-item-delete {

@@ -97,8 +97,8 @@ export function PlanTree() {
                         <div className="plan-tree-item-meta">{itemCount} products</div>
                       </div>
                     </div>
+                    <button className="plan-tree-add-variant" onClick={(e) => { e.stopPropagation(); handleNewVariant(plan.id); }} title="Add variant">+</button>
                     <div className="plan-tree-item-actions">
-                      <button className="plan-tree-add-variant" onClick={() => handleNewVariant(plan.id)} title="Add variant">+V</button>
                       {!isActive && project.plans.length > 1 && (
                         <button className="plan-tree-item-delete" onClick={(e) => {
                           e.stopPropagation();

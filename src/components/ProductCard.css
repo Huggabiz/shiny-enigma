@@ -211,10 +211,18 @@
 
 /* Ghosted: variant-excluded items — matches matrix ghosted style */
 .product-card.ghosted {
-  opacity: 0.2;
-  filter: grayscale(0.8);
+  opacity: 0.15;
+  filter: grayscale(1);
   border-style: dashed;
   border-color: #ccc;
+  pointer-events: none;
+}
+
+.product-card.ghosted .card-image,
+.product-card.ghosted .card-name,
+.product-card.ghosted .card-stats,
+.product-card.ghosted .card-new-badge {
+  opacity: 0.6;
 }
 
 /* Ghosted discontinued: red dashed border */

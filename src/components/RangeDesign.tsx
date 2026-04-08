@@ -155,7 +155,7 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
   const cellId = `matrix-cell-${row}-${col}`;
   const { setNodeRef, isOver } = useDroppable({ id: cellId });
   const allItems = itemIds.map((id) => shelf.items.find((i) => i.id === id)).filter(Boolean);
-  const { removeItemFromShelf, removeMatrixAssignment } = useProjectStore();
+  const { removeItemFromShelf, removeMatrixAssignment, activeVariantId: storeVariantId, toggleVariantItem } = useProjectStore();
 
   // Filter items by variant
   const items = allItems.filter((item) => {
@@ -175,8 +175,12 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
             isPlaceholder={item.isPlaceholder} placeholderName={item.placeholderName}
             isGhosted={isGhosted}
             onRemove={() => {
-              removeItemFromShelf(shelf.id, item.id);
-              removeMatrixAssignment(shelf.id, item.id);
+              if (storeVariantId) {
+                toggleVariantItem(storeVariantId, shelf.id, item.id);
+              } else {
+                removeItemFromShelf(shelf.id, item.id);
+                removeMatrixAssignment(shelf.id, item.id);
+              }
             }} />
         );
       })}
