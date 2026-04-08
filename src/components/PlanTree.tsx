@@ -65,7 +65,7 @@ export function PlanTree() {
                 <div
                   key={plan.id}
                   className={`plan-tree-item ${isActive ? 'active' : ''}`}
-                  onClick={() => { setActivePlan(plan.id); setShowPlanTree(false); }}
+                  onClick={() => { setActivePlan(plan.id); }}
                 >
                   <div className="plan-tree-item-icon">▦</div>
                   <div className="plan-tree-item-info">

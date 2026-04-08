@@ -235,7 +235,7 @@ function App() {
   if (showNewProject && !project) {
     return (
       <div className="app">
-        <Toolbar onImport={() => setShowImport(true)} />
+        <Toolbar onImport={() => setShowImport(true)} activeView={activeView} />
         <div className="welcome-screen">
           <div className="welcome-card">
             <h1>Range Planner</h1>
@@ -256,7 +256,7 @@ function App() {
 
   return (
     <div className="app">
-      <Toolbar onImport={() => setShowImport(true)} />
+      <Toolbar onImport={() => setShowImport(true)} activeView={activeView} />
       <div className="workspace">
         <NavSidebar activeView={activeView} designShelfId={designShelfId}
           onViewChange={setActiveView} onDesignShelfChange={setDesignShelfId} />

@@ -405,10 +405,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   updateMatrixLayout: (shelfId, layoutUpdates) => {
     const { project } = get();
     if (!project) return;
-    set({ project: updateShelf(project, shelfId, (shelf) => {
+    let updated = updateShelf(project, shelfId, (shelf) => {
       const current = shelf.matrixLayout || { title: '', xLabels: [], yLabels: [], assignments: [] };
       return { ...shelf, matrixLayout: { ...current, ...layoutUpdates } };
-    })});
+    });
+    // Sync plan name when title changes
+    if (layoutUpdates.title) {
+      const plan = getActivePlan(updated);
+      if (plan) {
+        updated = updatePlan(updated, plan.id, (p) => ({ ...p, name: layoutUpdates.title! }));
+      }
+    }
+    set({ project: updated });
   },
 
   setMatrixAssignment: (shelfId, itemId, row, col) => {

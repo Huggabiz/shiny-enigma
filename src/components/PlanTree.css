@@ -141,7 +141,6 @@
 }
 
 .plan-tree-item-delete {
-  display: none;
   width: 18px;
   height: 18px;
   border: none;
@@ -150,11 +149,14 @@
   border-radius: 50%;
   font-size: 11px;
   cursor: pointer;
+  display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  padding: 0;
+  opacity: 0;
 }
 
 .plan-tree-item:hover .plan-tree-item-delete {
-  display: flex;
+  opacity: 1;
 }

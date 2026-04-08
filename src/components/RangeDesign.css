@@ -95,7 +95,7 @@
 }
 
 .matrix-col-header:hover .matrix-label-remove {
-  display: block;
+  opacity: 1;
 }
 
 /* Grid rows — explicit height from JS */
@@ -124,11 +124,10 @@
 }
 
 .matrix-row-header:hover .matrix-label-remove {
-  display: block;
+  opacity: 1;
 }
 
 .matrix-label-remove {
-  display: none;
   position: absolute;
   top: 2px;
   right: 2px;
@@ -140,8 +139,12 @@
   border-radius: 50%;
   font-size: 9px;
   cursor: pointer;
-  line-height: 1;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0;
 }
 
 .matrix-label-input {
@@ -231,7 +234,6 @@
 }
 
 .matrix-card-remove {
-  display: none;
   position: absolute;
   top: -5px;
   right: -5px;
@@ -243,14 +245,16 @@
   border-radius: 50%;
   font-size: 9px;
   cursor: pointer;
-  line-height: 1;
   z-index: 2;
+  display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  opacity: 0;
 }
 
 .matrix-card:hover .matrix-card-remove {
-  display: flex;
+  opacity: 1;
 }
 
 .matrix-card-image {

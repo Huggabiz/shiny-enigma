@@ -223,12 +223,22 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
     [shelf?.matrixLayout, shelf?.name]
   );
 
-  const currentProductIds = useMemo(() => new Set<string>(
-    activePlan?.currentShelf.items.map((i: { productId: string }) => i.productId).filter(Boolean) || []
-  ), [activePlan?.currentShelf.items]);
-  const futureProductIds = useMemo(() => new Set<string>(
-    activePlan?.futureShelf.items.map((i: { productId: string }) => i.productId).filter(Boolean) || []
-  ), [activePlan?.futureShelf.items]);
+  const { currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds } = useMemo(() => {
+    if (!project || !activePlan) return {
+      currentProductIds: new Set<string>(), futureProductIds: new Set<string>(),
+      otherCurrentIds: new Set<string>(), otherFutureIds: new Set<string>(),
+    };
+    const cur = new Set<string>(activePlan.currentShelf.items.map((i) => i.productId).filter(Boolean));
+    const fut = new Set<string>(activePlan.futureShelf.items.map((i) => i.productId).filter(Boolean));
+    const oCur = new Set<string>();
+    const oFut = new Set<string>();
+    for (const plan of project.plans) {
+      if (plan.id === activePlan.id) continue;
+      for (const item of plan.currentShelf.items) if (item.productId) oCur.add(item.productId);
+      for (const item of plan.futureShelf.items) if (item.productId) oFut.add(item.productId);
+    }
+    return { currentProductIds: cur, futureProductIds: fut, otherCurrentIds: oCur, otherFutureIds: oFut };
+  }, [project, activePlan]);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -485,7 +495,8 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
         </div>
 
         <Catalogue products={catalogue} onImport={onImport}
-          currentProductIds={currentProductIds} futureProductIds={futureProductIds} />
+          currentProductIds={currentProductIds} futureProductIds={futureProductIds}
+          otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds} />
 
         <DragOverlay>
           {activeProduct && (

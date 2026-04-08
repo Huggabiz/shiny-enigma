@@ -8,9 +8,11 @@ import './Toolbar.css';
 
 interface ToolbarProps {
   onImport: () => void;
+  activeView?: 'transform' | 'range-design';
 }
 
-export function Toolbar({ onImport }: ToolbarProps) {
+export function Toolbar({ onImport, activeView }: ToolbarProps) {
+  const isTransform = activeView === 'transform';
   const {
     project, loadProject, linkMode, setLinkMode, setLinkSource,
     assumeContinuity, setAssumeContinuity,
@@ -47,20 +49,24 @@ export function Toolbar({ onImport }: ToolbarProps) {
           <>
             <button className="toolbar-btn" onClick={onImport}>Import Data</button>
 
-            <div className="toolbar-divider" />
+            {isTransform && (
+              <>
+                <div className="toolbar-divider" />
 
-            <label className="toolbar-checkbox" title="Products added to current range auto-add to future">
-              <input type="checkbox" checked={assumeContinuity}
-                onChange={(e) => setAssumeContinuity(e.target.checked)} />
-              <span>Range continuity</span>
-            </label>
+                <label className="toolbar-checkbox" title="Products added to current range auto-add to future">
+                  <input type="checkbox" checked={assumeContinuity}
+                    onChange={(e) => setAssumeContinuity(e.target.checked)} />
+                  <span>Range continuity</span>
+                </label>
 
-            <div className="toolbar-divider" />
+                <div className="toolbar-divider" />
 
-            <button className={`toolbar-btn ${linkMode ? 'active' : ''}`}
-              onClick={() => { setLinkMode(!linkMode); setLinkSource(null); }}>
-              {linkMode ? 'Exit Link Mode' : 'Link Mode'}
-            </button>
+                <button className={`toolbar-btn ${linkMode ? 'active' : ''}`}
+                  onClick={() => { setLinkMode(!linkMode); setLinkSource(null); }}>
+                  {linkMode ? 'Exit Link Mode' : 'Link Mode'}
+                </button>
+              </>
+            )}
 
             <div className="toolbar-divider" />
 
