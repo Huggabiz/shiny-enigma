@@ -20,8 +20,8 @@ const FLOW_HEIGHT = 120;
 
 interface FlowSpec {
   link: SankeyLink;
-  sourceIndex: number;
-  targetIndex: number;
+  sourceItemId: string;
+  targetItemId: string;
   strokeWidth: number;
   color: string;
   isLoss: boolean;
@@ -70,13 +70,12 @@ export function SankeyFlow({
 
     // Transfer links
     for (const link of links) {
-      const sourceIndex = visibleCurrentItems.findIndex((i) => i.id === link.sourceItemId);
-      const targetIndex = visibleFutureItems.findIndex((i) => i.id === link.targetItemId);
-      if (sourceIndex === -1 || targetIndex === -1) continue;
+      if (!currentShelf.items.some((i) => i.id === link.sourceItemId)) continue;
+      if (!futureShelf.items.some((i) => i.id === link.targetItemId)) continue;
       allFlows.push({
         link,
-        sourceIndex,
-        targetIndex,
+        sourceItemId: link.sourceItemId,
+        targetItemId: link.targetItemId,
         strokeWidth: calcWidth(link.volume),
         color: link.type === 'growth' ? '#4CAF50' : link.type === 'loss' ? '#F44336' : '#2196F3',
         isLoss: false,
@@ -84,14 +83,12 @@ export function SankeyFlow({
       });
     }
 
-    // Loss flows (virtual — targetIndex = -1)
+    // Loss flows
     for (const [itemId, lostVolume] of lossMap) {
-      const sourceIndex = visibleCurrentItems.findIndex((i) => i.id === itemId);
-      if (sourceIndex === -1) continue;
       allFlows.push({
         link: { sourceItemId: itemId, targetItemId: '__loss__', percent: 0, volume: lostVolume, type: 'loss' },
-        sourceIndex,
-        targetIndex: -1,
+        sourceItemId: itemId,
+        targetItemId: '__loss__',
         strokeWidth: calcWidth(lostVolume),
         color: '#F44336',
         isLoss: true,
@@ -100,8 +97,7 @@ export function SankeyFlow({
     }
 
     return { flows: allFlows, hasContent: allFlows.length > 0 };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentShelf.items, links, catalogue]);
+  }, [currentShelf.items, futureShelf.items, links, catalogue]);
 
   // Compute visible items (matching Shelf's filter logic)
   const visibleCurrentItems = useMemo(() =>
@@ -143,35 +139,47 @@ export function SankeyFlow({
     lossGrad.append('stop').attr('offset', '0%').attr('stop-color', '#F44336').attr('stop-opacity', 0.5);
     lossGrad.append('stop').attr('offset', '100%').attr('stop-color', '#F44336').attr('stop-opacity', 0.05);
 
-    // ---- Compute stacking offsets ----
-    // Group flows by source index, then compute each flow's horizontal offset at the source
+    // ---- Compute stacking offsets using VISIBLE item indices ----
+    // Map item IDs to visible indices
+    const visCurrentIdx = new Map(visibleCurrentItems.map((item, idx) => [item.id, idx]));
+    const visFutureIdx = new Map(visibleFutureItems.map((item, idx) => [item.id, idx]));
+
+    // Filter flows to only those with visible source/target
+    const visibleFlows = flows.filter((f) => {
+      if (!visCurrentIdx.has(f.sourceItemId)) return false;
+      if (!f.isLoss && !visFutureIdx.has(f.targetItemId)) return false;
+      return true;
+    });
+
+    // Group by source
     const bySource = new Map<number, FlowSpec[]>();
-    for (const f of flows) {
-      const arr = bySource.get(f.sourceIndex) || [];
+    for (const f of visibleFlows) {
+      const idx = visCurrentIdx.get(f.sourceItemId)!;
+      const arr = bySource.get(idx) || [];
       arr.push(f);
-      bySource.set(f.sourceIndex, arr);
+      bySource.set(idx, arr);
     }
 
-    // Group flows by target index (excluding loss flows)
+    // Group by target (excluding loss)
     const byTarget = new Map<number, FlowSpec[]>();
-    for (const f of flows) {
+    for (const f of visibleFlows) {
       if (f.isLoss) continue;
-      const arr = byTarget.get(f.targetIndex) || [];
+      const idx = visFutureIdx.get(f.targetItemId)!;
+      const arr = byTarget.get(idx) || [];
       arr.push(f);
-      byTarget.set(f.targetIndex, arr);
+      byTarget.set(idx, arr);
     }
 
-    // For each group, sort by target position (for source groups) or source position (for target groups)
-    // so flows don't cross unnecessarily
+    // Sort to minimize crossing
     for (const [, arr] of bySource) {
       arr.sort((a, b) => {
-        if (a.isLoss && !b.isLoss) return 1; // loss goes last (rightmost)
+        if (a.isLoss && !b.isLoss) return 1;
         if (!a.isLoss && b.isLoss) return -1;
-        return a.targetIndex - b.targetIndex;
+        return (visFutureIdx.get(a.targetItemId) ?? 0) - (visFutureIdx.get(b.targetItemId) ?? 0);
       });
     }
     for (const [, arr] of byTarget) {
-      arr.sort((a, b) => a.sourceIndex - b.sourceIndex);
+      arr.sort((a, b) => (visCurrentIdx.get(a.sourceItemId) ?? 0) - (visCurrentIdx.get(b.sourceItemId) ?? 0));
     }
 
     // Compute x offset for each flow at source and target
@@ -199,7 +207,7 @@ export function SankeyFlow({
     }
 
     // ---- Draw flows ----
-    for (const flow of flows) {
+    for (const flow of visibleFlows) {
       const sx = sourceOffsets.get(flow) || 0;
 
       if (flow.isLoss) {
@@ -254,7 +262,7 @@ export function SankeyFlow({
           .text(`${pct}% (${flow.volume.toLocaleString()})`);
       }
     }
-  }, [flows, hasContent, railWidth, currentLayout, futureLayout, onClickFlow]);
+  }, [flows, hasContent, railWidth, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems]);
 
   if (!hasContent) {
     return (
