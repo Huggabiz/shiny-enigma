@@ -1,5 +1,6 @@
 import type { Product, ShelfItem, SankeyLink } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
+import { CloseIcon } from './Icons';
 import './LinkPanel.css';
 
 interface LinkPanelProps {
@@ -90,7 +91,7 @@ export function LinkPanel({ sourceItem, sourceProduct, links, futureItems, catal
                   onClick={() => removeLink(sourceItem.id, link.targetItemId)}
                   title="Remove connection"
                 >
-                  ×
+                  <CloseIcon size={8} color="currentColor" />
                 </button>
               </div>
             );

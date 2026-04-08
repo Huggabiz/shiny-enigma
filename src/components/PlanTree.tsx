@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
+import { CloseIcon } from './Icons';
 import type { Product, RangePlan } from '../types';
 import './PlanTree.css';
 
@@ -50,7 +51,7 @@ export function PlanTree() {
         <h3>Range Plans</h3>
         <div className="plan-tree-header-actions">
           <button className="plan-tree-new" onClick={handleNew}>+ New</button>
-          <button className="plan-tree-close" onClick={() => setShowPlanTree(false)}>×</button>
+          <button className="plan-tree-close" onClick={() => setShowPlanTree(false)}><CloseIcon size={10} color="#999" /></button>
         </div>
       </div>
 
@@ -80,7 +81,7 @@ export function PlanTree() {
                         if (confirm(`Delete "${plan.name}"?`)) removePlan(plan.id);
                       }}
                     >
-                      ×
+                      <CloseIcon size={8} color="#fff" />
                     </button>
                   )}
                 </div>

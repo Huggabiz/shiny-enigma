@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Product, ShelfItem } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
+import { CloseIcon } from './Icons';
 import './ProductCard.css';
 
 interface ProductCardProps {
@@ -84,7 +85,7 @@ export function ProductCard({
         <div className={`card-new-badge ${isCompact ? 'compact' : ''}`}>New</div>
       )}
       {onRemove && !isDimmed && (
-        <button className="card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>×</button>
+        <button className="card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}><CloseIcon size={8} color="#fff" /></button>
       )}
       {cardFormat.showImage && (
         <div className="card-image" style={isCompact ? { width: 36, height: 32 } : undefined}>
@@ -104,22 +105,25 @@ export function ProductCard({
       )}
       {product && !isCompact && (
         <div className="card-stats">
-          {cardFormat.showSku && <span className="card-sku">{product.sku}</span>}
-          {cardFormat.showVolume && <span className="card-volume">Vol: {product.volume.toLocaleString()}</span>}
-          {cardFormat.showRrp && product.rrp > 0 && <span className="card-rrp">RRP: {product.rrp}</span>}
-          {cardFormat.showRevenue && product.revenue > 0 && <span className="card-revenue">Rev: {product.revenue.toLocaleString()}</span>}
-          {cardFormat.showCategory && product.category && <span className="card-category">{product.category}</span>}
+          {cardFormat.showSku && <span className="card-sku">{product.sku || '—'}</span>}
+          {cardFormat.showVolume && <span className="card-volume">Vol: {product.volume ? product.volume.toLocaleString() : '—'}</span>}
+          {cardFormat.showRrp && <span className="card-rrp">RRP: {product.rrp || '—'}</span>}
+          {cardFormat.showRevenue && <span className="card-revenue">Rev: {product.revenue ? product.revenue.toLocaleString() : '—'}</span>}
+          {cardFormat.showCategory && <span className="card-category">{product.category || '—'}</span>}
         </div>
       )}
       {product && isCompact && (
         <div className="card-stats">
-          {cardFormat.showVolume && <span className="card-volume">{product.volume.toLocaleString()}</span>}
-          {cardFormat.showRrp && product.rrp > 0 && <span className="card-rrp">{product.rrp}</span>}
+          {cardFormat.showVolume && <span className="card-volume">{product.volume ? product.volume.toLocaleString() : '—'}</span>}
+          {cardFormat.showRrp && <span className="card-rrp">{product.rrp || '—'}</span>}
         </div>
       )}
       {item.isPlaceholder && !isCompact && (
         <div className="card-stats">
           <span className="card-placeholder-tag">Planned</span>
+          {cardFormat.showSku && <span className="card-sku">—</span>}
+          {cardFormat.showVolume && <span className="card-volume">Vol: —</span>}
+          {cardFormat.showRrp && <span className="card-rrp">RRP: —</span>}
         </div>
       )}
     </div>

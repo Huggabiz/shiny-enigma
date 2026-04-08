@@ -13,6 +13,7 @@ import {
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Catalogue } from './Catalogue';
 import { useProjectStore } from '../store/useProjectStore';
+import { CloseIcon } from './Icons';
 import type { Product, Shelf, MatrixLayout } from '../types';
 import { getActivePlan } from '../types';
 import './RangeDesign.css';
@@ -185,7 +186,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, on
   return (
     <div ref={setNodeRef} className={`matrix-card ${isDragging ? 'dragging' : ''} ${isPlaceholder ? 'placeholder' : ''}`}
       {...attributes} {...listeners}>
-      <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>×</button>
+      <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}><CloseIcon size={8} color="#fff" /></button>
       {cardFormat.showImage && (
         <div className="matrix-card-image">
           {product?.imageUrl ? (
@@ -196,9 +197,9 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, on
         </div>
       )}
       {cardFormat.showName && <div className="matrix-card-name" title={name}>{name}</div>}
-      {product && cardFormat.showSku && <div className="matrix-card-sku">{product.sku}</div>}
-      {product && cardFormat.showRrp && product.rrp > 0 && <div className="matrix-card-rrp">RRP: {product.rrp}</div>}
-      {product && cardFormat.showVolume && <div className="matrix-card-vol">Vol: {product.volume.toLocaleString()}</div>}
+      {cardFormat.showSku && <div className="matrix-card-sku">{product?.sku || '—'}</div>}
+      {cardFormat.showRrp && <div className="matrix-card-rrp">RRP: {product?.rrp || '—'}</div>}
+      {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {product?.volume ? product.volume.toLocaleString() : '—'}</div>}
     </div>
   );
 }
@@ -443,7 +444,7 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
                         onBlur={(e) => updateLabel('x', i, e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && updateLabel('x', i, (e.target as HTMLInputElement).value)} />
                     ) : <span>{label}</span>}
-                    <button className="matrix-label-remove" onClick={() => removeLabel('x', i)}>×</button>
+                    <button className="matrix-label-remove" onClick={() => removeLabel('x', i)}><CloseIcon size={7} color="#fff" /></button>
                   </div>
                 ))}
                 <button className="matrix-add-btn" onClick={() => addLabel('x')}>+</button>
@@ -458,7 +459,7 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
                         onBlur={(e) => updateLabel('y', row, e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && updateLabel('y', row, (e.target as HTMLInputElement).value)} />
                     ) : <span>{yLabel}</span>}
-                    <button className="matrix-label-remove" onClick={() => removeLabel('y', row)}>×</button>
+                    <button className="matrix-label-remove" onClick={() => removeLabel('y', row)}><CloseIcon size={7} color="#fff" /></button>
                   </div>
                   {layout.xLabels.map((_, col) => (
                     <MatrixCell key={`${row}-${col}`} row={row} col={col}

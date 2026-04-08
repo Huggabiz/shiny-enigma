@@ -29,10 +29,10 @@ export function NavSidebar({ activeView, designShelfId, onViewChange, onDesignSh
       <button
         className={`nav-item ${activeView === 'range-design' ? 'active' : ''}`}
         onClick={() => onViewChange('range-design')}
-        title="Range Design Matrix"
+        title="Range View"
       >
         <span className="nav-icon">▦</span>
-        <span className="nav-label">Design</span>
+        <span className="nav-label">Range</span>
       </button>
       <button
         className={`nav-item ${activeView === 'transform' ? 'active' : ''}`}

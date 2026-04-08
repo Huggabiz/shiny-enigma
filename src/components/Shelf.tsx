@@ -189,8 +189,8 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
             + Placeholder
           </button>
           {onViewDesign && (
-            <button className="shelf-btn view-design-btn" onClick={onViewDesign} title="View in Design matrix">
-              View Design
+            <button className="shelf-btn view-range-btn" onClick={onViewDesign} title="View in Range matrix">
+              View Range
             </button>
           )}
         </div>
