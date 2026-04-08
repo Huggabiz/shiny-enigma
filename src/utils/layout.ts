@@ -23,7 +23,7 @@ export function computeShelfLayout(itemCount: number, railWidth: number): ShelfL
     : BASE_CARD_WIDTH;
   const slotWidth = cardWidth + CARD_GAP;
   const contentWidth = itemCount * slotWidth - (itemCount > 0 ? CARD_GAP : 0);
-  const offsetLeft = needsShrink ? RAIL_PADDING : Math.max(0, (railWidth - contentWidth) / 2);
+  const offsetLeft = needsShrink ? RAIL_PADDING : RAIL_PADDING + Math.max(0, (availableWidth - contentWidth) / 2);
 
   return { cardWidth, slotWidth, offsetLeft, needsShrink, contentWidth };
 }
