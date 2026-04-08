@@ -56,21 +56,28 @@ function packLabelsIntoRows(labels: DerivedLabel[]): DerivedLabel[][] {
   return rows;
 }
 
-// Derive labels from matrix layout based on item order
-function deriveLabelsFromMatrix(shelf: ShelfType): { xLabels: DerivedLabel[]; yLabels: DerivedLabel[] } {
+// Derive labels from matrix layout based on VISIBLE item order
+function deriveLabelsFromMatrix(
+  shelf: ShelfType,
+  visibleItemIds: string[],
+): { xLabels: DerivedLabel[]; yLabels: DerivedLabel[] } {
   const layout = shelf.matrixLayout;
   if (!layout || layout.assignments.length === 0) return { xLabels: [], yLabels: [] };
 
   const xLabels: DerivedLabel[] = [];
   const yLabels: DerivedLabel[] = [];
 
-  // Build a map of itemId -> position in the shelf
-  const posMap = new Map(shelf.items.map((item, idx) => [item.id, idx]));
+  // Build a map of itemId -> position in the VISIBLE items list
+  const posMap = new Map(visibleItemIds.map((id, idx) => [id, idx]));
 
-  // For each X label (column), find the min and max position of its assigned items
+  // Only consider assignments for visible items
+  const visibleAssignments = layout.assignments.filter((a) => posMap.has(a.itemId));
+
   for (let col = 0; col < layout.xLabels.length; col++) {
-    const colAssignments = layout.assignments.filter((a) => a.col === col);
-    const positions = colAssignments.map((a) => posMap.get(a.itemId)).filter((p): p is number => p !== undefined);
+    const positions = visibleAssignments
+      .filter((a) => a.col === col)
+      .map((a) => posMap.get(a.itemId))
+      .filter((p): p is number => p !== undefined);
     if (positions.length === 0) continue;
     xLabels.push({
       text: layout.xLabels[col],
@@ -81,11 +88,12 @@ function deriveLabelsFromMatrix(shelf: ShelfType): { xLabels: DerivedLabel[]; yL
     });
   }
 
-  // For each Y label (row) within each X label, find positions
   for (let col = 0; col < layout.xLabels.length; col++) {
     for (let row = 0; row < layout.yLabels.length; row++) {
-      const cellAssignments = layout.assignments.filter((a) => a.col === col && a.row === row);
-      const positions = cellAssignments.map((a) => posMap.get(a.itemId)).filter((p): p is number => p !== undefined);
+      const positions = visibleAssignments
+        .filter((a) => a.col === col && a.row === row)
+        .map((a) => posMap.get(a.itemId))
+        .filter((p): p is number => p !== undefined);
       if (positions.length === 0) continue;
       yLabels.push({
         text: layout.yLabels[row],
@@ -173,10 +181,20 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
   );
   const { cardWidth, slotWidth, offsetLeft, needsShrink } = layout;
 
-  // Derive labels from matrix layout
+  // Compute visible item IDs for label derivation (respects variant filter)
+  const visibleItemIds = useMemo(() => {
+    return shelf.items
+      .filter((item) => {
+        if (!variantIncludedIds) return true;
+        return variantIncludedIds.has(item.id) || showGhostedProp;
+      })
+      .map((item) => item.id);
+  }, [shelf.items, variantIncludedIds, showGhostedProp]);
+
+  // Derive labels from matrix layout based on visible items
   const { xLabels: derivedXLabels, yLabels: derivedYLabels } = useMemo(
-    () => deriveLabelsFromMatrix(shelf),
-    [shelf]
+    () => deriveLabelsFromMatrix(shelf, visibleItemIds),
+    [shelf, visibleItemIds]
   );
 
   const hasMatrixLabels = derivedXLabels.length > 0 || derivedYLabels.length > 0;
