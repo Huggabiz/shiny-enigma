@@ -316,7 +316,10 @@ function App() {
 
               <SankeyFlow currentShelf={activePlan.currentShelf} futureShelf={activePlan.futureShelf}
                 links={activePlan.sankeyLinks} catalogue={project!.catalogue}
-                railWidth={shelfRailWidth} onClickFlow={handleSankeyClick} />
+                railWidth={shelfRailWidth}
+                variantCurrentIds={variantCurrentIds} variantFutureIds={variantFutureIds}
+                showGhosted={showGhosted}
+                onClickFlow={handleSankeyClick} />
 
               <Shelf shelf={activePlan.futureShelf} catalogue={project!.catalogue}
                 onAddPlaceholder={() => handleAddPlaceholder('future')}

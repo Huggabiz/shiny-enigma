@@ -106,6 +106,10 @@
   border: 1px solid #bbdefb;
 }
 
+.plan-tree-item.active-parent {
+  background: #f5f5f5;
+}
+
 .plan-tree-item.variant {
   padding-left: 8px;
 }

@@ -10,6 +10,9 @@ interface SankeyFlowProps {
   links: SankeyLink[];
   catalogue: Product[];
   railWidth: number;
+  variantCurrentIds?: Set<string> | null;
+  variantFutureIds?: Set<string> | null;
+  showGhosted?: boolean;
   onClickFlow?: (sourceItemId: string) => void;
 }
 
@@ -31,6 +34,9 @@ export function SankeyFlow({
   links,
   catalogue,
   railWidth,
+  variantCurrentIds,
+  variantFutureIds,
+  showGhosted: showGhostedProp,
   onClickFlow,
 }: SankeyFlowProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -64,8 +70,8 @@ export function SankeyFlow({
 
     // Transfer links
     for (const link of links) {
-      const sourceIndex = currentShelf.items.findIndex((i) => i.id === link.sourceItemId);
-      const targetIndex = futureShelf.items.findIndex((i) => i.id === link.targetItemId);
+      const sourceIndex = visibleCurrentItems.findIndex((i) => i.id === link.sourceItemId);
+      const targetIndex = visibleFutureItems.findIndex((i) => i.id === link.targetItemId);
       if (sourceIndex === -1 || targetIndex === -1) continue;
       allFlows.push({
         link,
@@ -80,7 +86,7 @@ export function SankeyFlow({
 
     // Loss flows (virtual — targetIndex = -1)
     for (const [itemId, lostVolume] of lossMap) {
-      const sourceIndex = currentShelf.items.findIndex((i) => i.id === itemId);
+      const sourceIndex = visibleCurrentItems.findIndex((i) => i.id === itemId);
       if (sourceIndex === -1) continue;
       allFlows.push({
         link: { sourceItemId: itemId, targetItemId: '__loss__', percent: 0, volume: lostVolume, type: 'loss' },
@@ -94,15 +100,32 @@ export function SankeyFlow({
     }
 
     return { flows: allFlows, hasContent: allFlows.length > 0 };
-  }, [currentShelf.items, futureShelf.items, links, catalogue]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentShelf.items, links, catalogue]);
+
+  // Compute visible items (matching Shelf's filter logic)
+  const visibleCurrentItems = useMemo(() =>
+    currentShelf.items.filter((i) => {
+      if (!variantCurrentIds) return true;
+      return variantCurrentIds.has(i.id) || showGhostedProp;
+    }),
+    [currentShelf.items, variantCurrentIds, showGhostedProp]
+  );
+  const visibleFutureItems = useMemo(() =>
+    futureShelf.items.filter((i) => {
+      if (!variantFutureIds) return true;
+      return variantFutureIds.has(i.id) || showGhostedProp;
+    }),
+    [futureShelf.items, variantFutureIds, showGhostedProp]
+  );
 
   const currentLayout = useMemo(
-    () => computeShelfLayout(currentShelf.items.length, railWidth),
-    [currentShelf.items.length, railWidth]
+    () => computeShelfLayout(visibleCurrentItems.length, railWidth),
+    [visibleCurrentItems.length, railWidth]
   );
   const futureLayout = useMemo(
-    () => computeShelfLayout(futureShelf.items.length, railWidth),
-    [futureShelf.items.length, railWidth]
+    () => computeShelfLayout(visibleFutureItems.length, railWidth),
+    [visibleFutureItems.length, railWidth]
   );
 
   useEffect(() => {
@@ -194,7 +217,7 @@ export function SankeyFlow({
 
         svg.append('text')
           .attr('x', sx)
-          .attr('y', FLOW_HEIGHT - 14)
+          .attr('y', flow.strokeWidth / 2 + 12)
           .attr('text-anchor', 'middle')
           .attr('font-size', '8px')
           .attr('fill', '#e53935')

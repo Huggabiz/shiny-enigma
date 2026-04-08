@@ -382,6 +382,20 @@
   color: #666;
 }
 
+.unassigned-item.draggable {
+  cursor: grab;
+  user-select: none;
+}
+
+.unassigned-item.draggable:hover {
+  background: #fff8e1;
+  border-color: #f57c00;
+}
+
+.unassigned-item.dragging {
+  opacity: 0.3;
+}
+
 /* Drag preview */
 .matrix-drag-preview {
   background: #fff;

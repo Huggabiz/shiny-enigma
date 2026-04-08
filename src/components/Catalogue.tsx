@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { useProjectStore } from '../store/useProjectStore';
 import type { Product } from '../types';
 import './Catalogue.css';
 
@@ -142,10 +143,15 @@ function groupByCategory(products: Product[]): GroupedProducts[] {
 
 export function Catalogue({ products, onImport, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds, isDropTarget }: CatalogueProps) {
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({ id: 'catalogue-drop-zone' });
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [subCategoryFilter, setSubCategoryFilter] = useState('');
-  const [familyFilter, setFamilyFilter] = useState('');
+  const { catalogueFilters, setCatalogueFilters } = useProjectStore();
+  const search = catalogueFilters.search;
+  const categoryFilter = catalogueFilters.category;
+  const subCategoryFilter = catalogueFilters.subCategory;
+  const familyFilter = catalogueFilters.family;
+  const setSearch = (v: string) => setCatalogueFilters({ search: v });
+  const setCategoryFilter = (v: string) => setCatalogueFilters({ category: v, subCategory: '' });
+  const setSubCategoryFilter = (v: string) => setCatalogueFilters({ subCategory: v });
+  const setFamilyFilter = (v: string) => setCatalogueFilters({ family: v });
   const [expanded, setExpanded] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [collapsedSubCats, setCollapsedSubCats] = useState<Set<string>>(new Set());

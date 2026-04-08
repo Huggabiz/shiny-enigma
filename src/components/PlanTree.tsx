@@ -80,23 +80,21 @@ export function PlanTree() {
             {plans.map((plan) => {
               const isActive = plan.id === project.activePlanId;
               const isExpanded = expandedPlans.has(plan.id);
-              const hasVariants = plan.variants.length > 0;
               const itemCount = plan.currentShelf.items.length + plan.futureShelf.items.length;
 
               return (
                 <div key={plan.id}>
-                  {/* Plan row */}
-                  <div className={`plan-tree-item ${isActive && !activeVariantId ? 'active' : ''}`}>
-                    {/* Expand arrow */}
+                  {/* Plan row — always expandable */}
+                  <div className={`plan-tree-item plan-parent ${isActive ? 'active-parent' : ''}`}>
                     <button className="plan-tree-expand" onClick={() => toggleExpand(plan.id)}>
-                      {hasVariants ? (isExpanded ? '▾' : '▸') : ' '}
+                      {isExpanded ? '▾' : '▸'}
                     </button>
                     <div className="plan-tree-item-body"
-                      onClick={() => { setActivePlan(plan.id); setActiveVariant(null); }}>
+                      onClick={() => { setActivePlan(plan.id); setActiveVariant(null); if (!isExpanded) toggleExpand(plan.id); }}>
                       <div className="plan-tree-item-icon">▦</div>
                       <div className="plan-tree-item-info">
                         <div className="plan-tree-item-name">{plan.name}</div>
-                        <div className="plan-tree-item-meta">{itemCount} products · Master</div>
+                        <div className="plan-tree-item-meta">{itemCount} products</div>
                       </div>
                     </div>
                     <div className="plan-tree-item-actions">
@@ -110,7 +108,19 @@ export function PlanTree() {
                     </div>
                   </div>
 
-                  {/* Variants */}
+                  {/* Master + Variants */}
+                  {isExpanded && (
+                    <div
+                      className={`plan-tree-item variant ${isActive && !activeVariantId ? 'active' : ''}`}
+                      onClick={() => { setActivePlan(plan.id); setActiveVariant(null); }}>
+                      <div className="plan-tree-variant-indent" />
+                      <div className="plan-tree-item-icon variant-icon">●</div>
+                      <div className="plan-tree-item-info">
+                        <div className="plan-tree-item-name">Master</div>
+                        <div className="plan-tree-item-meta">{itemCount} products</div>
+                      </div>
+                    </div>
+                  )}
                   {isExpanded && plan.variants.map((variant) => {
                     const isVarActive = isActive && activeVariantId === variant.id;
                     const varCount = variant.includedCurrentItemIds.length + variant.includedFutureItemIds.length;

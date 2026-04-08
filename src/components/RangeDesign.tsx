@@ -206,6 +206,18 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, on
   );
 }
 
+function UnassignedDraggable({ itemId, name }: { itemId: string; name: string }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `matrix-item-${itemId}`, data: { itemId },
+  });
+  return (
+    <span ref={setNodeRef} className={`unassigned-item draggable ${isDragging ? 'dragging' : ''}`}
+      {...attributes} {...listeners}>
+      {name}
+    </span>
+  );
+}
+
 export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignProps) {
   const {
     project, addItemToShelf,
@@ -408,9 +420,12 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   }, [shelfId, layout, updateMatrixLayout]);
 
   const updateTitle = useCallback((text: string) => {
-    updateMatrixLayout(shelfId, { title: text || layout.title });
+    const newTitle = text || activePlan?.name || '';
+    // Sync title to both shelves and plan name
+    updateMatrixLayout('current', { title: newTitle });
+    updateMatrixLayout('future', { title: newTitle });
     setEditingTitle(false);
-  }, [shelfId, layout, updateMatrixLayout]);
+  }, [activePlan, updateMatrixLayout]);
 
   if (!shelf || !project) return null;
 
@@ -424,13 +439,13 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         <div className="range-design-canvas">
           <div className="range-design-title-bar">
             {editingTitle ? (
-              <input className="range-design-title-input" defaultValue={layout.title} autoFocus
+              <input className="range-design-title-input" defaultValue={activePlan?.name || layout.title} autoFocus
                 onBlur={(e) => updateTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && updateTitle((e.target as HTMLInputElement).value)} />
             ) : (
               <>
                 <h2 className="range-design-title" onDoubleClick={() => setEditingTitle(true)} title="Double-click to edit">
-                  {layout.title}
+                  {activePlan?.name || layout.title}
                 </h2>
                 <PillToggle value={shelfId} onChange={onShelfChange} />
               </>
@@ -489,9 +504,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                 {unassigned.map((item) => {
                   const product = catalogue.find((p) => p.id === item.productId);
                   return (
-                    <span key={item.id} className="unassigned-item">
-                      {item.isPlaceholder ? item.placeholderName : product?.name || item.productId}
-                    </span>
+                    <UnassignedDraggable key={item.id} itemId={item.id}
+                      name={item.isPlaceholder ? (item.placeholderName || 'New SKU') : (product?.name || item.productId)} />
                   );
                 })}
               </div>
