@@ -7,11 +7,10 @@ import { APP_VERSION } from '../version';
 import './Toolbar.css';
 
 interface ToolbarProps {
-  onImport: () => void;
   activeView?: 'transform' | 'range-design';
 }
 
-export function Toolbar({ onImport, activeView }: ToolbarProps) {
+export function Toolbar({ activeView }: ToolbarProps) {
   const isTransform = activeView === 'transform';
   const {
     project, loadProject, linkMode, setLinkMode, setLinkSource,
@@ -47,12 +46,8 @@ export function Toolbar({ onImport, activeView }: ToolbarProps) {
       <div className="toolbar-actions">
         {project && (
           <>
-            <button className="toolbar-btn" onClick={onImport}>Import Data</button>
-
             {isTransform && (
               <>
-                <div className="toolbar-divider" />
-
                 <label className="toolbar-checkbox" title="Products added to current range auto-add to future">
                   <input type="checkbox" checked={assumeContinuity}
                     onChange={(e) => setAssumeContinuity(e.target.checked)} />

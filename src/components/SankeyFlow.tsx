@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import type { Shelf, SankeyLink, Product } from '../types';
 import { computeShelfLayout } from '../utils/layout';
@@ -44,6 +44,19 @@ export function SankeyFlow({
   onClickFlow,
 }: SankeyFlowProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Use self-measured width, falling back to railWidth prop
+  const effectiveWidth = containerWidth || railWidth;
 
   // Build all flow specs including loss flows
   const { flows, hasContent } = useMemo(() => {
@@ -121,21 +134,21 @@ export function SankeyFlow({
 
   // Layout based on visible regular items only (matching Shelf's explicit positioning)
   const currentLayout = useMemo(
-    () => computeShelfLayout(visibleCurrentItems.length, railWidth),
-    [visibleCurrentItems.length, railWidth]
+    () => computeShelfLayout(visibleCurrentItems.length, effectiveWidth),
+    [visibleCurrentItems.length, effectiveWidth]
   );
   const futureLayout = useMemo(
-    () => computeShelfLayout(visibleFutureItems.length, railWidth),
-    [visibleFutureItems.length, railWidth]
+    () => computeShelfLayout(visibleFutureItems.length, effectiveWidth),
+    [visibleFutureItems.length, effectiveWidth]
   );
 
   useEffect(() => {
-    if (!svgRef.current || !railWidth) return;
+    if (!svgRef.current || !effectiveWidth) return;
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
     if (!hasContent) return;
 
-    svg.attr('width', railWidth).attr('height', FLOW_HEIGHT);
+    svg.attr('width', effectiveWidth).attr('height', FLOW_HEIGHT);
 
     // Gradient for loss flows
     const defs = svg.append('defs');
@@ -311,7 +324,7 @@ export function SankeyFlow({
           .text(`${pct}% (${flow.volume.toLocaleString()})`);
       }
     }
-  }, [flows, hasContent, railWidth, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems, showDiscontinued, discontinuedItems, variantCurrentIds]);
+  }, [flows, hasContent, effectiveWidth, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems, showDiscontinued, discontinuedItems, variantCurrentIds]);
 
   if (!hasContent) {
     return (
@@ -322,7 +335,7 @@ export function SankeyFlow({
   }
 
   return (
-    <div className="sankey-container">
+    <div className="sankey-container" ref={containerRef}>
       <svg ref={svgRef} className="sankey-svg" />
     </div>
   );

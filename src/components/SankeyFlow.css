@@ -1,6 +1,9 @@
 .sankey-container {
   width: 100%;
   overflow: hidden;
+  /* Match shelf-container (16px) + shelf-rail (8px) padding each side */
+  padding: 0 24px;
+  box-sizing: border-box;
 }
 
 .sankey-svg {

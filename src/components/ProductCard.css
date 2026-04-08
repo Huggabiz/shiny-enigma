@@ -225,12 +225,20 @@
   opacity: 0.6;
 }
 
-/* Ghosted discontinued: red dashed border */
+/* Discontinued: semi-transparent red background */
 .product-card.ghosted-discontinued {
-  opacity: 0.2;
-  filter: grayscale(0.8);
-  border-style: dashed;
-  border-color: #f44336;
+  opacity: 0.5;
+  background: rgba(244, 67, 54, 0.12);
+  border: 2px dashed #f44336;
+}
+
+.product-card.ghosted-discontinued .card-image {
+  opacity: 0.5;
+}
+
+.product-card.ghosted-discontinued .card-name,
+.product-card.ghosted-discontinued .card-stats {
+  opacity: 0.6;
 }
 
 .product-card.link-highlight {
