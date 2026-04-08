@@ -312,7 +312,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
                 key={`disc-${item.id}`}
                 item={item}
                 product={getProduct(item)}
-                isGhosted={true}
+                isDiscontinued={true}
                 cardWidth={cardWidth}
               />
             ))}

@@ -213,8 +213,10 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
         <div className="catalogue-header-actions">
           <button className="catalogue-collapse-all-btn" onClick={() => {
             const allCats = grouped.map((g) => g.category);
-            setCollapsedCategories(new Set(allCats));
-          }} title="Collapse all">↕</button>
+            const allCollapsed = allCats.every((c) => collapsedCategories.has(c));
+            setCollapsedCategories(allCollapsed ? new Set() : new Set(allCats));
+            if (allCollapsed) setCollapsedSubCats(new Set());
+          }} title={collapsedCategories.size > 0 ? "Expand all" : "Collapse all"}>↕</button>
           <button
             className={`catalogue-expand-btn ${expanded ? 'active' : ''}`}
             onClick={() => setExpanded(!expanded)}

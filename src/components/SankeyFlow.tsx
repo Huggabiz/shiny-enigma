@@ -276,6 +276,13 @@ export function SankeyFlow({
       } else {
         const tx = targetOffsets.get(flow) || 0;
 
+        // Dim flows for variant-excluded items
+        const isExcluded = variantCurrentIds
+          ? !variantCurrentIds.has(flow.sourceItemId)
+          : false;
+        const baseOpacity = isExcluded ? 0.1 : 0.45;
+        const hoverOpacity = isExcluded ? 0.15 : 0.75;
+
         const path = d3.path();
         path.moveTo(sx, 0);
         path.bezierCurveTo(sx, FLOW_HEIGHT * 0.4, tx, FLOW_HEIGHT * 0.6, tx, FLOW_HEIGHT);
@@ -285,11 +292,11 @@ export function SankeyFlow({
           .attr('fill', 'none')
           .attr('stroke', flow.color)
           .attr('stroke-width', flow.strokeWidth)
-          .attr('stroke-opacity', 0.45)
+          .attr('stroke-opacity', baseOpacity)
           .attr('stroke-linecap', 'round')
           .style('cursor', 'pointer')
-          .on('mouseenter', function () { d3.select(this).attr('stroke-opacity', 0.75); })
-          .on('mouseleave', function () { d3.select(this).attr('stroke-opacity', 0.45); })
+          .on('mouseenter', function () { d3.select(this).attr('stroke-opacity', hoverOpacity); })
+          .on('mouseleave', function () { d3.select(this).attr('stroke-opacity', baseOpacity); })
           .on('click', () => { onClickFlow?.(flow.link.sourceItemId); });
 
         // Label at midpoint
@@ -304,7 +311,7 @@ export function SankeyFlow({
           .text(`${pct}% (${flow.volume.toLocaleString()})`);
       }
     }
-  }, [flows, hasContent, railWidth, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems, showDiscontinued, discontinuedItems]);
+  }, [flows, hasContent, railWidth, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems, showDiscontinued, discontinuedItems, variantCurrentIds]);
 
   if (!hasContent) {
     return (

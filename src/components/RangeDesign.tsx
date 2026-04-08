@@ -267,13 +267,16 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   }, [project, activePlan]);
 
   // Variant filter for the current shelf view
-  const variantIncludedIds = useMemo(() => {
+  const activeVariant = useMemo(() => {
     if (!activeVariantId || !activePlan) return null;
-    const variant = activePlan.variants.find((v) => v.id === activeVariantId);
-    if (!variant) return null;
+    return activePlan.variants.find((v) => v.id === activeVariantId) || null;
+  }, [activeVariantId, activePlan]);
+
+  const variantIncludedIds = useMemo(() => {
+    if (!activeVariant) return null;
     const key = shelfId === 'current' ? 'includedCurrentItemIds' : 'includedFutureItemIds';
-    return new Set(variant[key]);
-  }, [activeVariantId, activePlan, shelfId]);
+    return new Set(activeVariant[key]);
+  }, [activeVariant, shelfId]);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -471,6 +474,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
               <>
                 <h2 className="range-design-title" onDoubleClick={() => setEditingTitle(true)} title="Double-click to edit">
                   {activePlan?.name || layout.title}
+                  {activeVariant && <span className="variant-badge">{activeVariant.name}</span>}
                 </h2>
                 <PillToggle value={shelfId} onChange={onShelfChange} />
               </>

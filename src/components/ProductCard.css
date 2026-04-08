@@ -209,9 +209,17 @@
   pointer-events: none;
 }
 
-/* Ghosted state for items not in active variant */
+/* Ghosted: variant-excluded items — matches matrix ghosted style */
 .product-card.ghosted {
-  opacity: 0.25;
+  opacity: 0.2;
+  filter: grayscale(0.8);
+  border-style: dashed;
+  border-color: #ccc;
+}
+
+/* Ghosted discontinued: red dashed border */
+.product-card.ghosted-discontinued {
+  opacity: 0.2;
   filter: grayscale(0.8);
   border-style: dashed;
   border-color: #f44336;

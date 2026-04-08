@@ -13,6 +13,7 @@ interface ProductCardProps {
   isLinkSource?: boolean;
   isDimmed?: boolean;
   isGhosted?: boolean;
+  isDiscontinued?: boolean;
   isLinkHighlight?: boolean;
   onClick?: () => void;
   onDoubleClick?: () => void;
@@ -29,6 +30,7 @@ export function ProductCard({
   isLinkSource,
   isDimmed,
   isGhosted,
+  isDiscontinued,
   isLinkHighlight,
   onClick,
   onDoubleClick,
@@ -67,6 +69,7 @@ export function ProductCard({
     isLinkSource ? 'link-source' : '',
     isDimmed ? 'dimmed' : '',
     isGhosted ? 'ghosted' : '',
+    isDiscontinued ? 'ghosted-discontinued' : '',
     isLinkHighlight ? 'link-highlight' : '',
     overlay ? 'overlay' : '',
     isCompact ? 'compact' : '',
