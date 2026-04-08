@@ -94,12 +94,13 @@ const D_CARD_RADIUS = 0.04;
 const D_MAX_CW = 0.85;
 const D_MIN_CW = 0.3;
 const D_EMPTY = 0.2;
+const D_MIN_ROW_H = 0.3;
 
-// Minimum horizontal cols needed so rows fit within available height
-function minColsForH(n: number, _cw: number, ch: number, cellH: number): number {
-  if (n === 0) return 0;
-  const maxRows = Math.max(1, Math.floor((cellH - D_CELL_PAD * 2 + D_CARD_GAP) / (ch + D_CARD_GAP)));
-  return Math.max(1, Math.ceil(n / maxRows));
+function pptCellGrid(n: number, cw: number, cellW: number): { cols: number; rows: number } {
+  if (n === 0) return { cols: 0, rows: 0 };
+  const maxCols = Math.max(1, Math.floor((cellW - D_CELL_PAD * 2 + D_CARD_GAP) / (cw + D_CARD_GAP)));
+  const cols = Math.min(n, maxCols);
+  return { cols, rows: Math.ceil(n / cols) };
 }
 
 function designLayoutFits(
@@ -107,45 +108,59 @@ function designLayoutFits(
   availW: number, availH: number,
 ): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
   const ch = cw * D_CARD_ASPECT;
-  const estRowH = availH / numRows;
 
-  // Column slots: minimum cols needed in the most-packed cell per column
-  const colSlots = Array.from({ length: numCols }, (_, col) => {
+  // Column widths: use sqrt-based estimate for initial cols per cell
+  const maxPerCol = Array.from({ length: numCols }, (_, col) => {
     let max = 0;
     for (let row = 0; row < numRows; row++) {
-      const n = cellCounts[row][col];
-      if (n === 0) continue;
-      const cols = minColsForH(n, cw, ch, estRowH);
-      if (cols > max) max = cols;
+      if (cellCounts[row][col] > max) max = cellCounts[row][col];
     }
     return max;
   });
 
-  const colWidths = colSlots.map((s) =>
+  const idealColSlots = maxPerCol.map((n) => n === 0 ? 0 : Math.max(1, Math.ceil(Math.sqrt(n))));
+  let colWidths = idealColSlots.map((s) =>
     s === 0 ? D_EMPTY : s * (cw + D_CARD_GAP) - D_CARD_GAP + D_CELL_PAD * 2
   );
-  const totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * D_CELL_GAP;
-  if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
+  let totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * D_CELL_GAP;
 
-  // Row slots: given real column widths, compute rows needed
-  const rowSlots = Array.from({ length: numRows }, (_, row) => {
+  if (totalW > availW) {
+    const totalProducts = maxPerCol.reduce((s, n) => s + n, 0) || 1;
+    const usableW = availW - (numCols - 1) * D_CELL_GAP - maxPerCol.filter((n) => n === 0).length * D_EMPTY;
+    colWidths = maxPerCol.map((n) =>
+      n === 0 ? D_EMPTY : Math.max(cw + D_CELL_PAD * 2, (n / totalProducts) * usableW)
+    );
+    totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * D_CELL_GAP;
+    if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
+  }
+
+  // Row heights: proportional to max card-rows needed
+  const maxCardRowsPerRow = Array.from({ length: numRows }, (_, row) => {
     let max = 0;
     for (let col = 0; col < numCols; col++) {
       const n = cellCounts[row][col];
       if (n === 0) continue;
-      const maxHCols = Math.max(1, Math.floor((colWidths[col] - D_CELL_PAD * 2 + D_CARD_GAP) / (cw + D_CARD_GAP)));
-      const c = Math.min(n, maxHCols);
-      const r = Math.ceil(n / c);
-      if (r > max) max = r;
+      const { rows } = pptCellGrid(n, cw, colWidths[col]);
+      if (rows > max) max = rows;
     }
     return max;
   });
 
-  const rowHeights = rowSlots.map((s) =>
-    s === 0 ? D_EMPTY : s * (ch + D_CARD_GAP) - D_CARD_GAP + D_CELL_PAD * 2
+  const naturalRowH = maxCardRowsPerRow.map((r) =>
+    r === 0 ? D_MIN_ROW_H : r * (ch + D_CARD_GAP) - D_CARD_GAP + D_CELL_PAD * 2
   );
-  const totalH = rowHeights.reduce((s, h) => s + h, 0) + (numRows - 1) * D_CELL_GAP;
-  return { fits: totalH <= availH, colWidths, rowHeights };
+  const totalNaturalH = naturalRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * D_CELL_GAP;
+
+  if (totalNaturalH > availH) return { fits: false, colWidths, rowHeights: naturalRowH };
+
+  // Distribute extra height to content rows
+  const extraH = availH - totalNaturalH;
+  const contentRows = maxCardRowsPerRow.filter((r) => r > 0).length || 1;
+  const rowHeights = naturalRowH.map((h, i) =>
+    maxCardRowsPerRow[i] > 0 ? h + extraH / contentRows : h
+  );
+
+  return { fits: true, colWidths, rowHeights };
 }
 
 function drawProductCard(
