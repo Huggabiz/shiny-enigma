@@ -95,7 +95,7 @@ export interface Project {
 
 // Helper to get the active plan from a project
 export function getActivePlan(project: Project): RangePlan | undefined {
-  return project.plans.find((p) => p.id === project.activePlanId);
+  return project.plans.find((p) => p.id === project.activePlanId) || project.plans[0];
 }
 
 export const DEFAULT_MATRIX_LAYOUT: MatrixLayout = {

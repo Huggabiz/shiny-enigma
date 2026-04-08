@@ -280,7 +280,8 @@ function App() {
 
         {showPlanTree && <PlanTree />}
 
-        {activeView === 'transform' && activePlan ? (
+        {activeView === 'transform' ? (
+          activePlan ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter}
             onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="shelves-area">
@@ -346,6 +347,9 @@ function App() {
               {activeItem && <ProductCard item={activeItem.item} product={activeItem.product} overlay />}
             </DragOverlay>
           </DndContext>
+          ) : (
+            <div className="shelves-area"><div className="shelf-empty">No active range plan. Create one from the Plans panel.</div></div>
+          )
         ) : activeView === 'range-design' ? (
           <RangeDesign shelfId={designShelfId} onShelfChange={setDesignShelfId} onImport={() => setShowImport(true)} />
         ) : null}
