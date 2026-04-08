@@ -22,6 +22,7 @@ import { ImportDialog } from './components/ImportDialog';
 import { ProductCard } from './components/ProductCard';
 import { LinkPanel } from './components/LinkPanel';
 import { RangeDesign } from './components/RangeDesign';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjectStore } from './store/useProjectStore';
 import { getActivePlan } from './types';
 import type { Product, ShelfItem } from './types';
@@ -282,6 +283,7 @@ function App() {
 
         {activeView === 'transform' ? (
           activePlan ? (
+          <ErrorBoundary>
           <DndContext sensors={sensors} collisionDetection={closestCenter}
             onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="shelves-area">
@@ -347,6 +349,7 @@ function App() {
               {activeItem && <ProductCard item={activeItem.item} product={activeItem.product} overlay />}
             </DragOverlay>
           </DndContext>
+          </ErrorBoundary>
           ) : (
             <div className="shelves-area"><div className="shelf-empty">No active range plan. Create one from the Plans panel.</div></div>
           )
