@@ -398,6 +398,22 @@
   background: #0097a7;
 }
 
+/* Dotted outline for products used in other plans */
+.usage-badge.other {
+  background: transparent;
+  border: 1.5px dashed;
+}
+
+.usage-badge.current.other {
+  border-color: #7b1fa2;
+  color: #7b1fa2;
+}
+
+.usage-badge.future.other {
+  border-color: #0097a7;
+  color: #0097a7;
+}
+
 /* Dim used items slightly */
 .catalogue-item.used,
 .catalogue-item-expanded.used {

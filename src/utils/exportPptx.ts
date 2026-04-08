@@ -398,36 +398,38 @@ export function exportToPptx(project: Project): void {
   pptx.author = 'Range Planner';
   pptx.title = project.name;
 
-  // Slide 1: Transform
-  const tSlide = pptx.addSlide();
-  const sharedTitle = project.currentShelf.matrixLayout?.title || project.name;
-  tSlide.addText(sharedTitle + ' — Range Transformation', {
-    x: 0.3, y: 0.15, w: SLIDE_WIDTH - 0.6, h: 0.5,
-    fontSize: 20, bold: true, color: '1a1a2e', objectName: 'transform-title',
-  });
-  drawShelfItems(tSlide, project.currentShelf, project.catalogue, 1.0);
-  drawShelfItems(tSlide, project.futureShelf, project.catalogue, 4.2);
-
-  const cCardW = Math.min(CARD_W, (SLIDE_WIDTH - SHELF_MARGIN_LEFT * 2 - (project.currentShelf.items.length - 1) * CARD_GAP_PPT) / Math.max(project.currentShelf.items.length, 1));
-  const fCardW = Math.min(CARD_W, (SLIDE_WIDTH - SHELF_MARGIN_LEFT * 2 - (project.futureShelf.items.length - 1) * CARD_GAP_PPT) / Math.max(project.futureShelf.items.length, 1));
-
-  project.sankeyLinks.forEach((link) => {
-    const si = project.currentShelf.items.findIndex((i) => i.id === link.sourceItemId);
-    const ti = project.futureShelf.items.findIndex((i) => i.id === link.targetItemId);
-    if (si === -1 || ti === -1) return;
-    const sx = SHELF_MARGIN_LEFT + si * (cCardW + CARD_GAP_PPT) + cCardW / 2;
-    const tx = SHELF_MARGIN_LEFT + ti * (fCardW + CARD_GAP_PPT) + fCardW / 2;
-    const color = link.type === 'growth' ? '4CAF50' : link.type === 'loss' ? 'F44336' : '2196F3';
-    tSlide.addShape('line' as PptxGenJS.ShapeType, {
-      x: Math.min(sx, tx), y: 1.0 + 0.15 + CARD_H + 0.05,
-      w: Math.abs(tx - sx) || 0.01, h: 4.2 + 0.1 - (1.0 + 0.15 + CARD_H + 0.05),
-      line: { color, width: Math.max(0.5, Math.min(link.volume / 1000, 4)) },
+  // Export all plans
+  for (const plan of project.plans) {
+    // Transform slide
+    const tSlide = pptx.addSlide();
+    tSlide.addText(plan.name + ' — Range Transformation', {
+      x: 0.3, y: 0.15, w: SLIDE_WIDTH - 0.6, h: 0.5,
+      fontSize: 20, bold: true, color: '1a1a2e', objectName: 'transform-title',
     });
-  });
+    drawShelfItems(tSlide, plan.currentShelf, project.catalogue, 1.0);
+    drawShelfItems(tSlide, plan.futureShelf, project.catalogue, 4.2);
 
-  // Design slides
-  addDesignSlide(pptx, project.currentShelf, project.catalogue, 'Current Range');
-  addDesignSlide(pptx, project.futureShelf, project.catalogue, 'Future Range');
+    const cCardW = Math.min(CARD_W, (SLIDE_WIDTH - SHELF_MARGIN_LEFT * 2 - (plan.currentShelf.items.length - 1) * CARD_GAP_PPT) / Math.max(plan.currentShelf.items.length, 1));
+    const fCardW = Math.min(CARD_W, (SLIDE_WIDTH - SHELF_MARGIN_LEFT * 2 - (plan.futureShelf.items.length - 1) * CARD_GAP_PPT) / Math.max(plan.futureShelf.items.length, 1));
+
+    plan.sankeyLinks.forEach((link) => {
+      const si = plan.currentShelf.items.findIndex((i) => i.id === link.sourceItemId);
+      const ti = plan.futureShelf.items.findIndex((i) => i.id === link.targetItemId);
+      if (si === -1 || ti === -1) return;
+      const sx = SHELF_MARGIN_LEFT + si * (cCardW + CARD_GAP_PPT) + cCardW / 2;
+      const tx = SHELF_MARGIN_LEFT + ti * (fCardW + CARD_GAP_PPT) + fCardW / 2;
+      const color = link.type === 'growth' ? '4CAF50' : link.type === 'loss' ? 'F44336' : '2196F3';
+      tSlide.addShape('line' as PptxGenJS.ShapeType, {
+        x: Math.min(sx, tx), y: 1.0 + 0.15 + CARD_H + 0.05,
+        w: Math.abs(tx - sx) || 0.01, h: 4.2 + 0.1 - (1.0 + 0.15 + CARD_H + 0.05),
+        line: { color, width: Math.max(0.5, Math.min(link.volume / 1000, 4)) },
+      });
+    });
+
+    // Design slides
+    addDesignSlide(pptx, plan.currentShelf, project.catalogue, plan.name + ' — Current');
+    addDesignSlide(pptx, plan.futureShelf, project.catalogue, plan.name + ' — Future');
+  }
 
   pptx.writeFile({ fileName: `${project.name.replace(/\s+/g, '_')}_range_plan.pptx` });
 }

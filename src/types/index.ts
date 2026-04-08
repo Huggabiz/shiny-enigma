@@ -60,20 +60,62 @@ export interface Shelf {
 export interface SankeyLink {
   sourceItemId: string;
   targetItemId: string;
-  percent: number; // percentage of source volume allocated to this target
-  volume: number;  // computed: source volume * percent / 100
+  percent: number;
+  volume: number;
   type: 'transfer' | 'growth' | 'loss';
 }
 
-// The full project state
-export interface Project {
+// A single range plan (current + future + sankey links)
+export interface RangePlan {
+  id: string;
   name: string;
   currentShelf: Shelf;
   futureShelf: Shelf;
   sankeyLinks: SankeyLink[];
+}
+
+// The full project state — now holds multiple range plans
+export interface Project {
+  name: string;
+  plans: RangePlan[];
+  activePlanId: string;
   catalogue: Product[];
   createdAt: string;
   updatedAt: string;
+}
+
+// Helper to get the active plan from a project
+export function getActivePlan(project: Project): RangePlan | undefined {
+  return project.plans.find((p) => p.id === project.activePlanId);
+}
+
+export const DEFAULT_MATRIX_LAYOUT: MatrixLayout = {
+  title: '',
+  xLabels: ['Entry', 'Mid', 'Premium'],
+  yLabels: ['Subset 1', 'Subset 2'],
+  assignments: [],
+};
+
+export function createEmptyPlan(name: string): RangePlan {
+  return {
+    id: `plan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name,
+    currentShelf: {
+      id: 'current',
+      name: 'Current Range',
+      items: [],
+      labels: [],
+      matrixLayout: { ...DEFAULT_MATRIX_LAYOUT, title: name },
+    },
+    futureShelf: {
+      id: 'future',
+      name: 'Future Range',
+      items: [],
+      labels: [],
+      matrixLayout: { ...DEFAULT_MATRIX_LAYOUT, title: name },
+    },
+    sankeyLinks: [],
+  };
 }
 
 // Card display format options

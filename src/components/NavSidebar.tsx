@@ -1,3 +1,4 @@
+import { useProjectStore } from '../store/useProjectStore';
 import './NavSidebar.css';
 
 export type ViewType = 'transform' | 'range-design';
@@ -10,8 +11,21 @@ interface NavSidebarProps {
 }
 
 export function NavSidebar({ activeView, designShelfId, onViewChange, onDesignShelfChange }: NavSidebarProps) {
+  const { showPlanTree, setShowPlanTree } = useProjectStore();
+
   return (
     <div className="nav-sidebar">
+      <button
+        className={`nav-item ${showPlanTree ? 'active' : ''}`}
+        onClick={() => setShowPlanTree(!showPlanTree)}
+        title="Range Plans"
+      >
+        <span className="nav-icon">☰</span>
+        <span className="nav-label">Plans</span>
+      </button>
+
+      <div className="nav-separator" />
+
       <button
         className={`nav-item ${activeView === 'range-design' ? 'active' : ''}`}
         onClick={() => onViewChange('range-design')}

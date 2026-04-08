@@ -14,6 +14,7 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Catalogue } from './Catalogue';
 import { useProjectStore } from '../store/useProjectStore';
 import type { Product, Shelf, MatrixLayout } from '../types';
+import { getActivePlan } from '../types';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
@@ -214,19 +215,20 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [wrapperSize, setWrapperSize] = useState({ w: 0, h: 0 });
 
-  const shelf = project?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'];
+  const activePlan = project ? getActivePlan(project) : undefined;
+  const shelf = activePlan?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'];
   const catalogue = project?.catalogue || [];
   const layout: MatrixLayout = useMemo(() =>
     shelf?.matrixLayout || { title: shelf?.name || '', xLabels: [], yLabels: [], assignments: [] },
     [shelf?.matrixLayout, shelf?.name]
   );
 
-  const currentProductIds = useMemo(() => new Set(
-    project?.currentShelf.items.map((i) => i.productId).filter(Boolean) || []
-  ), [project?.currentShelf.items]);
-  const futureProductIds = useMemo(() => new Set(
-    project?.futureShelf.items.map((i) => i.productId).filter(Boolean) || []
-  ), [project?.futureShelf.items]);
+  const currentProductIds = useMemo(() => new Set<string>(
+    activePlan?.currentShelf.items.map((i: { productId: string }) => i.productId).filter(Boolean) || []
+  ), [activePlan?.currentShelf.items]);
+  const futureProductIds = useMemo(() => new Set<string>(
+    activePlan?.futureShelf.items.map((i: { productId: string }) => i.productId).filter(Boolean) || []
+  ), [activePlan?.futureShelf.items]);
 
   useEffect(() => {
     const el = wrapperRef.current;

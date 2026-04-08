@@ -1,17 +1,5 @@
 import type { Project, Product } from '../types';
 
-// Range structure: everything except the catalogue data (volume, revenue etc)
-// Keeps SKU references so it can be matched against a catalogue later
-interface RangeStructure {
-  type: 'range-structure';
-  name: string;
-  currentShelf: Project['currentShelf'];
-  futureShelf: Project['futureShelf'];
-  sankeyLinks: Project['sankeyLinks'];
-  // Snapshot of product basics for display when no catalogue is loaded
-  productSnapshots: { id: string; sku: string; name: string; volume: number; revenue: number; rrp: number }[];
-}
-
 export function saveProject(project: Project): void {
   const json = JSON.stringify(project, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -24,22 +12,22 @@ export function saveProject(project: Project): void {
 }
 
 export function saveRangeStructure(project: Project): void {
-  // Create lightweight snapshots of products used in shelves
-  const usedProductIds = new Set([
-    ...project.currentShelf.items.map((i) => i.productId),
-    ...project.futureShelf.items.map((i) => i.productId),
-  ].filter(Boolean));
+  const usedProductIds = new Set<string>();
+  for (const plan of project.plans) {
+    for (const item of [...plan.currentShelf.items, ...plan.futureShelf.items]) {
+      if (item.productId) usedProductIds.add(item.productId);
+    }
+  }
 
   const productSnapshots = project.catalogue
     .filter((p) => usedProductIds.has(p.id))
     .map((p) => ({ id: p.id, sku: p.sku, name: p.name, volume: p.volume, revenue: p.revenue, rrp: p.rrp }));
 
-  const structure: RangeStructure = {
+  const structure = {
     type: 'range-structure',
     name: project.name,
-    currentShelf: project.currentShelf,
-    futureShelf: project.futureShelf,
-    sankeyLinks: project.sankeyLinks,
+    plans: project.plans,
+    activePlanId: project.activePlanId,
     productSnapshots,
   };
 
@@ -60,34 +48,22 @@ export function loadProjectFile(file: File): Promise<Project> {
       try {
         const data = JSON.parse(e.target!.result as string);
 
-        // Check if this is a range structure file
         if (data.type === 'range-structure') {
-          const structure = data as RangeStructure;
-          // Convert snapshots to minimal Product objects
-          const catalogue: Product[] = structure.productSnapshots.map((s) => ({
-            id: s.id,
-            sku: s.sku,
-            name: s.name,
-            category: '',
-            subCategory: '',
-            function: '',
-            productFamily: '',
-            volume: s.volume,
-            rrp: s.rrp,
-            revenue: s.revenue,
+          const catalogue: Product[] = (data.productSnapshots || []).map((s: Record<string, unknown>) => ({
+            id: s.id as string, sku: s.sku as string, name: s.name as string,
+            category: '', subCategory: '', function: '', productFamily: '',
+            volume: s.volume as number, rrp: s.rrp as number, revenue: s.revenue as number,
           }));
-
-          const project: Project = {
-            name: structure.name,
-            currentShelf: structure.currentShelf,
-            futureShelf: structure.futureShelf,
-            sankeyLinks: structure.sankeyLinks,
+          resolve({
+            name: data.name,
+            plans: data.plans || [],
+            activePlanId: data.activePlanId || data.plans?.[0]?.id || '',
             catalogue,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-          };
-          resolve(project);
+          });
         } else {
+          // The store's loadProject handles migration from old format
           resolve(data as Project);
         }
       } catch {

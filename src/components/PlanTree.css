@@ -1,0 +1,160 @@
+.plan-tree-panel {
+  width: 240px;
+  min-width: 240px;
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  animation: slideIn 0.15s ease;
+}
+
+@keyframes slideIn {
+  from { width: 0; min-width: 0; opacity: 0; }
+  to { width: 240px; min-width: 240px; opacity: 1; }
+}
+
+.plan-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.plan-tree-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.plan-tree-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.plan-tree-new {
+  padding: 3px 10px;
+  font-size: 11px;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.plan-tree-new:hover {
+  background: #1565c0;
+}
+
+.plan-tree-close {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.plan-tree-close:hover {
+  background: #f0f0f0;
+}
+
+.plan-tree-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.plan-tree-group {
+  margin-bottom: 8px;
+}
+
+.plan-tree-category {
+  font-size: 9px;
+  font-weight: 700;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+}
+
+.plan-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+  position: relative;
+}
+
+.plan-tree-item:hover {
+  background: #f5f5f5;
+}
+
+.plan-tree-item.active {
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+}
+
+.plan-tree-item-icon {
+  font-size: 14px;
+  color: #999;
+  flex-shrink: 0;
+}
+
+.plan-tree-item.active .plan-tree-item-icon {
+  color: #1976d2;
+}
+
+.plan-tree-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-tree-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-tree-item.active .plan-tree-item-name {
+  color: #1565c0;
+}
+
+.plan-tree-item-meta {
+  font-size: 9px;
+  color: #999;
+}
+
+.plan-tree-item-delete {
+  display: none;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: #ef5350;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 11px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.plan-tree-item:hover .plan-tree-item-delete {
+  display: flex;
+}

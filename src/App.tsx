@@ -14,6 +14,7 @@ import {
 import { arrayMove } from '@dnd-kit/sortable';
 import { Toolbar } from './components/Toolbar';
 import { NavSidebar, type ViewType } from './components/NavSidebar';
+import { PlanTree } from './components/PlanTree';
 import { Shelf } from './components/Shelf';
 import { Catalogue } from './components/Catalogue';
 import { SankeyFlow } from './components/SankeyFlow';
@@ -22,28 +23,9 @@ import { ProductCard } from './components/ProductCard';
 import { LinkPanel } from './components/LinkPanel';
 import { RangeDesign } from './components/RangeDesign';
 import { useProjectStore } from './store/useProjectStore';
+import { getActivePlan } from './types';
 import type { Product, ShelfItem } from './types';
 import './App.css';
-
-function findShelfForItem(project: NonNullable<ReturnType<typeof useProjectStore.getState>['project']>, itemId: string): string | null {
-  if (project.currentShelf.items.some((i) => i.id === itemId)) return 'current';
-  if (project.futureShelf.items.some((i) => i.id === itemId)) return 'future';
-  return null;
-}
-
-function getTargetShelfId(overId: string, project: NonNullable<ReturnType<typeof useProjectStore.getState>['project']>): string | null {
-  if (overId.startsWith('shelf-')) return overId.replace('shelf-', '');
-  if (overId === 'catalogue-drop-zone') return null;
-  if (project.currentShelf.items.some((i) => i.id === overId)) return 'current';
-  if (project.futureShelf.items.some((i) => i.id === overId)) return 'future';
-  return null;
-}
-
-function isProductOnShelf(project: NonNullable<ReturnType<typeof useProjectStore.getState>['project']>, productId: string, shelfId: string): boolean {
-  if (!productId) return false;
-  const shelf = shelfId === 'current' ? project.currentShelf : project.futureShelf;
-  return shelf.items.some((item) => item.productId === productId);
-}
 
 function App() {
   const {
@@ -60,12 +42,15 @@ function App() {
     setLinkSource,
     assumeContinuity,
     copyCurrentToFuture,
+    showPlanTree,
   } = useProjectStore();
+
+  const activePlan = project ? getActivePlan(project) : undefined;
 
   const [showImport, setShowImport] = useState(false);
   const [showNewProject, setShowNewProject] = useState(!project);
   const [newProjectName, setNewProjectName] = useState('');
-  const [activeView, setActiveView] = useState<ViewType>('transform');
+  const [activeView, setActiveView] = useState<ViewType>('range-design');
   const [designShelfId, setDesignShelfId] = useState<'current' | 'future'>('current');
   const [activeItem, setActiveItem] = useState<{
     item: ShelfItem;
@@ -76,18 +61,30 @@ function App() {
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [shelfRailWidth, setShelfRailWidth] = useState(0);
 
-  const currentProductIds = useMemo(() => new Set(
-    project?.currentShelf.items.map((i) => i.productId).filter(Boolean) || []
-  ), [project?.currentShelf.items]);
-
-  const futureProductIds = useMemo(() => new Set(
-    project?.futureShelf.items.map((i) => i.productId).filter(Boolean) || []
-  ), [project?.futureShelf.items]);
+  // Build usage sets across ALL plans for catalogue badges
+  const { currentPlanProductIds, futurePlanProductIds, otherPlansCurrentIds, otherPlansFutureIds } = useMemo(() => {
+    if (!project || !activePlan) return {
+      currentPlanProductIds: new Set<string>(),
+      futurePlanProductIds: new Set<string>(),
+      otherPlansCurrentIds: new Set<string>(),
+      otherPlansFutureIds: new Set<string>(),
+    };
+    const curIds = new Set(activePlan.currentShelf.items.map((i) => i.productId).filter(Boolean));
+    const futIds = new Set(activePlan.futureShelf.items.map((i) => i.productId).filter(Boolean));
+    const otherCur = new Set<string>();
+    const otherFut = new Set<string>();
+    for (const plan of project.plans) {
+      if (plan.id === activePlan.id) continue;
+      for (const item of plan.currentShelf.items) if (item.productId) otherCur.add(item.productId);
+      for (const item of plan.futureShelf.items) if (item.productId) otherFut.add(item.productId);
+    }
+    return { currentPlanProductIds: curIds, futurePlanProductIds: futIds, otherPlansCurrentIds: otherCur, otherPlansFutureIds: otherFut };
+  }, [project, activePlan]);
 
   const linkSourceItem = useMemo(() => {
-    if (!linkMode || !linkSource || !project) return null;
-    return project.currentShelf.items.find((i) => i.id === linkSource) || null;
-  }, [linkMode, linkSource, project]);
+    if (!linkMode || !linkSource || !activePlan) return null;
+    return activePlan.currentShelf.items.find((i) => i.id === linkSource) || null;
+  }, [linkMode, linkSource, activePlan]);
 
   const linkSourceProduct = useMemo(() => {
     if (!linkSourceItem || !project) return undefined;
@@ -100,8 +97,7 @@ function App() {
   );
 
   const handleCreateProject = () => {
-    const name = newProjectName.trim() || 'Untitled Project';
-    createProject(name, []);
+    createProject(newProjectName.trim() || 'Untitled Project', []);
     setShowNewProject(false);
   };
 
@@ -114,73 +110,75 @@ function App() {
     }
   };
 
-  const handleAddPlaceholder = useCallback(
-    (shelfId: string) => {
-      const name = prompt('Placeholder name (e.g. "New Premium SKU"):');
-      if (name === null) return;
-      addItemToShelf(shelfId, {
-        id: `placeholder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        productId: '',
-        position: project?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length || 0,
-        isPlaceholder: true,
-        placeholderName: name || 'New SKU',
-      });
-    },
-    [project, addItemToShelf]
-  );
+  const handleAddPlaceholder = useCallback((shelfId: string) => {
+    const name = prompt('Placeholder name (e.g. "New Premium SKU"):');
+    if (name === null) return;
+    addItemToShelf(shelfId, {
+      id: `placeholder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      productId: '', position: activePlan?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length || 0,
+      isPlaceholder: true, placeholderName: name || 'New SKU',
+    });
+  }, [activePlan, addItemToShelf]);
 
   const showDuplicateWarning = (productName: string) => {
     setDuplicateWarning(`"${productName}" is already in this range`);
     setTimeout(() => setDuplicateWarning(null), 2500);
   };
 
-  const handleRailWidthChange = useCallback((width: number) => {
-    setShelfRailWidth(width);
-  }, []);
+  const handleRailWidthChange = useCallback((width: number) => setShelfRailWidth(width), []);
 
   const enterLinkModeFor = useCallback((itemId: string) => {
     setLinkMode(true);
     setLinkSource(itemId);
   }, [setLinkMode, setLinkSource]);
 
-  const handleSankeyClick = useCallback((sourceItemId: string) => {
-    enterLinkModeFor(sourceItemId);
-  }, [enterLinkModeFor]);
+  const handleSankeyClick = useCallback((sourceItemId: string) => enterLinkModeFor(sourceItemId), [enterLinkModeFor]);
+
+  // Drag handlers
+  const findShelfForItem = (itemId: string): string | null => {
+    if (!activePlan) return null;
+    if (activePlan.currentShelf.items.some((i) => i.id === itemId)) return 'current';
+    if (activePlan.futureShelf.items.some((i) => i.id === itemId)) return 'future';
+    return null;
+  };
+
+  const getTargetShelfId = (overId: string): string | null => {
+    if (!activePlan) return null;
+    if (overId.startsWith('shelf-')) return overId.replace('shelf-', '');
+    if (overId === 'catalogue-drop-zone') return null;
+    if (activePlan.currentShelf.items.some((i) => i.id === overId)) return 'current';
+    if (activePlan.futureShelf.items.some((i) => i.id === overId)) return 'future';
+    return null;
+  };
+
+  const isProductOnShelf = (productId: string, shelfId: string): boolean => {
+    if (!productId || !activePlan) return false;
+    const shelf = shelfId === 'current' ? activePlan.currentShelf : activePlan.futureShelf;
+    return shelf.items.some((item) => item.productId === productId);
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const activeId = String(active.id);
-
+    const activeId = String(event.active.id);
     if (activeId.startsWith('catalogue-')) {
-      const data = active.data.current as { product: Product };
-      if (data?.product) {
-        setActiveItem({
-          item: { id: activeId, productId: data.product.id, position: 0, isPlaceholder: false },
-          product: data.product,
-        });
-      }
+      const data = event.active.data.current as { product: Product };
+      if (data?.product) setActiveItem({ item: { id: activeId, productId: data.product.id, position: 0, isPlaceholder: false }, product: data.product });
       return;
     }
-
-    if (!project) return;
-    const sourceShelf = findShelfForItem(project, activeId);
-    const allItems = [...project.currentShelf.items, ...project.futureShelf.items];
+    if (!activePlan) return;
+    const sourceShelf = findShelfForItem(activeId);
+    const allItems = [...activePlan.currentShelf.items, ...activePlan.futureShelf.items];
     const item = allItems.find((i) => i.id === activeId);
     if (item) {
-      const product = project.catalogue.find((p) => p.id === item.productId);
+      const product = project?.catalogue.find((p) => p.id === item.productId);
       setActiveItem({ item, product, sourceShelf: sourceShelf || undefined });
     }
   };
 
   const handleDragOver = (event: DragOverEvent) => {
     const { over } = event;
-    if (!over || !project) { setOverShelfId(null); return; }
+    if (!over) { setOverShelfId(null); return; }
     const overId = String(over.id);
-    if (overId === 'catalogue-drop-zone') {
-      setOverShelfId('catalogue');
-    } else {
-      setOverShelfId(getTargetShelfId(overId, project));
-    }
+    setOverShelfId(overId === 'catalogue-drop-zone' ? 'catalogue' : getTargetShelfId(overId));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -188,81 +186,47 @@ function App() {
     setActiveItem(null);
     setOverShelfId(null);
     const { active, over } = event;
-    if (!over || !project) return;
-
+    if (!over || !activePlan || !project) return;
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    // Drop on catalogue = remove
     if (overId === 'catalogue-drop-zone' && draggedItem?.sourceShelf && draggedItem.item) {
       removeItemFromShelf(draggedItem.sourceShelf, draggedItem.item.id);
       return;
     }
 
-    const targetShelfId = getTargetShelfId(overId, project);
+    const targetShelfId = getTargetShelfId(overId);
 
-    // Catalogue item onto shelf
     if (activeId.startsWith('catalogue-')) {
       const data = active.data.current as { product: Product };
       if (!data?.product || !targetShelfId) return;
-      if (isProductOnShelf(project, data.product.id, targetShelfId)) {
-        showDuplicateWarning(data.product.name); return;
-      }
-      const currentItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      addItemToShelf(targetShelfId, {
-        id: currentItemId,
-        productId: data.product.id,
-        position: project[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length,
-        isPlaceholder: false,
-      });
-
-      if (targetShelfId === 'current' && assumeContinuity && !isProductOnShelf(project, data.product.id, 'future')) {
+      if (isProductOnShelf(data.product.id, targetShelfId)) { showDuplicateWarning(data.product.name); return; }
+      const newItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      addItemToShelf(targetShelfId, { id: newItemId, productId: data.product.id, position: activePlan[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length, isPlaceholder: false });
+      if (targetShelfId === 'current' && assumeContinuity && !isProductOnShelf(data.product.id, 'future')) {
         const futureItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-        addItemToShelf('future', {
-          id: futureItemId,
-          productId: data.product.id,
-          position: project.futureShelf.items.length,
-          isPlaceholder: false,
-        });
-        addLink({
-          sourceItemId: currentItemId,
-          targetItemId: futureItemId,
-          percent: 100,
-          volume: data.product.volume || 0,
-          type: 'transfer',
-        });
+        addItemToShelf('future', { id: futureItemId, productId: data.product.id, position: activePlan.futureShelf.items.length, isPlaceholder: false });
+        addLink({ sourceItemId: newItemId, targetItemId: futureItemId, percent: 100, volume: data.product.volume || 0, type: 'transfer' });
       }
       return;
     }
 
-    // Cross-shelf drag: duplicate
     const sourceShelf = draggedItem?.sourceShelf;
     if (sourceShelf && targetShelfId && sourceShelf !== targetShelfId) {
       const sourceItem = draggedItem?.item;
       if (!sourceItem) return;
-      if (sourceItem.productId && isProductOnShelf(project, sourceItem.productId, targetShelfId)) {
-        showDuplicateWarning(draggedItem?.product?.name || 'This product'); return;
-      }
-      addItemToShelf(targetShelfId, {
-        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        productId: sourceItem.productId,
-        position: project[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length,
-        isPlaceholder: sourceItem.isPlaceholder,
-        placeholderName: sourceItem.placeholderName,
-      });
+      if (sourceItem.productId && isProductOnShelf(sourceItem.productId, targetShelfId)) { showDuplicateWarning(draggedItem?.product?.name || 'This product'); return; }
+      addItemToShelf(targetShelfId, { id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, productId: sourceItem.productId, position: activePlan[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length, isPlaceholder: sourceItem.isPlaceholder, placeholderName: sourceItem.placeholderName });
       return;
     }
 
-    // Reorder within shelf
     if (sourceShelf && targetShelfId === sourceShelf) {
       const shelfKey = sourceShelf === 'current' ? 'currentShelf' : 'futureShelf';
-      const items = project[shelfKey].items;
+      const items = activePlan[shelfKey].items;
       const oldIndex = items.findIndex((i) => i.id === activeId);
       const newIndex = items.findIndex((i) => i.id === overId);
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        reorderShelfItems(sourceShelf, arrayMove(items, oldIndex, newIndex).map((item, idx) => ({
-          ...item, position: idx,
-        })));
+        reorderShelfItems(sourceShelf, arrayMove(items, oldIndex, newIndex).map((item, idx) => ({ ...item, position: idx })));
       }
     }
   };
@@ -293,75 +257,62 @@ function App() {
   return (
     <div className="app">
       <Toolbar onImport={() => setShowImport(true)} />
-
       <div className="workspace">
         <NavSidebar activeView={activeView} designShelfId={designShelfId}
           onViewChange={setActiveView} onDesignShelfChange={setDesignShelfId} />
 
-        {activeView === 'transform' ? (
+        {showPlanTree && <PlanTree />}
+
+        {activeView === 'transform' && activePlan ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter}
             onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="shelves-area">
-              {project && (
-                <>
-                  {/* Shared title */}
-                  <div className="transform-title-bar">
-                    <h2 className="transform-title">{project.currentShelf.matrixLayout?.title || project.name}</h2>
-                    <button className="transform-copy-btn" onClick={copyCurrentToFuture}
-                      title="Copy all current range products to future range as a starting point">
-                      Copy Current → Future
-                    </button>
-                  </div>
+              <div className="transform-title-bar">
+                <h2 className="transform-title">{activePlan.name}</h2>
+                <button className="transform-copy-btn" onClick={copyCurrentToFuture}>Copy Current → Future</button>
+              </div>
 
-                  <Shelf shelf={project.currentShelf} catalogue={project.catalogue}
-                    onAddPlaceholder={() => handleAddPlaceholder('current')}
-                    onRailWidthChange={handleRailWidthChange}
-                    onDoubleClickItem={enterLinkModeFor}
-                    onViewDesign={() => { setDesignShelfId('current'); setActiveView('range-design'); }} />
+              <Shelf shelf={activePlan.currentShelf} catalogue={project!.catalogue}
+                onAddPlaceholder={() => handleAddPlaceholder('current')}
+                onRailWidthChange={handleRailWidthChange}
+                onDoubleClickItem={enterLinkModeFor}
+                onViewDesign={() => { setDesignShelfId('current'); setActiveView('range-design'); }} />
 
-                  {linkMode && linkSourceItem && (
-                    <LinkPanel
-                      sourceItem={linkSourceItem}
-                      sourceProduct={linkSourceProduct}
-                      links={project.sankeyLinks}
-                      futureItems={project.futureShelf.items}
-                      catalogue={project.catalogue}
-                    />
-                  )}
-
-                  <SankeyFlow
-                    currentShelf={project.currentShelf} futureShelf={project.futureShelf}
-                    links={project.sankeyLinks} catalogue={project.catalogue}
-                    railWidth={shelfRailWidth} onClickFlow={handleSankeyClick} />
-
-                  <Shelf shelf={project.futureShelf} catalogue={project.catalogue}
-                    onAddPlaceholder={() => handleAddPlaceholder('future')}
-                    onViewDesign={() => { setDesignShelfId('future'); setActiveView('range-design'); }} />
-
-                  {activeItem?.sourceShelf && overShelfId === 'catalogue' && (
-                    <div className="cross-shelf-hint remove-hint">Drop to remove from range</div>
-                  )}
-                  {activeItem?.sourceShelf && overShelfId && overShelfId !== 'catalogue' && overShelfId !== activeItem.sourceShelf && (
-                    <div className="cross-shelf-hint">
-                      Drop to duplicate into {overShelfId === 'current' ? 'Current' : 'Future'} Range
-                    </div>
-                  )}
-                  {duplicateWarning && <div className="duplicate-warning">{duplicateWarning}</div>}
-                </>
+              {linkMode && linkSourceItem && (
+                <LinkPanel sourceItem={linkSourceItem} sourceProduct={linkSourceProduct}
+                  links={activePlan.sankeyLinks} futureItems={activePlan.futureShelf.items}
+                  catalogue={project!.catalogue} />
               )}
+
+              <SankeyFlow currentShelf={activePlan.currentShelf} futureShelf={activePlan.futureShelf}
+                links={activePlan.sankeyLinks} catalogue={project!.catalogue}
+                railWidth={shelfRailWidth} onClickFlow={handleSankeyClick} />
+
+              <Shelf shelf={activePlan.futureShelf} catalogue={project!.catalogue}
+                onAddPlaceholder={() => handleAddPlaceholder('future')}
+                onViewDesign={() => { setDesignShelfId('future'); setActiveView('range-design'); }} />
+
+              {activeItem?.sourceShelf && overShelfId === 'catalogue' && (
+                <div className="cross-shelf-hint remove-hint">Drop to remove from range</div>
+              )}
+              {activeItem?.sourceShelf && overShelfId && overShelfId !== 'catalogue' && overShelfId !== activeItem.sourceShelf && (
+                <div className="cross-shelf-hint">Drop to duplicate into {overShelfId === 'current' ? 'Current' : 'Future'} Range</div>
+              )}
+              {duplicateWarning && <div className="duplicate-warning">{duplicateWarning}</div>}
             </div>
 
             <Catalogue products={project?.catalogue || []} onImport={() => setShowImport(true)}
-              currentProductIds={currentProductIds} futureProductIds={futureProductIds}
+              currentProductIds={currentPlanProductIds} futureProductIds={futurePlanProductIds}
+              otherCurrentIds={otherPlansCurrentIds} otherFutureIds={otherPlansFutureIds}
               isDropTarget={!!activeItem?.sourceShelf} />
 
             <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
               {activeItem && <ProductCard item={activeItem.item} product={activeItem.product} overlay />}
             </DragOverlay>
           </DndContext>
-        ) : (
+        ) : activeView === 'range-design' ? (
           <RangeDesign shelfId={designShelfId} onImport={() => setShowImport(true)} />
-        )}
+        ) : null}
       </div>
 
       {showImport && <ImportDialog onImport={handleImport} onClose={() => setShowImport(false)} />}

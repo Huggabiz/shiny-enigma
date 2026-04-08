@@ -48,6 +48,13 @@
   letter-spacing: 0.3px;
 }
 
+.nav-separator {
+  width: 36px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 0;
+}
+
 .nav-shelf-toggle {
   display: flex;
   flex-direction: column;

@@ -8,31 +8,41 @@ interface CatalogueProps {
   onImport: () => void;
   currentProductIds: Set<string>;
   futureProductIds: Set<string>;
+  otherCurrentIds?: Set<string>;
+  otherFutureIds?: Set<string>;
   isDropTarget?: boolean;
 }
 
-function UsageBadges({ productId, currentProductIds, futureProductIds }: {
+function UsageBadges({ productId, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds }: {
   productId: string;
   currentProductIds: Set<string>;
   futureProductIds: Set<string>;
+  otherCurrentIds?: Set<string>;
+  otherFutureIds?: Set<string>;
 }) {
   const inCurrent = currentProductIds.has(productId);
   const inFuture = futureProductIds.has(productId);
-  if (!inCurrent && !inFuture) return null;
+  const inOtherCurrent = otherCurrentIds?.has(productId);
+  const inOtherFuture = otherFutureIds?.has(productId);
+  if (!inCurrent && !inFuture && !inOtherCurrent && !inOtherFuture) return null;
 
   return (
     <div className="catalogue-usage-badges">
-      {inCurrent && <span className="usage-badge current" title="In Current Range">C</span>}
-      {inFuture && <span className="usage-badge future" title="In Future Range">F</span>}
+      {inCurrent && <span className="usage-badge current" title="In Current Range (this plan)">C</span>}
+      {!inCurrent && inOtherCurrent && <span className="usage-badge current other" title="In Current Range (other plan)">C</span>}
+      {inFuture && <span className="usage-badge future" title="In Future Range (this plan)">F</span>}
+      {!inFuture && inOtherFuture && <span className="usage-badge future other" title="In Future Range (other plan)">F</span>}
     </div>
   );
 }
 
-function CatalogueItem({ product, expanded, currentProductIds, futureProductIds }: {
+function CatalogueItem({ product, expanded, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds }: {
   product: Product;
   expanded: boolean;
   currentProductIds: Set<string>;
   futureProductIds: Set<string>;
+  otherCurrentIds?: Set<string>;
+  otherFutureIds?: Set<string>;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `catalogue-${product.id}`,
@@ -51,7 +61,7 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds 
         {...attributes}
         {...listeners}
       >
-        <UsageBadges productId={product.id} currentProductIds={currentProductIds} futureProductIds={futureProductIds} />
+        <UsageBadges productId={product.id} currentProductIds={currentProductIds} futureProductIds={futureProductIds} otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds} />
         <div className="catalogue-item-image-large">
           {product.imageUrl ? (
             <img src={product.imageUrl} alt={product.name} />
@@ -81,7 +91,7 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds 
       {...attributes}
       {...listeners}
     >
-      <UsageBadges productId={product.id} currentProductIds={currentProductIds} futureProductIds={futureProductIds} />
+      <UsageBadges productId={product.id} currentProductIds={currentProductIds} futureProductIds={futureProductIds} otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds} />
       <div className="catalogue-item-image">
         {product.imageUrl ? (
           <img src={product.imageUrl} alt={product.name} />
@@ -130,7 +140,7 @@ function groupByCategory(products: Product[]): GroupedProducts[] {
     }));
 }
 
-export function Catalogue({ products, onImport, currentProductIds, futureProductIds, isDropTarget }: CatalogueProps) {
+export function Catalogue({ products, onImport, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds, isDropTarget }: CatalogueProps) {
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({ id: 'catalogue-drop-zone' });
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -297,6 +307,8 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
                             expanded={expanded}
                             currentProductIds={currentProductIds}
                             futureProductIds={futureProductIds}
+                            otherCurrentIds={otherCurrentIds}
+                            otherFutureIds={otherFutureIds}
                           />
                         ))}
                       </div>

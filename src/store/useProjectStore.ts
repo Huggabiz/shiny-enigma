@@ -1,6 +1,26 @@
 import { create } from 'zustand';
-import type { Product, Project, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat } from '../types';
-import { DEFAULT_CARD_FORMAT } from '../types';
+import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat } from '../types';
+import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan } from '../types';
+
+// Helper: update a specific plan in the plans array
+function updatePlan(project: Project, planId: string, updater: (plan: RangePlan) => RangePlan): Project {
+  return {
+    ...project,
+    plans: project.plans.map((p) => p.id === planId ? updater(p) : p),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+// Helper: update a shelf within the active plan
+function updateShelf(project: Project, shelfId: string, updater: (shelf: Shelf) => Shelf): Project {
+  const plan = getActivePlan(project);
+  if (!plan) return project;
+  const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
+  return updatePlan(project, plan.id, (p) => ({
+    ...p,
+    [shelfKey]: updater(p[shelfKey]),
+  }));
+}
 
 interface ProjectStore {
   project: Project | null;
@@ -9,19 +29,30 @@ interface ProjectStore {
   linkSource: string | null;
   assumeContinuity: boolean;
   cardFormat: CardFormat;
+  showPlanTree: boolean;
+
+  // Card format
   setCardFormat: (format: Partial<CardFormat>) => void;
+
+  // Plan tree
+  setShowPlanTree: (show: boolean) => void;
 
   // Project actions
   createProject: (name: string, catalogue: Product[]) => void;
   loadProject: (project: Project) => void;
   updateProjectName: (name: string) => void;
 
+  // Plan management
+  addPlan: (name: string) => void;
+  removePlan: (planId: string) => void;
+  setActivePlan: (planId: string) => void;
+  renamePlan: (planId: string, name: string) => void;
+
   // Catalogue actions
   setCatalogue: (products: Product[]) => void;
   clearCatalogue: () => void;
-  clearRanges: () => void;
 
-  // Shelf actions
+  // Shelf actions (operate on active plan)
   addItemToShelf: (shelfId: string, item: ShelfItem) => void;
   removeItemFromShelf: (shelfId: string, itemId: string) => void;
   reorderShelfItems: (shelfId: string, items: ShelfItem[]) => void;
@@ -32,17 +63,15 @@ interface ProjectStore {
   updateLabel: (shelfId: string, labelId: string, updates: Partial<ShelfLabel>) => void;
   removeLabel: (shelfId: string, labelId: string) => void;
 
-  // Sankey actions
+  // Sankey actions (operate on active plan)
   addLink: (link: SankeyLink) => void;
   removeLink: (sourceId: string, targetId: string) => void;
   updateLink: (sourceId: string, targetId: string, updates: Partial<SankeyLink>) => void;
   clearLinks: () => void;
-  autoLinkMatchingProducts: () => void;
-  recalculateLinkVolumes: () => void;
   copyCurrentToFuture: () => void;
   reorderShelfByMatrix: (shelfId: string) => void;
 
-  // Matrix layout
+  // Matrix layout (operate on active plan)
   updateMatrixLayout: (shelfId: string, layout: Partial<import('../types').MatrixLayout>) => void;
   setMatrixAssignment: (shelfId: string, itemId: string, row: number, col: number) => void;
   removeMatrixAssignment: (shelfId: string, itemId: string) => void;
@@ -52,20 +81,10 @@ interface ProjectStore {
   setLinkMode: (enabled: boolean) => void;
   setLinkSource: (id: string | null) => void;
   setAssumeContinuity: (enabled: boolean) => void;
-}
 
-const createEmptyShelf = (id: string, name: string, projectName: string): Shelf => ({
-  id,
-  name,
-  items: [],
-  labels: [],
-  matrixLayout: {
-    title: projectName,
-    xLabels: ['Entry', 'Core', 'Premium'],
-    yLabels: ['Category 1', 'Category 2'],
-    assignments: [],
-  },
-});
+  // Manage
+  clearRanges: () => void;
+}
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   project: null,
@@ -74,15 +93,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   linkSource: null,
   assumeContinuity: true,
   cardFormat: { ...DEFAULT_CARD_FORMAT },
+  showPlanTree: false,
+
   setCardFormat: (updates) => set((state) => ({ cardFormat: { ...state.cardFormat, ...updates } })),
+  setShowPlanTree: (show) => set({ showPlanTree: show }),
 
   createProject: (name, catalogue) => {
+    const firstPlan = createEmptyPlan('Range Plan 1');
     set({
       project: {
         name,
-        currentShelf: createEmptyShelf('current', 'Current Range', name),
-        futureShelf: createEmptyShelf('future', 'Future Range', name),
-        sankeyLinks: [],
+        plans: [firstPlan],
+        activePlanId: firstPlan.id,
         catalogue,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -91,7 +113,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   loadProject: (project) => {
-    set({ project, selectedItemId: null, linkMode: false, linkSource: null });
+    // Migration: if old format (no plans array), convert
+    const migrated = migrateProject(project as unknown as Record<string, unknown>);
+    set({ project: migrated, selectedItemId: null, linkMode: false, linkSource: null });
   },
 
   updateProjectName: (name) => {
@@ -100,26 +124,84 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ project: { ...project, name, updatedAt: new Date().toISOString() } });
   },
 
+  // Plan management
+  addPlan: (name) => {
+    const { project } = get();
+    if (!project) return;
+    const newPlan = createEmptyPlan(name);
+    set({
+      project: {
+        ...project,
+        plans: [...project.plans, newPlan],
+        activePlanId: newPlan.id,
+        updatedAt: new Date().toISOString(),
+      },
+      linkMode: false,
+      linkSource: null,
+    });
+  },
+
+  removePlan: (planId) => {
+    const { project } = get();
+    if (!project || project.plans.length <= 1) return;
+    const remaining = project.plans.filter((p) => p.id !== planId);
+    set({
+      project: {
+        ...project,
+        plans: remaining,
+        activePlanId: project.activePlanId === planId ? remaining[0].id : project.activePlanId,
+        updatedAt: new Date().toISOString(),
+      },
+      linkMode: false,
+      linkSource: null,
+    });
+  },
+
+  setActivePlan: (planId) => {
+    const { project } = get();
+    if (!project) return;
+    set({
+      project: { ...project, activePlanId: planId },
+      linkMode: false,
+      linkSource: null,
+      selectedItemId: null,
+    });
+  },
+
+  renamePlan: (planId, name) => {
+    const { project } = get();
+    if (!project) return;
+    set({
+      project: updatePlan(project, planId, (p) => ({
+        ...p,
+        name,
+        currentShelf: {
+          ...p.currentShelf,
+          matrixLayout: p.currentShelf.matrixLayout ? { ...p.currentShelf.matrixLayout, title: name } : undefined,
+        },
+        futureShelf: {
+          ...p.futureShelf,
+          matrixLayout: p.futureShelf.matrixLayout ? { ...p.futureShelf.matrixLayout, title: name } : undefined,
+        },
+      })),
+    });
+  },
+
+  // Catalogue
   setCatalogue: (newProducts) => {
     const { project } = get();
     if (!project) return;
-
-    // Build lookup of new products by SKU
     const newBySku = new Map(newProducts.map((p) => [p.sku, p]));
-
-    // Update existing catalogue products with new data, keeping IDs stable
     const updatedCatalogue = newProducts.map((p) => {
-      // Check if this SKU already existed in the old catalogue
       const existing = project.catalogue.find((old) => old.sku === p.sku);
-      if (existing) {
-        // Preserve the old ID so shelf references remain valid
-        return { ...p, id: existing.id };
-      }
-      return p;
+      return existing ? { ...p, id: existing.id } : p;
     });
 
-    // Find products on shelves whose SKU is missing from the new import
-    const allShelfItems = [...project.currentShelf.items, ...project.futureShelf.items];
+    // Check all plans for missing products
+    const allShelfItems = project.plans.flatMap((plan) => [
+      ...plan.currentShelf.items,
+      ...plan.futureShelf.items,
+    ]);
     const missingProducts: string[] = [];
     for (const item of allShelfItems) {
       if (item.isPlaceholder || !item.productId) continue;
@@ -127,21 +209,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       if (!oldProduct) continue;
       if (!newBySku.has(oldProduct.sku)) {
         missingProducts.push(oldProduct.name || oldProduct.sku);
-        // Keep the old product in catalogue so the shelf reference doesn't break
         if (!updatedCatalogue.some((p) => p.id === oldProduct.id)) {
           updatedCatalogue.push(oldProduct);
         }
       }
     }
 
-    set({
-      project: { ...project, catalogue: updatedCatalogue, updatedAt: new Date().toISOString() },
-    });
+    set({ project: { ...project, catalogue: updatedCatalogue, updatedAt: new Date().toISOString() } });
 
-    // Return missing products for notification
     if (missingProducts.length > 0) {
       setTimeout(() => {
-        alert(`The following products are in your ranges but missing from the new catalogue:\n\n${missingProducts.join('\n')}\n\nThey have been kept with their old data.`);
+        alert(`Missing from new catalogue:\n\n${[...new Set(missingProducts)].join('\n')}\n\nKept with old data.`);
       }, 100);
     }
   },
@@ -152,311 +230,163 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ project: { ...project, catalogue: [], updatedAt: new Date().toISOString() } });
   },
 
-  clearRanges: () => {
-    const { project } = get();
-    if (!project) return;
-    const preserveLayout = (shelfId: string, name: string) => ({
-      id: shelfId,
-      name,
-      items: [],
-      labels: [],
-      matrixLayout: project[shelfId === 'current' ? 'currentShelf' : 'futureShelf'].matrixLayout
-        ? {
-            ...project[shelfId === 'current' ? 'currentShelf' : 'futureShelf'].matrixLayout!,
-            assignments: [],
-          }
-        : undefined,
-    });
-    set({
-      project: {
-        ...project,
-        currentShelf: preserveLayout('current', project.currentShelf.name),
-        futureShelf: preserveLayout('future', project.futureShelf.name),
-        sankeyLinks: [],
-        updatedAt: new Date().toISOString(),
-      },
-      linkMode: false,
-      linkSource: null,
-    });
-  },
-
+  // Shelf actions — operate on active plan
   addItemToShelf: (shelfId, item) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    set({
-      project: {
-        ...project,
-        [shelfKey]: { ...shelf, items: [...shelf.items, item] },
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    set({ project: updateShelf(project, shelfId, (shelf) => ({
+      ...shelf, items: [...shelf.items, item],
+    }))});
   },
 
   removeItemFromShelf: (shelfId, itemId) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    set({
-      project: {
-        ...project,
-        [shelfKey]: { ...shelf, items: shelf.items.filter((i) => i.id !== itemId) },
-        sankeyLinks: project.sankeyLinks.filter(
-          (l) => l.sourceItemId !== itemId && l.targetItemId !== itemId
-        ),
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    const plan = getActivePlan(project);
+    if (!plan) return;
+    let updated = updateShelf(project, shelfId, (shelf) => ({
+      ...shelf, items: shelf.items.filter((i) => i.id !== itemId),
+    }));
+    // Also remove sankey links referencing this item
+    updated = updatePlan(updated, plan.id, (p) => ({
+      ...p,
+      sankeyLinks: p.sankeyLinks.filter((l) => l.sourceItemId !== itemId && l.targetItemId !== itemId),
+    }));
+    set({ project: updated });
   },
 
   reorderShelfItems: (shelfId, items) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    set({
-      project: {
-        ...project,
-        [shelfKey]: { ...shelf, items },
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    set({ project: updateShelf(project, shelfId, (shelf) => ({ ...shelf, items })) });
   },
 
   updateShelfItem: (shelfId, itemId, updates) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    set({
-      project: {
-        ...project,
-        [shelfKey]: {
-          ...shelf,
-          items: shelf.items.map((i) => (i.id === itemId ? { ...i, ...updates } : i)),
-        },
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    set({ project: updateShelf(project, shelfId, (shelf) => ({
+      ...shelf, items: shelf.items.map((i) => i.id === itemId ? { ...i, ...updates } : i),
+    }))});
   },
 
+  // Labels
   addLabel: (shelfId, label) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    set({
-      project: {
-        ...project,
-        [shelfKey]: { ...shelf, labels: [...shelf.labels, label] },
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    set({ project: updateShelf(project, shelfId, (shelf) => ({
+      ...shelf, labels: [...shelf.labels, label],
+    }))});
   },
 
   updateLabel: (shelfId, labelId, updates) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    set({
-      project: {
-        ...project,
-        [shelfKey]: {
-          ...shelf,
-          labels: shelf.labels.map((l) => (l.id === labelId ? { ...l, ...updates } : l)),
-        },
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    set({ project: updateShelf(project, shelfId, (shelf) => ({
+      ...shelf, labels: shelf.labels.map((l) => l.id === labelId ? { ...l, ...updates } : l),
+    }))});
   },
 
   removeLabel: (shelfId, labelId) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    set({
-      project: {
-        ...project,
-        [shelfKey]: { ...shelf, labels: shelf.labels.filter((l) => l.id !== labelId) },
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    set({ project: updateShelf(project, shelfId, (shelf) => ({
+      ...shelf, labels: shelf.labels.filter((l) => l.id !== labelId),
+    }))});
   },
 
+  // Sankey
   addLink: (link) => {
     const { project } = get();
     if (!project) return;
-    const exists = project.sankeyLinks.some(
-      (l) => l.sourceItemId === link.sourceItemId && l.targetItemId === link.targetItemId
-    );
-    if (exists) return;
-    set({
-      project: {
-        ...project,
-        sankeyLinks: [...project.sankeyLinks, link],
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    const plan = getActivePlan(project);
+    if (!plan) return;
+    if (plan.sankeyLinks.some((l) => l.sourceItemId === link.sourceItemId && l.targetItemId === link.targetItemId)) return;
+    set({ project: updatePlan(project, plan.id, (p) => ({
+      ...p, sankeyLinks: [...p.sankeyLinks, link],
+    }))});
   },
 
   removeLink: (sourceId, targetId) => {
     const { project } = get();
     if (!project) return;
-    set({
-      project: {
-        ...project,
-        sankeyLinks: project.sankeyLinks.filter(
-          (l) => !(l.sourceItemId === sourceId && l.targetItemId === targetId)
-        ),
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    const plan = getActivePlan(project);
+    if (!plan) return;
+    set({ project: updatePlan(project, plan.id, (p) => ({
+      ...p, sankeyLinks: p.sankeyLinks.filter((l) => !(l.sourceItemId === sourceId && l.targetItemId === targetId)),
+    }))});
   },
 
   updateLink: (sourceId, targetId, updates) => {
     const { project } = get();
     if (!project) return;
-    set({
-      project: {
-        ...project,
-        sankeyLinks: project.sankeyLinks.map((l) =>
-          l.sourceItemId === sourceId && l.targetItemId === targetId ? { ...l, ...updates } : l
-        ),
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    const plan = getActivePlan(project);
+    if (!plan) return;
+    set({ project: updatePlan(project, plan.id, (p) => ({
+      ...p, sankeyLinks: p.sankeyLinks.map((l) =>
+        l.sourceItemId === sourceId && l.targetItemId === targetId ? { ...l, ...updates } : l
+      ),
+    }))});
   },
 
   clearLinks: () => {
     const { project } = get();
     if (!project) return;
-    set({
-      project: { ...project, sankeyLinks: [], updatedAt: new Date().toISOString() },
-    });
-  },
-
-  // Auto-link: if a productId exists in both current and future, create a 100% transfer link
-  autoLinkMatchingProducts: () => {
-    const { project } = get();
-    if (!project) return;
-    const newLinks: SankeyLink[] = [...project.sankeyLinks];
-
-    for (const currentItem of project.currentShelf.items) {
-      if (!currentItem.productId) continue;
-      const futureItem = project.futureShelf.items.find(
-        (fi) => fi.productId === currentItem.productId
-      );
-      if (!futureItem) continue;
-      // Skip if link already exists
-      const exists = newLinks.some(
-        (l) => l.sourceItemId === currentItem.id && l.targetItemId === futureItem.id
-      );
-      if (exists) continue;
-
-      const product = project.catalogue.find((p) => p.id === currentItem.productId);
-      const volume = product?.volume || 0;
-      newLinks.push({
-        sourceItemId: currentItem.id,
-        targetItemId: futureItem.id,
-        percent: 100,
-        volume,
-        type: 'transfer',
-      });
-    }
-
-    set({
-      project: { ...project, sankeyLinks: newLinks, updatedAt: new Date().toISOString() },
-    });
-  },
-
-  // Recalculate all link volumes based on source product volume and link percentage
-  recalculateLinkVolumes: () => {
-    const { project } = get();
-    if (!project) return;
-
-    const updatedLinks = project.sankeyLinks.map((link) => {
-      const sourceItem = project.currentShelf.items.find((i) => i.id === link.sourceItemId);
-      if (!sourceItem) return link;
-      const product = project.catalogue.find((p) => p.id === sourceItem.productId);
-      const baseVolume = product?.volume || 0;
-      return {
-        ...link,
-        volume: Math.round(baseVolume * (link.percent ?? 100) / 100),
-      };
-    });
-
-    set({
-      project: { ...project, sankeyLinks: updatedLinks, updatedAt: new Date().toISOString() },
-    });
+    const plan = getActivePlan(project);
+    if (!plan) return;
+    set({ project: updatePlan(project, plan.id, (p) => ({ ...p, sankeyLinks: [] })) });
   },
 
   copyCurrentToFuture: () => {
     const { project } = get();
     if (!project) return;
-    // Copy items, matrix layout; generate new IDs; create 100% links
+    const plan = getActivePlan(project);
+    if (!plan) return;
+
     const newItems: ShelfItem[] = [];
-    const newLinks: SankeyLink[] = [...project.sankeyLinks];
-    const currentLayout = project.currentShelf.matrixLayout;
+    const newLinks: SankeyLink[] = [...plan.sankeyLinks];
+    const currentLayout = plan.currentShelf.matrixLayout;
     const newAssignments: { itemId: string; row: number; col: number }[] = [];
 
-    for (const item of project.currentShelf.items) {
-      // Skip if already on future shelf
-      if (item.productId && project.futureShelf.items.some((fi) => fi.productId === item.productId)) continue;
+    for (const item of plan.currentShelf.items) {
+      if (item.productId && plan.futureShelf.items.some((fi) => fi.productId === item.productId)) continue;
       const newId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       newItems.push({ ...item, id: newId });
-      // Create 100% link
       const prod = project.catalogue.find((p) => p.id === item.productId);
-      newLinks.push({
-        sourceItemId: item.id,
-        targetItemId: newId,
-        percent: 100,
-        volume: prod?.volume || 0,
-        type: 'transfer',
-      });
-      // Copy matrix assignment
+      newLinks.push({ sourceItemId: item.id, targetItemId: newId, percent: 100, volume: prod?.volume || 0, type: 'transfer' });
       if (currentLayout) {
-        const assignment = currentLayout.assignments.find((a) => a.itemId === item.id);
-        if (assignment) newAssignments.push({ itemId: newId, row: assignment.row, col: assignment.col });
+        const a = currentLayout.assignments.find((a) => a.itemId === item.id);
+        if (a) newAssignments.push({ itemId: newId, row: a.row, col: a.col });
       }
     }
 
-    const futureLayout = project.futureShelf.matrixLayout || {
-      title: currentLayout?.title || project.name,
-      xLabels: [], yLabels: [], assignments: [],
-    };
+    const futureLayout = plan.futureShelf.matrixLayout || { title: plan.name, xLabels: [], yLabels: [], assignments: [] };
 
-    set({
-      project: {
-        ...project,
-        futureShelf: {
-          ...project.futureShelf,
-          items: [...project.futureShelf.items, ...newItems],
-          matrixLayout: {
-            ...futureLayout,
-            xLabels: currentLayout?.xLabels || futureLayout.xLabels,
-            yLabels: currentLayout?.yLabels || futureLayout.yLabels,
-            assignments: [...futureLayout.assignments, ...newAssignments],
-          },
+    set({ project: updatePlan(project, plan.id, (p) => ({
+      ...p,
+      futureShelf: {
+        ...p.futureShelf,
+        items: [...p.futureShelf.items, ...newItems],
+        matrixLayout: {
+          ...futureLayout,
+          xLabels: currentLayout?.xLabels || futureLayout.xLabels,
+          yLabels: currentLayout?.yLabels || futureLayout.yLabels,
+          assignments: [...futureLayout.assignments, ...newAssignments],
         },
-        sankeyLinks: newLinks,
-        updatedAt: new Date().toISOString(),
       },
-    });
+      sankeyLinks: newLinks,
+    }))});
   },
 
   reorderShelfByMatrix: (shelfId) => {
     const { project } = get();
     if (!project) return;
+    const plan = getActivePlan(project);
+    if (!plan) return;
     const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
+    const shelf = plan[shelfKey];
     const layout = shelf.matrixLayout;
     if (!layout || layout.assignments.length === 0) return;
 
-    // Sort items: by column first, then row within column, then unassigned at end
     const assignmentMap = new Map(layout.assignments.map((a) => [a.itemId, a]));
     const sorted = [...shelf.items].sort((a, b) => {
       const aa = assignmentMap.get(a.id);
@@ -468,72 +398,96 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       return aa.row - ba.row;
     }).map((item, idx) => ({ ...item, position: idx }));
 
-    set({
-      project: {
-        ...project,
-        [shelfKey]: { ...shelf, items: sorted },
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    set({ project: updateShelf(project, shelfId, () => ({ ...shelf, items: sorted })) });
   },
 
+  // Matrix layout
   updateMatrixLayout: (shelfId, layoutUpdates) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    const current = shelf.matrixLayout || { title: shelf.name, xLabels: [], yLabels: [], assignments: [] };
-    set({
-      project: {
-        ...project,
-        [shelfKey]: { ...shelf, matrixLayout: { ...current, ...layoutUpdates } },
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    set({ project: updateShelf(project, shelfId, (shelf) => {
+      const current = shelf.matrixLayout || { title: '', xLabels: [], yLabels: [], assignments: [] };
+      return { ...shelf, matrixLayout: { ...current, ...layoutUpdates } };
+    })});
   },
 
   setMatrixAssignment: (shelfId, itemId, row, col) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    const layout = shelf.matrixLayout || { title: shelf.name, xLabels: [], yLabels: [], assignments: [] };
-    const filtered = layout.assignments.filter((a) => a.itemId !== itemId);
-    set({
-      project: {
-        ...project,
-        [shelfKey]: {
-          ...shelf,
-          matrixLayout: { ...layout, assignments: [...filtered, { itemId, row, col }] },
-        },
-        updatedAt: new Date().toISOString(),
-      },
-    });
-    // Auto-reorder shelf items to match matrix layout
+    set({ project: updateShelf(project, shelfId, (shelf) => {
+      const layout = shelf.matrixLayout || { title: '', xLabels: [], yLabels: [], assignments: [] };
+      const filtered = layout.assignments.filter((a) => a.itemId !== itemId);
+      return { ...shelf, matrixLayout: { ...layout, assignments: [...filtered, { itemId, row, col }] } };
+    })});
     get().reorderShelfByMatrix(shelfId);
   },
 
   removeMatrixAssignment: (shelfId, itemId) => {
     const { project } = get();
     if (!project) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = project[shelfKey];
-    const layout = shelf.matrixLayout;
-    if (!layout) return;
-    set({
-      project: {
-        ...project,
-        [shelfKey]: {
-          ...shelf,
-          matrixLayout: { ...layout, assignments: layout.assignments.filter((a) => a.itemId !== itemId) },
-        },
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    set({ project: updateShelf(project, shelfId, (shelf) => {
+      const layout = shelf.matrixLayout;
+      if (!layout) return shelf;
+      return { ...shelf, matrixLayout: { ...layout, assignments: layout.assignments.filter((a) => a.itemId !== itemId) } };
+    })});
   },
 
+  // Selection
   setSelectedItem: (id) => set({ selectedItemId: id }),
   setLinkMode: (enabled) => set({ linkMode: enabled, linkSource: enabled ? get().linkSource : null }),
   setLinkSource: (id) => set({ linkSource: id }),
   setAssumeContinuity: (enabled) => set({ assumeContinuity: enabled }),
+
+  clearRanges: () => {
+    const { project } = get();
+    if (!project) return;
+    const plan = getActivePlan(project);
+    if (!plan) return;
+    set({
+      project: updatePlan(project, plan.id, (p) => ({
+        ...p,
+        currentShelf: { ...p.currentShelf, items: [], labels: [],
+          matrixLayout: p.currentShelf.matrixLayout ? { ...p.currentShelf.matrixLayout, assignments: [] } : undefined },
+        futureShelf: { ...p.futureShelf, items: [], labels: [],
+          matrixLayout: p.futureShelf.matrixLayout ? { ...p.futureShelf.matrixLayout, assignments: [] } : undefined },
+        sankeyLinks: [],
+      })),
+      linkMode: false,
+      linkSource: null,
+    });
+  },
 }));
+
+// Migration: convert old single-plan projects to multi-plan format
+function migrateProject(data: Record<string, unknown>): Project {
+  // Already new format
+  if (Array.isArray(data.plans)) return data as unknown as Project;
+
+  // Old format: has currentShelf/futureShelf at top level
+  const old = data as {
+    name: string;
+    currentShelf: Shelf;
+    futureShelf: Shelf;
+    sankeyLinks: SankeyLink[];
+    catalogue: Product[];
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  const plan: RangePlan = {
+    id: `plan-${Date.now()}`,
+    name: old.currentShelf.matrixLayout?.title || old.name || 'Range Plan 1',
+    currentShelf: old.currentShelf,
+    futureShelf: old.futureShelf,
+    sankeyLinks: old.sankeyLinks || [],
+  };
+
+  return {
+    name: old.name,
+    plans: [plan],
+    activePlanId: plan.id,
+    catalogue: old.catalogue || [],
+    createdAt: old.createdAt,
+    updatedAt: old.updatedAt,
+  };
+}

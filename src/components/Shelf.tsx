@@ -5,6 +5,7 @@ import {
 } from '@dnd-kit/sortable';
 import { ProductCard } from './ProductCard';
 import type { Product, Shelf as ShelfType, ShelfItem } from '../types';
+import { getActivePlan } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { computeShelfLayout } from '../utils/layout';
@@ -118,14 +119,15 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
       if (shelf.id === 'current') {
         setLinkSource(item.id);
       } else if (shelf.id === 'future' && linkSource) {
-        const existingLinks = useProjectStore.getState().project?.sankeyLinks.filter(
-          (l) => l.sourceItemId === linkSource
+        const plan = useProjectStore.getState().project ? getActivePlan(useProjectStore.getState().project!) : undefined;
+        const existingLinks = plan?.sankeyLinks.filter(
+          (l: { sourceItemId: string }) => l.sourceItemId === linkSource
         ) || [];
-        const existingLink = existingLinks.find((l) => l.targetItemId === item.id);
+        const existingLink = existingLinks.find((l: { targetItemId: string }) => l.targetItemId === item.id);
         if (existingLink) {
           removeLink(linkSource, item.id);
         } else {
-          const sourceItem = useProjectStore.getState().project?.currentShelf.items.find((i) => i.id === linkSource);
+          const sourceItem = plan?.currentShelf.items.find((i: { id: string }) => i.id === linkSource);
           const sourceProduct = sourceItem ? catalogue.find((p) => p.id === sourceItem.productId) : null;
           const usedPercent = existingLinks.reduce((sum, l) => sum + (l.percent ?? 100), 0);
           const remaining = Math.max(0, 100 - usedPercent);
