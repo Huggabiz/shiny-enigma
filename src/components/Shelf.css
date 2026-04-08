@@ -95,7 +95,7 @@
   justify-content: flex-start;
   gap: 10px;
   min-height: 140px;
-  padding: 10px 8px;
+  padding: 10px 0;
   align-items: flex-end;
   position: relative;
 }

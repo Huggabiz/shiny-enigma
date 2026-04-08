@@ -1,8 +1,8 @@
 .sankey-container {
   width: 100%;
   overflow: hidden;
-  /* Match shelf-container (16px) + shelf-rail (8px) padding each side */
-  padding: 0 24px;
+  /* Match shelf-container padding only; computeShelfLayout adds RAIL_PADDING internally */
+  padding: 0 16px;
   box-sizing: border-box;
 }
 
