@@ -13,6 +13,8 @@ interface SankeyFlowProps {
   variantCurrentIds?: Set<string> | null;
   variantFutureIds?: Set<string> | null;
   showGhosted?: boolean;
+  discontinuedItems?: import('../types').ShelfItem[];
+  showDiscontinued?: boolean;
   onClickFlow?: (sourceItemId: string) => void;
 }
 
@@ -37,6 +39,8 @@ export function SankeyFlow({
   variantCurrentIds,
   variantFutureIds,
   showGhosted: showGhostedProp,
+  discontinuedItems,
+  showDiscontinued,
   onClickFlow,
 }: SankeyFlowProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -115,13 +119,17 @@ export function SankeyFlow({
     [futureShelf.items, variantFutureIds, showGhostedProp]
   );
 
+  // Include discontinued items in future layout when shown
+  const discCount = (showDiscontinued && discontinuedItems?.length) || 0;
+  const futureVisibleCount = visibleFutureItems.length + (discCount > 0 ? 1 + discCount : 0); // +1 for separator gap
+
   const currentLayout = useMemo(
     () => computeShelfLayout(visibleCurrentItems.length, railWidth),
     [visibleCurrentItems.length, railWidth]
   );
   const futureLayout = useMemo(
-    () => computeShelfLayout(visibleFutureItems.length, railWidth),
-    [visibleFutureItems.length, railWidth]
+    () => computeShelfLayout(futureVisibleCount, railWidth),
+    [futureVisibleCount, railWidth]
   );
 
   useEffect(() => {
@@ -211,26 +219,61 @@ export function SankeyFlow({
       const sx = sourceOffsets.get(flow) || 0;
 
       if (flow.isLoss) {
-        // Loss flow — straight down with gradient fade
-        const path = d3.path();
-        path.moveTo(sx, 0);
-        path.bezierCurveTo(sx, FLOW_HEIGHT * 0.3, sx, FLOW_HEIGHT * 0.6, sx, FLOW_HEIGHT);
+        // Find discontinued card position if showing
+        const discIdx = showDiscontinued && discontinuedItems
+          ? discontinuedItems.findIndex((i) => i.id === flow.sourceItemId)
+          : -1;
 
-        svg.append('path')
-          .attr('d', path.toString())
-          .attr('fill', 'none')
-          .attr('stroke', 'url(#loss-gradient)')
-          .attr('stroke-width', flow.strokeWidth)
-          .attr('stroke-linecap', 'round');
+        if (discIdx >= 0) {
+          // Draw red curve to the discontinued ghost card in future shelf
+          const targetPos = visibleFutureItems.length + 1 + discIdx; // +1 for separator gap
+          const tx = futureLayout.offsetLeft + targetPos * futureLayout.slotWidth + futureLayout.cardWidth / 2;
 
-        svg.append('text')
-          .attr('x', sx)
-          .attr('y', flow.strokeWidth / 2 + 12)
-          .attr('text-anchor', 'middle')
-          .attr('font-size', '8px')
-          .attr('fill', '#e53935')
-          .attr('font-weight', '600')
-          .text(`-${flow.volume.toLocaleString()}`);
+          const path = d3.path();
+          path.moveTo(sx, 0);
+          path.bezierCurveTo(sx, FLOW_HEIGHT * 0.4, tx, FLOW_HEIGHT * 0.6, tx, FLOW_HEIGHT);
+
+          svg.append('path')
+            .attr('d', path.toString())
+            .attr('fill', 'none')
+            .attr('stroke', '#F44336')
+            .attr('stroke-width', flow.strokeWidth)
+            .attr('stroke-opacity', 0.35)
+            .attr('stroke-linecap', 'round')
+            .style('cursor', 'pointer')
+            .on('click', () => { onClickFlow?.(flow.sourceItemId); });
+
+          const midX = (sx + tx) / 2;
+          svg.append('text')
+            .attr('x', midX)
+            .attr('y', FLOW_HEIGHT / 2 - flow.strokeWidth / 2 - 3)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '8px')
+            .attr('fill', '#e53935')
+            .attr('font-weight', '600')
+            .text(`-${flow.volume.toLocaleString()}`);
+        } else {
+          // No discontinued card — fade out vertically
+          const path = d3.path();
+          path.moveTo(sx, 0);
+          path.bezierCurveTo(sx, FLOW_HEIGHT * 0.3, sx, FLOW_HEIGHT * 0.6, sx, FLOW_HEIGHT);
+
+          svg.append('path')
+            .attr('d', path.toString())
+            .attr('fill', 'none')
+            .attr('stroke', 'url(#loss-gradient)')
+            .attr('stroke-width', flow.strokeWidth)
+            .attr('stroke-linecap', 'round');
+
+          svg.append('text')
+            .attr('x', sx)
+            .attr('y', flow.strokeWidth / 2 + 12)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '8px')
+            .attr('fill', '#e53935')
+            .attr('font-weight', '600')
+            .text(`-${flow.volume.toLocaleString()}`);
+        }
       } else {
         const tx = targetOffsets.get(flow) || 0;
 
@@ -262,7 +305,7 @@ export function SankeyFlow({
           .text(`${pct}% (${flow.volume.toLocaleString()})`);
       }
     }
-  }, [flows, hasContent, railWidth, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems]);
+  }, [flows, hasContent, railWidth, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems, showDiscontinued, discontinuedItems]);
 
   if (!hasContent) {
     return (

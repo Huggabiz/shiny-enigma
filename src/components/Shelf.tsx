@@ -18,8 +18,10 @@ interface ShelfProps {
   onRailWidthChange?: (width: number) => void;
   onDoubleClickItem?: (itemId: string) => void;
   onViewDesign?: () => void;
-  variantIncludedIds?: Set<string> | null; // null = Master (show all), Set = variant filter
+  variantIncludedIds?: Set<string> | null;
   showGhosted?: boolean;
+  discontinuedItems?: ShelfItem[];
+  showDiscontinued?: boolean;
 }
 
 interface DerivedLabel {
@@ -98,7 +100,7 @@ function deriveLabelsFromMatrix(shelf: ShelfType): { xLabels: DerivedLabel[]; yL
   return { xLabels, yLabels };
 }
 
-export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp }: ShelfProps) {
+export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp, discontinuedItems, showDiscontinued }: ShelfProps) {
   const {
     selectedItemId,
     setSelectedItem,
@@ -163,9 +165,11 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
     return () => observer.disconnect();
   }, [onRailWidthChange]);
 
+  const discExtra = (showDiscontinued && discontinuedItems?.length) ? discontinuedItems.length + 1 : 0; // +1 for separator
+  const totalDisplayItems = shelf.items.length + discExtra;
   const layout = useMemo(
-    () => computeShelfLayout(shelf.items.length, railWidth),
-    [shelf.items.length, railWidth]
+    () => computeShelfLayout(totalDisplayItems, railWidth),
+    [totalDisplayItems, railWidth]
   );
   const { cardWidth, slotWidth, offsetLeft, needsShrink } = layout;
 
@@ -273,7 +277,23 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
           })}
         </SortableContext>
 
-        {shelf.items.length === 0 && (
+        {/* Discontinued ghost cards */}
+        {showDiscontinued && discontinuedItems && discontinuedItems.length > 0 && (
+          <>
+            {discontinuedItems.length > 0 && <div className="shelf-discontinued-separator" />}
+            {discontinuedItems.map((item) => (
+              <ProductCard
+                key={`disc-${item.id}`}
+                item={item}
+                product={getProduct(item)}
+                isGhosted={true}
+                cardWidth={cardWidth}
+              />
+            ))}
+          </>
+        )}
+
+        {shelf.items.length === 0 && !discontinuedItems?.length && (
           <div className="shelf-empty">
             Drag products here from the catalogue or use Design view
           </div>

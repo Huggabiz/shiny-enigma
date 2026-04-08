@@ -211,9 +211,10 @@
 
 /* Ghosted state for items not in active variant */
 .product-card.ghosted {
-  opacity: 0.2;
+  opacity: 0.25;
   filter: grayscale(0.8);
   border-style: dashed;
+  border-color: #f44336;
 }
 
 .product-card.link-highlight {

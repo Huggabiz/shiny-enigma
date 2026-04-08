@@ -301,7 +301,12 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     for (let row = 0; row < numRows; row++) {
       cellCounts.push([]);
       for (let col = 0; col < numCols; col++) {
-        cellCounts[row].push(layout.assignments.filter((a) => a.row === row && a.col === col).length);
+        cellCounts[row].push(layout.assignments.filter((a) => {
+          if (a.row !== row || a.col !== col) return false;
+          // If variant active without ghost, only count included items
+          if (variantIncludedIds && !showGhosted) return variantIncludedIds.has(a.itemId);
+          return true;
+        }).length);
       }
     }
 
@@ -342,7 +347,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     }
 
     return { columnWidths: bestColW, rowHeights: bestRowH, cardWidth: bestCW };
-  }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize]);
+  }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize, variantIncludedIds, showGhosted]);
 
   const gridCols = `${ROW_HEADER_WIDTH}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${ADD_BTN_WIDTH}px`;
 

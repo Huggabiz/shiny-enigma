@@ -64,6 +64,7 @@ function App() {
   const [overShelfId, setOverShelfId] = useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [shelfRailWidth, setShelfRailWidth] = useState(0);
+  const [showDiscontinued, setShowDiscontinued] = useState(true);
 
   // Build usage sets across ALL plans for catalogue badges
   const { currentPlanProductIds, futurePlanProductIds, otherPlansCurrentIds, otherPlansFutureIds } = useMemo(() => {
@@ -99,6 +100,16 @@ function App() {
     activeVariant ? new Set(activeVariant.includedFutureItemIds) : null,
     [activeVariant]
   );
+
+  // Discontinued items: current shelf products not in future shelf
+  const discontinuedItems = useMemo(() => {
+    if (!activePlan) return [];
+    const futureProductIds = new Set(activePlan.futureShelf.items.map((i) => i.productId));
+    return activePlan.currentShelf.items.filter((item) => {
+      if (item.isPlaceholder || !item.productId) return false;
+      return !futureProductIds.has(item.productId);
+    });
+  }, [activePlan]);
 
   const linkSourceItem = useMemo(() => {
     if (!linkMode || !linkSource || !activePlan) return null;
@@ -299,6 +310,10 @@ function App() {
                       <span>Show excluded</span>
                     </label>
                   )}
+                  <label className="ghost-toggle" title="Show discontinued products in future range">
+                    <input type="checkbox" checked={showDiscontinued} onChange={(e) => setShowDiscontinued(e.target.checked)} />
+                    <span>Show discontinued</span>
+                  </label>
                   <button className="transform-copy-btn" onClick={copyCurrentToFuture}>Copy Current → Future</button>
                 </div>
               </div>
@@ -322,13 +337,17 @@ function App() {
                 railWidth={shelfRailWidth}
                 variantCurrentIds={variantCurrentIds} variantFutureIds={variantFutureIds}
                 showGhosted={showGhosted}
+                discontinuedItems={discontinuedItems}
+                showDiscontinued={showDiscontinued}
                 onClickFlow={handleSankeyClick} />
 
               <Shelf shelf={activePlan.futureShelf} catalogue={project!.catalogue}
                 onAddPlaceholder={() => handleAddPlaceholder('future')}
                 onViewDesign={() => { setDesignShelfId('future'); setActiveView('range-design'); }}
                 variantIncludedIds={variantFutureIds}
-                showGhosted={showGhosted} />
+                showGhosted={showGhosted}
+                discontinuedItems={discontinuedItems}
+                showDiscontinued={showDiscontinued} />
 
               {activeItem?.sourceShelf && overShelfId === 'catalogue' && (
                 <div className="cross-shelf-hint remove-hint">Drop to remove from range</div>
