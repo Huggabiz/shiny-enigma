@@ -43,6 +43,9 @@ function App() {
     assumeContinuity,
     copyCurrentToFuture,
     showPlanTree,
+    activeVariantId,
+    showGhosted,
+    setShowGhosted,
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
@@ -80,6 +83,21 @@ function App() {
     }
     return { currentPlanProductIds: curIds, futurePlanProductIds: futIds, otherPlansCurrentIds: otherCur, otherPlansFutureIds: otherFut };
   }, [project, activePlan]);
+
+  // Variant filter: which items are included in the active variant
+  const activeVariant = useMemo(() => {
+    if (!activeVariantId || !activePlan) return null;
+    return activePlan.variants.find((v) => v.id === activeVariantId) || null;
+  }, [activeVariantId, activePlan]);
+
+  const variantCurrentIds = useMemo(() =>
+    activeVariant ? new Set(activeVariant.includedCurrentItemIds) : null,
+    [activeVariant]
+  );
+  const variantFutureIds = useMemo(() =>
+    activeVariant ? new Set(activeVariant.includedFutureItemIds) : null,
+    [activeVariant]
+  );
 
   const linkSourceItem = useMemo(() => {
     if (!linkMode || !linkSource || !activePlan) return null;
@@ -258,8 +276,7 @@ function App() {
     <div className="app">
       <Toolbar onImport={() => setShowImport(true)} activeView={activeView} />
       <div className="workspace">
-        <NavSidebar activeView={activeView} designShelfId={designShelfId}
-          onViewChange={setActiveView} onDesignShelfChange={setDesignShelfId} />
+        <NavSidebar activeView={activeView} onViewChange={setActiveView} />
 
         {showPlanTree && <PlanTree />}
 
@@ -268,15 +285,28 @@ function App() {
             onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="shelves-area">
               <div className="transform-title-bar">
-                <h2 className="transform-title">{activePlan.name}</h2>
-                <button className="transform-copy-btn" onClick={copyCurrentToFuture}>Copy Current → Future</button>
+                <h2 className="transform-title">
+                  {activePlan.name}
+                  {activeVariant && <span className="variant-badge">{activeVariant.name}</span>}
+                </h2>
+                <div className="transform-title-actions">
+                  {activeVariant && (
+                    <label className="ghost-toggle" title="Show products not in this variant">
+                      <input type="checkbox" checked={showGhosted} onChange={(e) => setShowGhosted(e.target.checked)} />
+                      <span>Show excluded</span>
+                    </label>
+                  )}
+                  <button className="transform-copy-btn" onClick={copyCurrentToFuture}>Copy Current → Future</button>
+                </div>
               </div>
 
               <Shelf shelf={activePlan.currentShelf} catalogue={project!.catalogue}
                 onAddPlaceholder={() => handleAddPlaceholder('current')}
                 onRailWidthChange={handleRailWidthChange}
                 onDoubleClickItem={enterLinkModeFor}
-                onViewDesign={() => { setDesignShelfId('current'); setActiveView('range-design'); }} />
+                onViewDesign={() => { setDesignShelfId('current'); setActiveView('range-design'); }}
+                variantIncludedIds={variantCurrentIds}
+                showGhosted={showGhosted} />
 
               {linkMode && linkSourceItem && (
                 <LinkPanel sourceItem={linkSourceItem} sourceProduct={linkSourceProduct}
@@ -290,7 +320,9 @@ function App() {
 
               <Shelf shelf={activePlan.futureShelf} catalogue={project!.catalogue}
                 onAddPlaceholder={() => handleAddPlaceholder('future')}
-                onViewDesign={() => { setDesignShelfId('future'); setActiveView('range-design'); }} />
+                onViewDesign={() => { setDesignShelfId('future'); setActiveView('range-design'); }}
+                variantIncludedIds={variantFutureIds}
+                showGhosted={showGhosted} />
 
               {activeItem?.sourceShelf && overShelfId === 'catalogue' && (
                 <div className="cross-shelf-hint remove-hint">Drop to remove from range</div>
@@ -311,7 +343,7 @@ function App() {
             </DragOverlay>
           </DndContext>
         ) : activeView === 'range-design' ? (
-          <RangeDesign shelfId={designShelfId} onImport={() => setShowImport(true)} />
+          <RangeDesign shelfId={designShelfId} onShelfChange={setDesignShelfId} onImport={() => setShowImport(true)} />
         ) : null}
       </div>
 

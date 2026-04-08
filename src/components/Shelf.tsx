@@ -18,6 +18,8 @@ interface ShelfProps {
   onRailWidthChange?: (width: number) => void;
   onDoubleClickItem?: (itemId: string) => void;
   onViewDesign?: () => void;
+  variantIncludedIds?: Set<string> | null; // null = Master (show all), Set = variant filter
+  showGhosted?: boolean;
 }
 
 interface DerivedLabel {
@@ -96,7 +98,7 @@ function deriveLabelsFromMatrix(shelf: ShelfType): { xLabels: DerivedLabel[]; yL
   return { xLabels, yLabels };
 }
 
-export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign }: ShelfProps) {
+export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp }: ShelfProps) {
   const {
     selectedItemId,
     setSelectedItem,
@@ -237,10 +239,17 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
         style={needsShrink ? { justifyContent: 'flex-start' } : undefined}
       >
         <SortableContext items={shelf.items.map((i) => i.id)} strategy={horizontalListSortingStrategy}>
-          {shelf.items.map((item) => {
+          {shelf.items
+            .filter((item) => {
+              if (!variantIncludedIds) return true; // Master: show all
+              if (variantIncludedIds.has(item.id)) return true; // Included in variant
+              return showGhostedProp; // Ghosted toggle
+            })
+            .map((item) => {
             const isSourceSelected = !!(linkMode && linkSource);
             const isDimmed = isSourceSelected && shelf.id === 'current' && item.id !== linkSource;
             const isLinkHighlight = isSourceSelected && item.id === linkSource;
+            const isGhosted = variantIncludedIds ? !variantIncludedIds.has(item.id) : false;
 
             return (
               <ProductCard
@@ -251,6 +260,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
                 isLinkMode={linkMode}
                 isLinkSource={linkSource === item.id}
                 isDimmed={isDimmed}
+                isGhosted={isGhosted}
                 isLinkHighlight={isLinkHighlight}
                 onClick={() => handleCardClick(item)}
                 onDoubleClick={() => {

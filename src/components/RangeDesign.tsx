@@ -14,12 +14,14 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Catalogue } from './Catalogue';
 import { useProjectStore } from '../store/useProjectStore';
 import { CloseIcon } from './Icons';
+import { PillToggle } from './PillToggle';
 import type { Product, Shelf, MatrixLayout } from '../types';
 import { getActivePlan } from '../types';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
   shelfId: 'current' | 'future';
+  onShelfChange: (shelfId: 'current' | 'future') => void;
   onImport: () => void;
 }
 
@@ -204,7 +206,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, on
   );
 }
 
-export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
+export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignProps) {
   const {
     project, addItemToShelf,
     updateMatrixLayout, setMatrixAssignment,
@@ -426,10 +428,12 @@ export function RangeDesign({ shelfId, onImport }: RangeDesignProps) {
                 onBlur={(e) => updateTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && updateTitle((e.target as HTMLInputElement).value)} />
             ) : (
-              <h2 className="range-design-title" onDoubleClick={() => setEditingTitle(true)} title="Double-click to edit">
-                {layout.title}
-                <span className="range-design-shelf-tag">{shelfId === 'current' ? 'Current' : 'Future'}</span>
-              </h2>
+              <>
+                <h2 className="range-design-title" onDoubleClick={() => setEditingTitle(true)} title="Double-click to edit">
+                  {layout.title}
+                </h2>
+                <PillToggle value={shelfId} onChange={onShelfChange} />
+              </>
             )}
           </div>
 

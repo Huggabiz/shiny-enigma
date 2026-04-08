@@ -48,6 +48,16 @@ interface ProjectStore {
   setActivePlan: (planId: string) => void;
   renamePlan: (planId: string, name: string) => void;
 
+  // Variant management
+  activeVariantId: string | null;
+  showGhosted: boolean;
+  setActiveVariant: (variantId: string | null) => void;
+  setShowGhosted: (show: boolean) => void;
+  addVariant: (planId: string, name: string) => void;
+  removeVariant: (planId: string, variantId: string) => void;
+  renameVariant: (planId: string, variantId: string, name: string) => void;
+  toggleVariantItem: (variantId: string, shelfId: string, itemId: string) => void;
+
   // Catalogue actions
   setCatalogue: (products: Product[]) => void;
   clearCatalogue: () => void;
@@ -94,6 +104,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   assumeContinuity: true,
   cardFormat: { ...DEFAULT_CARD_FORMAT },
   showPlanTree: false,
+  activeVariantId: null,
+  showGhosted: true,
 
   setCardFormat: (updates) => set((state) => ({ cardFormat: { ...state.cardFormat, ...updates } })),
   setShowPlanTree: (show) => set({ showPlanTree: show }),
@@ -165,6 +177,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       linkMode: false,
       linkSource: null,
       selectedItemId: null,
+      activeVariantId: null,
     });
   },
 
@@ -183,6 +196,74 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           ...p.futureShelf,
           matrixLayout: p.futureShelf.matrixLayout ? { ...p.futureShelf.matrixLayout, title: name } : undefined,
         },
+      })),
+    });
+  },
+
+  // Variant management
+  setActiveVariant: (variantId) => set({ activeVariantId: variantId }),
+  setShowGhosted: (show) => set({ showGhosted: show }),
+
+  addVariant: (planId, name) => {
+    const { project } = get();
+    if (!project) return;
+    const plan = project.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    const variant: import('../types').RangeVariant = {
+      id: `var-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      includedCurrentItemIds: plan.currentShelf.items.map((i) => i.id),
+      includedFutureItemIds: plan.futureShelf.items.map((i) => i.id),
+    };
+    set({
+      project: updatePlan(project, planId, (p) => ({
+        ...p,
+        variants: [...p.variants, variant],
+      })),
+      activeVariantId: variant.id,
+    });
+  },
+
+  removeVariant: (planId, variantId) => {
+    const { project, activeVariantId } = get();
+    if (!project) return;
+    set({
+      project: updatePlan(project, planId, (p) => ({
+        ...p,
+        variants: p.variants.filter((v) => v.id !== variantId),
+      })),
+      activeVariantId: activeVariantId === variantId ? null : activeVariantId,
+    });
+  },
+
+  renameVariant: (planId, variantId, name) => {
+    const { project } = get();
+    if (!project) return;
+    set({
+      project: updatePlan(project, planId, (p) => ({
+        ...p,
+        variants: p.variants.map((v) => v.id === variantId ? { ...v, name } : v),
+      })),
+    });
+  },
+
+  toggleVariantItem: (variantId, shelfId, itemId) => {
+    const { project } = get();
+    if (!project) return;
+    const plan = getActivePlan(project);
+    if (!plan) return;
+    const key = shelfId === 'current' ? 'includedCurrentItemIds' : 'includedFutureItemIds';
+    set({
+      project: updatePlan(project, plan.id, (p) => ({
+        ...p,
+        variants: p.variants.map((v) => {
+          if (v.id !== variantId) return v;
+          const ids = v[key];
+          return {
+            ...v,
+            [key]: ids.includes(itemId) ? ids.filter((id) => id !== itemId) : [...ids, itemId],
+          };
+        }),
       })),
     });
   },
@@ -232,25 +313,61 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Shelf actions — operate on active plan
   addItemToShelf: (shelfId, item) => {
-    const { project } = get();
+    const { project, activeVariantId } = get();
     if (!project) return;
-    set({ project: updateShelf(project, shelfId, (shelf) => ({
+    let updated = updateShelf(project, shelfId, (shelf) => ({
       ...shelf, items: [...shelf.items, item],
-    }))});
+    }));
+    // If adding while viewing a variant, also include the item in that variant
+    if (activeVariantId) {
+      const plan = getActivePlan(updated);
+      if (plan) {
+        const key = shelfId === 'current' ? 'includedCurrentItemIds' : 'includedFutureItemIds';
+        updated = updatePlan(updated, plan.id, (p) => ({
+          ...p,
+          variants: p.variants.map((v) =>
+            v.id === activeVariantId ? { ...v, [key]: [...v[key], item.id] } : v
+          ),
+        }));
+      }
+    }
+    set({ project: updated });
   },
 
   removeItemFromShelf: (shelfId, itemId) => {
-    const { project } = get();
+    const { project, activeVariantId } = get();
     if (!project) return;
     const plan = getActivePlan(project);
     if (!plan) return;
+
+    // If viewing Master (no active variant), check if item is used in any variant
+    if (!activeVariantId) {
+      const key = shelfId === 'current' ? 'includedCurrentItemIds' : 'includedFutureItemIds';
+      const usedInVariant = plan.variants.some((v) => v[key].includes(itemId));
+      if (usedInVariant) {
+        alert('This product is included in a variant and cannot be removed from the Master range. Remove it from variants first.');
+        return;
+      }
+    }
+
+    // If viewing a variant, just toggle it off instead of actually removing
+    if (activeVariantId) {
+      get().toggleVariantItem(activeVariantId, shelfId, itemId);
+      return;
+    }
+
     let updated = updateShelf(project, shelfId, (shelf) => ({
       ...shelf, items: shelf.items.filter((i) => i.id !== itemId),
     }));
-    // Also remove sankey links referencing this item
     updated = updatePlan(updated, plan.id, (p) => ({
       ...p,
       sankeyLinks: p.sankeyLinks.filter((l) => l.sourceItemId !== itemId && l.targetItemId !== itemId),
+      // Also remove from all variant inclusion lists
+      variants: p.variants.map((v) => ({
+        ...v,
+        includedCurrentItemIds: v.includedCurrentItemIds.filter((id) => id !== itemId),
+        includedFutureItemIds: v.includedFutureItemIds.filter((id) => id !== itemId),
+      })),
     }));
     set({ project: updated });
   },
@@ -488,6 +605,7 @@ function migrateProject(data: Record<string, unknown>): Project {
     currentShelf: old.currentShelf,
     futureShelf: old.futureShelf,
     sankeyLinks: old.sankeyLinks || [],
+    variants: [],
   };
 
   return {

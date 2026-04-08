@@ -5,12 +5,10 @@ export type ViewType = 'transform' | 'range-design';
 
 interface NavSidebarProps {
   activeView: ViewType;
-  designShelfId: 'current' | 'future';
   onViewChange: (view: ViewType) => void;
-  onDesignShelfChange: (shelfId: 'current' | 'future') => void;
 }
 
-export function NavSidebar({ activeView, designShelfId, onViewChange, onDesignShelfChange }: NavSidebarProps) {
+export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
   const { showPlanTree, setShowPlanTree } = useProjectStore();
 
   return (
@@ -42,23 +40,6 @@ export function NavSidebar({ activeView, designShelfId, onViewChange, onDesignSh
         <span className="nav-icon">⇄</span>
         <span className="nav-label">Transform</span>
       </button>
-
-      {activeView === 'range-design' && (
-        <div className="nav-shelf-toggle">
-          <button
-            className={`nav-shelf-btn ${designShelfId === 'current' ? 'active' : ''}`}
-            onClick={() => onDesignShelfChange('current')}
-          >
-            Current
-          </button>
-          <button
-            className={`nav-shelf-btn ${designShelfId === 'future' ? 'active' : ''}`}
-            onClick={() => onDesignShelfChange('future')}
-          >
-            Future
-          </button>
-        </div>
-      )}
     </div>
   );
 }

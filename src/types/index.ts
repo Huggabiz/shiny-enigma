@@ -65,13 +65,22 @@ export interface SankeyLink {
   type: 'transfer' | 'growth' | 'loss';
 }
 
-// A single range plan (current + future + sankey links)
+// A range variant — a filtered subset of the Master range
+export interface RangeVariant {
+  id: string;
+  name: string;
+  includedCurrentItemIds: string[]; // references ShelfItem.id in currentShelf
+  includedFutureItemIds: string[];  // references ShelfItem.id in futureShelf
+}
+
+// A single range plan (current + future + sankey links + variants)
 export interface RangePlan {
   id: string;
   name: string;
   currentShelf: Shelf;
   futureShelf: Shelf;
   sankeyLinks: SankeyLink[];
+  variants: RangeVariant[];
 }
 
 // The full project state — now holds multiple range plans
@@ -115,6 +124,7 @@ export function createEmptyPlan(name: string): RangePlan {
       matrixLayout: { ...DEFAULT_MATRIX_LAYOUT, title: name },
     },
     sankeyLinks: [],
+    variants: [],
   };
 }
 
