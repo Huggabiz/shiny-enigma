@@ -127,9 +127,12 @@ export function SankeyFlow({
     () => computeShelfLayout(visibleCurrentItems.length, effectiveWidth),
     [visibleCurrentItems.length, effectiveWidth]
   );
+  // Include discontinued items in future layout to match shelf card sizing
+  const futureDiscCount = (showDiscontinued && discontinuedItems?.length) || 0;
+  const futureTotalCount = visibleFutureItems.length + (futureDiscCount > 0 ? futureDiscCount + 1 : 0);
   const futureLayout = useMemo(
-    () => computeShelfLayout(visibleFutureItems.length, effectiveWidth),
-    [visibleFutureItems.length, effectiveWidth]
+    () => computeShelfLayout(futureTotalCount, effectiveWidth),
+    [futureTotalCount, effectiveWidth]
   );
 
   useEffect(() => {

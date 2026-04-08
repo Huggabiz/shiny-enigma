@@ -182,12 +182,17 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
     [shelf.items, variantIncludedIds, showGhostedProp]
   );
 
-  // Layout based on visible regular items only — used for card sizing, labels, and sankey
-  const layout = useMemo(
-    () => computeShelfLayout(visibleRegularItems.length, railWidth),
-    [visibleRegularItems.length, railWidth]
+  // Total visible items including discontinued (for card sizing)
+  const discCount = (showDiscontinued && discontinuedItems?.length) || 0;
+  const totalVisibleCount = visibleRegularItems.length + (discCount > 0 ? discCount + 1 : 0); // +1 for separator
+
+  // Layout based on ALL visible items — used for card sizing
+  const fullLayout = useMemo(
+    () => computeShelfLayout(totalVisibleCount, railWidth),
+    [totalVisibleCount, railWidth]
   );
-  const { cardWidth, slotWidth, offsetLeft } = layout;
+
+  const { cardWidth, slotWidth, offsetLeft } = fullLayout;
 
   // Compute visible item IDs for label derivation (respects variant filter)
   const visibleItemIds = useMemo(() => {
