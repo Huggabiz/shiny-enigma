@@ -20,6 +20,16 @@
   width: 100%;
   max-width: 1100px;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.range-design-canvas-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .range-design-title {
@@ -64,17 +74,21 @@
   width: 300px;
 }
 
-/* 16:9 enforced container — NO scrollbars, content scales */
+/* 16:9 enforced container — width and height multiplied by the shared
+   --slide-base-scale CSS variable so the matrix view grows to fit dense
+   range plans; visually scaled by --slide-zoom for panning/zooming. */
 .matrix-16-9 {
-  width: 100%;
-  max-width: 1100px;
-  aspect-ratio: 16 / 9;
+  width: calc(1100px * var(--slide-base-scale, 1));
+  height: calc(619px * var(--slide-base-scale, 1));
   background: #fff;
   border-radius: 10px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+  transform: scale(var(--slide-zoom, 1));
+  transform-origin: top left;
 }
 
 .slide-title {

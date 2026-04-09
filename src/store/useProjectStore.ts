@@ -33,6 +33,21 @@ interface ProjectStore {
   catalogueFilters: { search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; hideUsed: boolean };
   setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; hideUsed: boolean }>) => void;
 
+  // Views — lifted out of App local state so the export loop can drive them
+  activeView: 'transform' | 'range-design';
+  designShelfId: 'current' | 'future';
+  setActiveView: (view: 'transform' | 'range-design') => void;
+  setDesignShelfId: (shelfId: 'current' | 'future') => void;
+
+  // Slide canvas size — baseScale grows the logical canvas so more content
+  // fits without shrinking; zoom is a visual multiplier for navigation.
+  slideBaseScale: number;        // 1, 1.25, 1.5, ...
+  slideBaseScaleMode: 'auto' | 'manual';
+  slideZoom: number;             // 0.5 - 2.0, default 1
+  setSlideBaseScale: (scale: number) => void;
+  setSlideBaseScaleMode: (mode: 'auto' | 'manual') => void;
+  setSlideZoom: (zoom: number) => void;
+
   // Card format
   setCardFormat: (format: Partial<CardFormat>) => void;
 
@@ -111,6 +126,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   showGhosted: true,
   catalogueFilters: { search: '', category: '', subCategory: '', family: '', showLive: true, showDev: true, hideUsed: false },
   setCatalogueFilters: (f) => set((s) => ({ catalogueFilters: { ...s.catalogueFilters, ...f } })),
+
+  activeView: 'range-design',
+  designShelfId: 'current',
+  setActiveView: (view) => set({ activeView: view }),
+  setDesignShelfId: (shelfId) => set({ designShelfId: shelfId }),
+
+  slideBaseScale: 1,
+  slideBaseScaleMode: 'auto',
+  slideZoom: 1,
+  setSlideBaseScale: (scale) => set({ slideBaseScale: scale }),
+  setSlideBaseScaleMode: (mode) => set({ slideBaseScaleMode: mode }),
+  setSlideZoom: (zoom) => set({ slideZoom: Math.max(0.3, Math.min(3, zoom)) }),
 
   setCardFormat: (updates) => set((state) => ({ cardFormat: { ...state.cardFormat, ...updates } })),
   setShowPlanTree: (show) => set({ showPlanTree: show }),

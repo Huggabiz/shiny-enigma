@@ -250,6 +250,7 @@ function drawShelfRow(
   labelBelow: boolean,
   shelfName: string,
   cardImages: Map<string, string> | null,
+  trailingItems?: ShelfItem[],
 ) {
   // Shelf name — sub-heading, lower authority than the main slide title
   slide.addText(shelfName.toUpperCase(), {
@@ -293,9 +294,9 @@ function drawShelfRow(
 
   // Cards — prefer a live-DOM screenshot when available, fall back to the
   // shape-based renderer if we don't have one (e.g. CORS-tainted image).
-  shelf.items.forEach((item, idx) => {
-    const cardX = layout.offsetLeft + idx * layout.slotWidth;
-    const cardId = `${shelf.id}-${idx}-${(item.id || '').slice(0, 8).replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const placeCard = (item: ShelfItem, slotIndex: number, tagExtra: string) => {
+    const cardX = layout.offsetLeft + slotIndex * layout.slotWidth;
+    const cardId = `${shelf.id}-${tagExtra}-${(item.id || '').slice(0, 8).replace(/[^a-zA-Z0-9]/g, '_')}`;
     const dataUrl = cardImages?.get(item.id);
     if (dataUrl) {
       slide.addImage({
@@ -313,7 +314,26 @@ function drawShelfRow(
         { cardId, compact: layout.cardWidth < 0.5 },
       );
     }
-  });
+  };
+
+  shelf.items.forEach((item, idx) => placeCard(item, idx, `${idx}`));
+
+  // Trailing items (e.g. discontinued ghost cards) sit after the regular
+  // items separated by a slot reserved for the red separator line. The
+  // layout was already computed with a total count that accounts for this.
+  if (trailingItems && trailingItems.length > 0) {
+    const separatorSlotIdx = shelf.items.length; // the gap slot
+    const separatorX = layout.offsetLeft + separatorSlotIdx * layout.slotWidth + layout.cardWidth / 2;
+    slide.addShape('line' as PptxGenJS.ShapeType, {
+      x: separatorX, y: layout.topY + 0.1,
+      w: 0, h: layout.cardHeight - 0.2,
+      line: { color: 'F44336', width: 1.2, transparency: 70 },
+      objectName: `${shelf.id}-disc-sep`,
+    });
+    trailingItems.forEach((item, i) => {
+      placeCard(item, separatorSlotIdx + 1 + i, `disc-${i}`);
+    });
+  }
 }
 
 // Convert (x, y) pairs into a rotated-rectangle flow ribbon
@@ -364,8 +384,11 @@ function addFlowRibbon(
 // ───────────────────────────────────────────────────────────────
 
 interface PlanCapture {
-  // Map<itemId, dataUrl> for both shelves combined
+  // Map<itemId, dataUrl> for both shelves combined (transform slide)
   cardImages: Map<string, string>;
+  // Map<itemId, dataUrl> for matrix cards in each shelf (design slides)
+  matrixCurrentCards: Map<string, string>;
+  matrixFutureCards: Map<string, string>;
   // PNG data URL for the whole sankey band, or null if nothing to draw
   sankeyImage: string | null;
 }
@@ -441,17 +464,22 @@ async function captureSankey(): Promise<string | null> {
   });
 }
 
-async function capturePlan(): Promise<PlanCapture> {
+async function captureTransformSlide(): Promise<{ cardImages: Map<string, string>; sankeyImage: string | null }> {
   const cardImages = new Map<string, string>();
   // Current shelf cards
   const currentCards = await captureCardsInShelf('.shelf-container:not(.flipped) .product-card[data-item-id]');
   for (const [id, url] of currentCards) cardImages.set(id, url);
-  // Future shelf cards
+  // Future shelf cards (includes discontinued ghost cards)
   const futureCards = await captureCardsInShelf('.shelf-container.flipped .product-card[data-item-id]');
   for (const [id, url] of futureCards) cardImages.set(id, url);
 
   const sankeyImage = await captureSankey();
   return { cardImages, sankeyImage };
+}
+
+async function captureMatrixCards(): Promise<Map<string, string>> {
+  // Matrix cards live inside .matrix-16-9 and carry their own data-item-id.
+  return captureCardsInShelf('.matrix-16-9 .matrix-card[data-item-id]');
 }
 
 function addTransformSlide(
@@ -479,10 +507,32 @@ function addTransformSlide(
   const currentLayout = computeShelfLayout(plan.currentShelf.items.length, railLeft, railWidth, currentY, cardH);
   drawShelfRow(slide, plan.currentShelf, catalogue, currentLayout, currentY - 0.48, false, 'Current Range', capture?.cardImages || null);
 
+  // Discontinued items — products present in the current shelf whose
+  // productId is missing from the future shelf. The web canvas shows these
+  // as ghost cards appended to the future shelf after a red separator, so
+  // we mirror that in the PPT export by reserving an extra slot for the
+  // separator and then the disc cards.
+  const futureProductIds = new Set(plan.futureShelf.items.map((i) => i.productId));
+  const discontinuedItems = plan.currentShelf.items.filter(
+    (item) => !item.isPlaceholder && item.productId && !futureProductIds.has(item.productId),
+  );
+  const discCount = discontinuedItems.length;
+  const futureTotalSlots = plan.futureShelf.items.length + (discCount > 0 ? discCount + 1 : 0);
+
   // Future range — pinned near the bottom
   const futureCardY = SLIDE_H - 0.4 - cardH;
-  const futureLayout = computeShelfLayout(plan.futureShelf.items.length, railLeft, railWidth, futureCardY, cardH);
-  drawShelfRow(slide, plan.futureShelf, catalogue, futureLayout, futureCardY + cardH + 0.26, true, 'Future Range', capture?.cardImages || null);
+  const futureLayout = computeShelfLayout(futureTotalSlots, railLeft, railWidth, futureCardY, cardH);
+  drawShelfRow(
+    slide,
+    plan.futureShelf,
+    catalogue,
+    futureLayout,
+    futureCardY + cardH + 0.26,
+    true,
+    'Future Range',
+    capture?.cardImages || null,
+    discontinuedItems.length > 0 ? discontinuedItems : undefined,
+  );
 
   const sankeyTop = currentLayout.bottomY + 0.05;
   const sankeyBottom = futureLayout.topY - 0.05;
@@ -610,7 +660,14 @@ function designLayoutFits(
   return { fits: true, colWidths, rowHeights };
 }
 
-function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], planName: string, label: string) {
+function addDesignSlide(
+  pptx: PptxGenJS,
+  shelf: Shelf,
+  catalogue: Product[],
+  planName: string,
+  label: string,
+  matrixCardImages: Map<string, string> | null,
+) {
   const layout = shelf.matrixLayout;
   if (!layout || layout.xLabels.length === 0 || layout.yLabels.length === 0) return;
 
@@ -756,7 +813,17 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], pla
         const py = startY + gr * (bestCH + D_CARD_GAP);
         const cardId = `d-${r}-${c}-${idx}`;
 
-        drawCard(slide, { x: px, y: py, w: bestCW, h: bestCH }, item, product, { cardId });
+        const dataUrl = matrixCardImages?.get(item.id);
+        if (dataUrl) {
+          slide.addImage({
+            data: dataUrl,
+            x: px, y: py, w: bestCW, h: bestCH,
+            sizing: { type: 'contain', w: bestCW, h: bestCH },
+            objectName: `${cardId}-img`,
+          });
+        } else {
+          drawCard(slide, { x: px, y: py, w: bestCW, h: bestCH }, item, product, { cardId });
+        }
       });
     }
   }
@@ -772,44 +839,78 @@ export async function exportToPptx(project: Project): Promise<void> {
   pptx.author = 'Range Planner';
   pptx.title = project.name;
 
-  // Attempt to capture each plan's transform view as cards + sankey images.
-  // Requires the transform canvas to be mounted in the DOM — if it isn't,
-  // tell the user to switch views and bail.
-  const hasCanvas = !!document.querySelector('.transform-16-9');
+  // Multi-view capture loop: for every plan we visit the transform view
+  // (cards + sankey), then the range-design matrix view for current and
+  // future shelves. Each visit waits two RAFs so React + d3 finish their
+  // repaint before html2canvas fires.
   const captures = new Map<string, PlanCapture>();
-  if (hasCanvas) {
-    const store = useProjectStore.getState();
-    const originalActivePlanId = store.project?.activePlanId;
-    const originalVariantId = store.activeVariantId;
+  const store = useProjectStore.getState();
+  const originalActiveView = store.activeView;
+  const originalDesignShelfId = store.designShelfId;
+  const originalActivePlanId = store.project?.activePlanId;
+  const originalVariantId = store.activeVariantId;
 
-    for (const plan of project.plans) {
-      store.setActivePlan(plan.id);
-      store.setActiveVariant(null);
-      // Two RAFs to flush React's commit phase and the d3 sankey re-draw
-      await waitForNextPaint();
-      await waitForNextPaint();
-      try {
-        const capture = await capturePlan();
-        captures.set(plan.id, capture);
-      } catch (err) {
-        console.warn('[exportPptx] capturePlan failed for', plan.name, err);
-      }
+  const settle = async () => {
+    await waitForNextPaint();
+    await waitForNextPaint();
+  };
+
+  for (const plan of project.plans) {
+    store.setActivePlan(plan.id);
+    store.setActiveVariant(null);
+
+    // ── Transform slide ──
+    store.setActiveView('transform');
+    await settle();
+    let transform: { cardImages: Map<string, string>; sankeyImage: string | null } | null = null;
+    try {
+      transform = await captureTransformSlide();
+    } catch (err) {
+      console.warn('[exportPptx] transform capture failed for', plan.name, err);
     }
 
-    // Restore the original active-plan / variant so the user's session
-    // returns to the view they started from.
-    if (originalActivePlanId) store.setActivePlan(originalActivePlanId);
-    if (originalVariantId) store.setActiveVariant(originalVariantId);
-    await waitForNextPaint();
-  } else {
-    console.warn('[exportPptx] transform canvas not mounted; using fallback shape rendering');
+    // ── Matrix current shelf ──
+    store.setActiveView('range-design');
+    store.setDesignShelfId('current');
+    await settle();
+    let matrixCurrentCards = new Map<string, string>();
+    try {
+      matrixCurrentCards = await captureMatrixCards();
+    } catch (err) {
+      console.warn('[exportPptx] matrix current capture failed for', plan.name, err);
+    }
+
+    // ── Matrix future shelf ──
+    store.setDesignShelfId('future');
+    await settle();
+    let matrixFutureCards = new Map<string, string>();
+    try {
+      matrixFutureCards = await captureMatrixCards();
+    } catch (err) {
+      console.warn('[exportPptx] matrix future capture failed for', plan.name, err);
+    }
+
+    captures.set(plan.id, {
+      cardImages: transform?.cardImages ?? new Map(),
+      sankeyImage: transform?.sankeyImage ?? null,
+      matrixCurrentCards,
+      matrixFutureCards,
+    });
   }
+
+  // Restore the original view / plan / variant so the user ends up back
+  // wherever they started.
+  if (originalActivePlanId) store.setActivePlan(originalActivePlanId);
+  if (originalVariantId) store.setActiveVariant(originalVariantId);
+  store.setDesignShelfId(originalDesignShelfId);
+  store.setActiveView(originalActiveView);
+  await settle();
 
   for (const plan of project.plans) {
     const capture = captures.get(plan.id) || null;
     addTransformSlide(pptx, plan, project.catalogue, capture);
-    addDesignSlide(pptx, plan.currentShelf, project.catalogue, plan.name, 'Current Range');
-    addDesignSlide(pptx, plan.futureShelf, project.catalogue, plan.name, 'Future Range');
+    addDesignSlide(pptx, plan.currentShelf, project.catalogue, plan.name, 'Current Range', capture?.matrixCurrentCards || null);
+    addDesignSlide(pptx, plan.futureShelf, project.catalogue, plan.name, 'Future Range', capture?.matrixFutureCards || null);
   }
 
   await pptx.writeFile({ fileName: `${project.name.replace(/\s+/g, '_')}_range_plan.pptx` });

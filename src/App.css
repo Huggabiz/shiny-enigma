@@ -43,19 +43,30 @@
   gap: 8px;
 }
 
-/* 16:9 transform canvas — fixed size so layout is stable regardless of
-   browser window height. Users can use browser zoom to fit their screen. */
+/* 16:9 transform canvas — width/height multiplied by --slide-base-scale
+   so the canvas grows to fit denser range plans, and visually scaled by
+   --slide-zoom for panning/zooming without changing layout. The outer
+   wrapper takes the final scaled bounds so scroll still works. */
+.slide-canvas-wrapper {
+  width: calc(1100px * var(--slide-base-scale, 1) * var(--slide-zoom, 1));
+  height: calc(619px * var(--slide-base-scale, 1) * var(--slide-zoom, 1));
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-start;
+}
+
 .transform-16-9 {
-  width: 1100px;
-  height: 619px; /* 1100 * 9 / 16 */
+  width: calc(1100px * var(--slide-base-scale, 1));
+  height: calc(619px * var(--slide-base-scale, 1));
   background: #fff;
   border-radius: 10px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
-  margin: 0 auto;
   overflow: hidden;
   flex-shrink: 0;
+  transform: scale(var(--slide-zoom, 1));
+  transform-origin: top left;
 }
 
 .transform-16-9 .slide-title {
@@ -85,6 +96,59 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.slide-size-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #666;
+}
+
+.slide-size-control select {
+  font-size: 11px;
+  padding: 3px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.slide-zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #666;
+  user-select: none;
+}
+
+.slide-zoom-control button {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #555;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.slide-zoom-control button:hover {
+  background: #f0f0f0;
+  border-color: #aaa;
+}
+
+.slide-zoom-control .zoom-value {
+  min-width: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .variant-badge {

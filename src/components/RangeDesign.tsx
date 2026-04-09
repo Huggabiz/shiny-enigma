@@ -17,6 +17,7 @@ import { CloseIcon } from './Icons';
 import { PillToggle } from './PillToggle';
 import { PlaceholderDialog } from './PlaceholderDialog';
 import { EditableTitle } from './EditableTitle';
+import { SlideCanvasControls } from './SlideCanvasControls';
 import type { Product, Shelf, MatrixLayout, PlaceholderData } from '../types';
 import { getActivePlan } from '../types';
 import './RangeDesign.css';
@@ -228,6 +229,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
 
   return (
     <div ref={setNodeRef} className={cardClasses}
+      data-item-id={itemId}
       onDoubleClick={(e) => { if (isPlaceholder && onEdit) { e.stopPropagation(); onEdit(); } }}
       {...attributes} {...listeners}>
       <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}><CloseIcon size={8} color="#fff" /></button>
@@ -561,8 +563,12 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         <div className="range-design-canvas">
           <div className="range-design-title-bar">
             <PillToggle value={shelfId} onChange={onShelfChange} />
+            <div className="range-design-canvas-controls">
+              <SlideCanvasControls />
+            </div>
           </div>
 
+          <div className="slide-canvas-wrapper">
           <div className="matrix-16-9">
             <div className="slide-title">
               <EditableTitle
@@ -617,6 +623,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                 <button className="matrix-add-btn wide" onClick={() => addLabel('y')}>+ Row</button>
               </div>
             </div>
+          </div>
           </div>
 
           {unassigned.length > 0 && (

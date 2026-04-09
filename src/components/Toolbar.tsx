@@ -113,10 +113,6 @@ export function Toolbar({ activeView }: ToolbarProps) {
                     onClick={async () => {
                       if (!project) return;
                       closeMenus();
-                      if (!document.querySelector('.transform-16-9')) {
-                        alert('Switch to Transform view before exporting so the card snapshots can be captured.');
-                        return;
-                      }
                       try {
                         await exportToPptx(project);
                       } catch (err) {

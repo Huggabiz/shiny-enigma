@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -13,7 +13,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Toolbar } from './components/Toolbar';
-import { NavSidebar, type ViewType } from './components/NavSidebar';
+import { NavSidebar } from './components/NavSidebar';
 import { PlanTree } from './components/PlanTree';
 import { Shelf } from './components/Shelf';
 import { Catalogue } from './components/Catalogue';
@@ -28,6 +28,7 @@ import { EditableTitle } from './components/EditableTitle';
 import { useProjectStore } from './store/useProjectStore';
 import { getActivePlan } from './types';
 import type { Product, ShelfItem, PlaceholderData } from './types';
+import { SlideCanvasControls } from './components/SlideCanvasControls';
 import './App.css';
 
 function App() {
@@ -51,6 +52,14 @@ function App() {
     showGhosted,
     setShowGhosted,
     renamePlan,
+    activeView,
+    setActiveView,
+    designShelfId,
+    setDesignShelfId,
+    slideBaseScale,
+    slideBaseScaleMode,
+    setSlideBaseScale,
+    slideZoom,
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
@@ -58,8 +67,6 @@ function App() {
   const [showImport, setShowImport] = useState(false);
   const [showNewProject, setShowNewProject] = useState(!project);
   const [newProjectName, setNewProjectName] = useState('');
-  const [activeView, setActiveView] = useState<ViewType>('range-design');
-  const [designShelfId, setDesignShelfId] = useState<'current' | 'future'>('current');
   const [activeItem, setActiveItem] = useState<{
     item: ShelfItem;
     product?: Product;
@@ -69,6 +76,56 @@ function App() {
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [shelfRailWidth, setShelfRailWidth] = useState(0);
   const [showDiscontinued, setShowDiscontinued] = useState(true);
+
+  // Auto-compute the required slide base scale from the busiest shelf so
+  // dense plans grow their canvas instead of shrinking cards. The tiers
+  // step 1x / 1.25x / 1.5x / 1.75x / 2x at 18 / 28 / 40 / 55 items. Users
+  // can override via the toolbar dropdown (slideBaseScaleMode = 'manual').
+  const maxShelfItems = useMemo(() => {
+    if (!activePlan) return 0;
+    return Math.max(activePlan.currentShelf.items.length, activePlan.futureShelf.items.length);
+  }, [activePlan]);
+
+  useEffect(() => {
+    if (slideBaseScaleMode !== 'auto') return;
+    const n = maxShelfItems;
+    let scale = 1;
+    if (n > 55) scale = 2;
+    else if (n > 40) scale = 1.75;
+    else if (n > 28) scale = 1.5;
+    else if (n > 18) scale = 1.25;
+    if (scale !== slideBaseScale) setSlideBaseScale(scale);
+  }, [maxShelfItems, slideBaseScaleMode, slideBaseScale, setSlideBaseScale]);
+
+  // Apply the computed canvas scale + zoom as CSS custom properties on the
+  // root <html> element so both .transform-16-9 and .matrix-16-9 read them.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--slide-base-scale', String(slideBaseScale));
+    root.style.setProperty('--slide-zoom', String(slideZoom));
+    return () => {
+      root.style.removeProperty('--slide-base-scale');
+      root.style.removeProperty('--slide-zoom');
+    };
+  }, [slideBaseScale, slideZoom]);
+
+  // Ctrl + scroll anywhere in the workspace zooms the slide. Attach a
+  // non-passive listener via effect so we can preventDefault on the
+  // native wheel event (React's SyntheticEvent is passive by default).
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      // Only intercept when the target is inside the shelves-area
+      const target = e.target as HTMLElement;
+      if (!target.closest('.shelves-area')) return;
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.08 : -0.08;
+      const current = useProjectStore.getState().slideZoom;
+      useProjectStore.getState().setSlideZoom(current + delta);
+    };
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
   const [placeholderDialog, setPlaceholderDialog] = useState<
     | { mode: 'create'; shelfId: string }
     | { mode: 'edit'; shelfId: string; itemId: string; data: PlaceholderData }
@@ -381,10 +438,12 @@ function App() {
                     <input type="checkbox" checked={showDiscontinued} onChange={(e) => setShowDiscontinued(e.target.checked)} />
                     <span>Show discontinued</span>
                   </label>
+                  <SlideCanvasControls />
                   <button className="transform-copy-btn" onClick={copyCurrentToFuture}>Copy Current → Future</button>
                 </div>
               </div>
 
+              <div className="slide-canvas-wrapper">
               <div className="transform-16-9">
                 <div className="slide-title">
                   <EditableTitle
@@ -420,6 +479,7 @@ function App() {
                   discontinuedItems={discontinuedItems}
                   showDiscontinued={showDiscontinued}
                   flipped={true} />
+              </div>
               </div>
 
               {linkMode && linkSourceItem && (
