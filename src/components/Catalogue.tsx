@@ -54,12 +54,13 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds,
   const inCurrent = currentProductIds.has(product.id);
   const inFuture = futureProductIds.has(product.id);
   const usedClass = (inCurrent || inFuture) ? 'used' : '';
+  const devClass = product.source === 'dev' ? 'dev' : '';
 
   if (expanded) {
     return (
       <div
         ref={setNodeRef}
-        className={`catalogue-item-expanded ${isDragging ? 'dragging' : ''} ${usedClass}`}
+        className={`catalogue-item-expanded ${isDragging ? 'dragging' : ''} ${usedClass} ${devClass}`}
         {...attributes}
         {...listeners}
       >
@@ -89,7 +90,7 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds,
   return (
     <div
       ref={setNodeRef}
-      className={`catalogue-item ${isDragging ? 'dragging' : ''} ${usedClass}`}
+      className={`catalogue-item ${isDragging ? 'dragging' : ''} ${usedClass} ${devClass}`}
       {...attributes}
       {...listeners}
     >
@@ -149,6 +150,7 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   const categoryFilter = catalogueFilters.category;
   const subCategoryFilter = catalogueFilters.subCategory;
   const familyFilter = catalogueFilters.family;
+  const { showLive, showDev } = catalogueFilters;
   const setSearch = (v: string) => setCatalogueFilters({ search: v });
   const setCategoryFilter = (v: string) => setCatalogueFilters({ category: v, subCategory: '' });
   const setSubCategoryFilter = (v: string) => setCatalogueFilters({ subCategory: v });
@@ -184,9 +186,12 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
       const matchesCategory = !categoryFilter || p.category === categoryFilter;
       const matchesSubCategory = !subCategoryFilter || p.subCategory === subCategoryFilter;
       const matchesFamily = !familyFilter || p.productFamily === familyFilter;
-      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily;
+      // Live/Dev filter: anything without an explicit 'dev' source counts as live.
+      const isDev = p.source === 'dev';
+      const matchesSource = isDev ? showDev : showLive;
+      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource;
     });
-  }, [products, search, categoryFilter, subCategoryFilter, familyFilter]);
+  }, [products, search, categoryFilter, subCategoryFilter, familyFilter, showLive, showDev]);
 
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
@@ -274,6 +279,24 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
             </option>
           ))}
         </select>
+        <div className="catalogue-source-toggles">
+          <label>
+            <input
+              type="checkbox"
+              checked={showLive}
+              onChange={(e) => setCatalogueFilters({ showLive: e.target.checked })}
+            />
+            <span>Live</span>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={showDev}
+              onChange={(e) => setCatalogueFilters({ showDev: e.target.checked })}
+            />
+            <span>Dev</span>
+          </label>
+        </div>
       </div>
 
       <div className="catalogue-count">{filtered.length} of {products.length} products</div>

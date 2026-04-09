@@ -236,7 +236,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
       )}
       {cardFormat.showName && <div className="matrix-card-name" title={displayName}>{displayName}</div>}
       {cardFormat.showSku && <div className="matrix-card-sku">{displaySku || '—'}</div>}
-      {cardFormat.showRrp && <div className="matrix-card-rrp">RRP: {displayRrp || '—'}</div>}
+      {cardFormat.showRrp && <div className="matrix-card-rrp">{displayRrp ? `\u00A3${displayRrp}` : '—'}</div>}
       {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {displayVolume ? displayVolume.toLocaleString() : '—'}</div>}
       {cardFormat.showForecastVolume && displayForecast !== undefined && (
         <div className="matrix-card-forecast">Fcst: {displayForecast.toLocaleString()}</div>

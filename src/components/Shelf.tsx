@@ -226,9 +226,6 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
       <div className="shelf-header">
         <h3 className="shelf-title">{shelf.name}</h3>
         <div className="shelf-actions">
-          <button className="shelf-btn" onClick={onAddPlaceholder} title="Add placeholder SKU">
-            + Placeholder
-          </button>
           {onViewDesign && (
             <button className="shelf-btn view-range-btn" onClick={onViewDesign} title="View in Range matrix">
               View Range
@@ -336,6 +333,25 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
           <div className="shelf-empty">
             Drag products here from the catalogue or use Design view
           </div>
+        )}
+
+        {/* Hover-only add-placeholder tile. Absolutely positioned after the
+            last visible card so it doesn't push the existing cards off their
+            centred position in the rail. */}
+        {visibleRegularItems.length > 0 && (
+          <button
+            type="button"
+            className="shelf-add-placeholder"
+            onClick={(e) => { e.stopPropagation(); onAddPlaceholder(); }}
+            style={{
+              left: offsetLeft + visibleRegularItems.length * slotWidth,
+              width: cardWidth,
+              height: cardWidth < 75 ? 92 : 112,
+            }}
+            title="Add placeholder SKU"
+          >
+            <span>+</span>
+          </button>
         )}
       </div>
     </div>

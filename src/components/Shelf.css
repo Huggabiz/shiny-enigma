@@ -109,10 +109,10 @@
 .shelf-rail {
   display: flex;
   justify-content: flex-start;
-  gap: 10px;
-  min-height: 108px;
+  gap: 6px;
+  min-height: 116px;
   padding: 4px 0;
-  align-items: flex-end;
+  align-items: stretch;
   position: relative;
 }
 
@@ -137,4 +137,35 @@
   min-height: 100px;
   border: 2px dashed #ddd;
   border-radius: 8px;
+}
+
+/* Hover-only add-placeholder tile — mirrors the matrix add pattern.
+   Absolutely positioned so it does not affect the centred layout of the
+   cards in the rail. */
+.shelf-add-placeholder {
+  position: absolute;
+  bottom: 4px;
+  border: 2px dashed #0097a7;
+  background: transparent;
+  border-radius: 8px;
+  color: #0097a7;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  padding: 0;
+  z-index: 1;
+}
+
+.shelf-container:hover .shelf-add-placeholder {
+  opacity: 0.7;
+}
+
+.shelf-add-placeholder:hover {
+  opacity: 1 !important;
+  background: #e0f7fa;
 }

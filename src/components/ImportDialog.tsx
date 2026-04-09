@@ -16,15 +16,49 @@ const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: str
   category: { label: 'Category', hint: 'Top-level product category (e.g. "Skincare")', required: true },
   subCategory: { label: 'Sub-Category', hint: 'Category subdivision (e.g. "Moisturisers")', required: false, aliases: ['sub category', 'subcategory'] },
   productFamily: { label: 'Product Family', hint: 'Product family grouping', required: false },
-  volume: { label: 'Volume', hint: 'Last year\'s actual sales volume (numeric)', required: true, aliases: ['units', 'actual volume', 'ly volume', 'last year volume'] },
-  forecastVolume: { label: 'Forecast Volume', hint: 'Next year\'s forecast sales volume (numeric)', required: false, aliases: ['forecast', 'forecasted volume', 'ny volume', 'next year volume', 'projected volume'] },
+  volume: {
+    label: 'Volume',
+    hint: 'Last year\'s actual sales volume (numeric)',
+    required: true,
+    aliases: [
+      'units', 'actual volume', 'ly volume', 'last year volume',
+      '12m vol q ly', '12m volume ly', 'vol ly', 'volume ly',
+    ],
+  },
+  forecastVolume: {
+    label: 'Forecast Volume',
+    hint: 'Next year\'s forecast sales volume (numeric)',
+    required: false,
+    aliases: [
+      'forecast', 'forecasted volume', 'ny volume', 'next year volume', 'projected volume',
+      '12m vol q / yr1 fc', '12m vol q yr1 fc', 'vol yr1 fc', 'volume yr1 fc',
+      'yr1 fc volume', 'fc volume',
+    ],
+  },
   rrp: { label: 'UK RRP', hint: 'UK recommended retail price (numeric)', required: false, aliases: ['rrp', 'uk rrp', 'rrp uk', 'rrp uk (gbp)', 'rrp (gbp)', 'uk rrp (gbp)', 'gbp rrp'] },
   usRrp: { label: 'US RRP', hint: 'US recommended retail price (numeric)', required: false, aliases: ['us rrp', 'usa rrp', 'rrp us', 'rrp us (usd)', 'rrp (usd)', 'us rrp (usd)', 'usd rrp'] },
   euRrp: { label: 'EU RRP', hint: 'EU recommended retail price (numeric)', required: false, aliases: ['eu rrp', 'europe rrp', 'rrp eu', 'rrp eu (eur)', 'rrp (eur)', 'eu rrp (eur)', 'eur rrp'] },
   ausRrp: { label: 'AUS RRP', hint: 'Australia recommended retail price (numeric)', required: false, aliases: ['aus rrp', 'australia rrp', 'rrp aus', 'rrp aus (aud)', 'rrp (aud)', 'aus rrp (aud)', 'aud rrp'] },
-  revenue: { label: 'Revenue', hint: 'Last year\'s actual revenue (numeric)', required: false, aliases: ['ytd', 'actual revenue', 'ly revenue', 'last year revenue'] },
-  forecastRevenue: { label: 'Forecast Revenue', hint: 'Next year\'s forecast revenue (numeric)', required: false, aliases: ['forecast revenue', 'forecasted revenue', 'ny revenue', 'next year revenue', 'projected revenue', 'revenue forecast'] },
-  imageUrl: { label: 'Image URL', hint: 'Web URL to product image', required: false },
+  revenue: {
+    label: 'Revenue',
+    hint: 'Last year\'s actual revenue (numeric)',
+    required: false,
+    aliases: [
+      'ytd', 'actual revenue', 'ly revenue', 'last year revenue',
+      '12m rev \u00a3 ly', '12m rev ly', '12m revenue ly', 'rev ly', 'revenue ly',
+    ],
+  },
+  forecastRevenue: {
+    label: 'Forecast Revenue',
+    hint: 'Next year\'s forecast revenue (numeric)',
+    required: false,
+    aliases: [
+      'forecast revenue', 'forecasted revenue', 'ny revenue', 'next year revenue', 'projected revenue', 'revenue forecast',
+      '12m rev \u00a3 / yr1 fc', '12m rev / yr1 fc', '12m rev yr1 fc', '12m revenue yr1 fc',
+      'rev yr1 fc', 'yr1 fc revenue', 'fc revenue',
+    ],
+  },
+  imageUrl: { label: 'Image URL', hint: 'Web URL to product image', required: false, aliases: ['image', 'image url', 'imageurl', 'img', 'picture', 'photo'] },
   source: { label: 'Source', hint: 'Live or Dev — set Dev for in-development products', required: false, aliases: ['status', 'product status'] },
 };
 
@@ -51,14 +85,18 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
     setTotalCount(products.length);
 
     // Auto-match headers to fields (label, key, aliases, then substring fallback)
+    // Normalise by lowercasing, trimming, and collapsing any whitespace runs
+    // (including non-breaking spaces) to a single ASCII space so that
+    // spreadsheet quirks around "Foo  Bar" / "Foo\u00a0Bar" still match.
+    const normalise = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
     const newMapping = { ...mapping };
-    const lowerHeaders = hdrs.map(h => h.toLowerCase().trim());
+    const lowerHeaders = hdrs.map(normalise);
     for (const [key, desc] of Object.entries(FIELD_DESCRIPTIONS)) {
-      const label = desc.label.toLowerCase();
-      const aliases = (desc.aliases || []).map(a => a.toLowerCase());
+      const label = normalise(desc.label);
+      const aliases = (desc.aliases || []).map(normalise);
       // Exact matches first
       let matchIndex = lowerHeaders.findIndex(h =>
-        h === label || h === key.toLowerCase() || aliases.includes(h)
+        h === label || h === normalise(key) || aliases.includes(h)
       );
       // Substring fallback
       if (matchIndex === -1) {

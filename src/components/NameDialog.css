@@ -1,0 +1,120 @@
+/* Reuses .dialog-overlay and .dialog / button styles declared in PlaceholderDialog.css */
+
+.name-dialog {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 420px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+}
+
+.name-dialog .dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #eee;
+}
+
+.name-dialog .dialog-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.name-dialog .dialog-close-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.name-dialog .dialog-close-btn:hover {
+  background: #f0f0f0;
+}
+
+.name-dialog .dialog-body {
+  padding: 18px;
+}
+
+.name-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.name-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+}
+
+.name-field input {
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.name-field input:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
+.name-error {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  color: #c53030;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.name-dialog .dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid #eee;
+}
+
+.name-dialog .btn-primary {
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.name-dialog .btn-primary:hover {
+  background: #1565c0;
+}
+
+.name-dialog .btn-secondary {
+  background: #fff;
+  color: #555;
+  border: 1px solid #ccc;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.name-dialog .btn-secondary:hover {
+  background: #f5f5f5;
+}

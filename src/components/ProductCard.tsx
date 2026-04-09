@@ -33,6 +33,19 @@ const REGION_LABEL: Record<RrpRegion, string> = {
   ausRrp: 'AUS',
 };
 
+const REGION_SYMBOL: Record<RrpRegion, string> = {
+  ukRrp: '\u00A3',   // £
+  usRrp: '$',
+  euRrp: '\u20AC',   // €
+  ausRrp: 'A$',
+};
+
+// Format a number with up to 2 decimal places, preserving the symbol
+function formatCurrency(symbol: string, value: number): string {
+  const str = Number.isInteger(value) ? String(value) : value.toFixed(2);
+  return `${symbol}${str}`;
+}
+
 function getCatalogueRrp(product: Product, region: RrpRegion): number | undefined {
   if (region === 'ukRrp') return product.rrp;
   return product[region] as number | undefined;
@@ -62,13 +75,14 @@ function RrpRow({ product, region, editable, showLabel }: RrpRowProps) {
     delta = futVal - catVal;
   }
 
-  const labelText = showLabel ? `${REGION_LABEL[region]}: ` : '';
+  const symbol = REGION_SYMBOL[region];
+  const regionLabel = showLabel ? `${REGION_LABEL[region]} ` : '';
   const className = `card-rrp ${region === 'ukRrp' ? '' : `card-rrp-${region.replace('Rrp', '')}`}`;
 
   if (editing && editable) {
     return (
       <span className={className} onClick={(e) => e.stopPropagation()}>
-        {labelText}
+        {regionLabel}{symbol}
         <input
           type="number"
           step="0.01"
@@ -102,10 +116,10 @@ function RrpRow({ product, region, editable, showLabel }: RrpRowProps) {
       onClick={editable ? (e) => { e.stopPropagation(); setEditing(true); } : undefined}
       style={editable ? { cursor: 'pointer' } : undefined}
     >
-      {labelText}{displayVal !== undefined && displayVal !== 0 ? displayVal : '—'}
+      {regionLabel}{displayVal !== undefined && displayVal !== 0 ? formatCurrency(symbol, displayVal) : '—'}
       {delta !== null && (
         <span className={`card-rrp-delta ${delta > 0 ? 'up' : 'down'}`}>
-          {' '}{delta > 0 ? '↑' : '↓'}{Math.abs(delta).toFixed(2)}
+          {' '}{delta > 0 ? '\u2191' : '\u2193'}{formatCurrency(symbol, Math.abs(delta))}
         </span>
       )}
     </span>

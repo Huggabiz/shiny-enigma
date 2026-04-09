@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { CloseIcon } from './Icons';
+import { NameDialog } from './NameDialog';
 import type { Product, RangePlan } from '../types';
 import './PlanTree.css';
 
@@ -28,6 +29,11 @@ export function PlanTree() {
     activeVariantId, setActiveVariant, addVariant, removeVariant,
   } = useProjectStore();
   const [expandedPlans, setExpandedPlans] = useState<Set<string>>(new Set());
+  const [nameDialog, setNameDialog] = useState<
+    | { kind: 'plan' }
+    | { kind: 'variant'; planId: string }
+    | null
+  >(null);
 
   const grouped = useMemo(() => {
     if (!project) return [];
@@ -43,17 +49,24 @@ export function PlanTree() {
 
   if (!project) return null;
 
-  const handleNew = () => {
-    const name = prompt('New range plan name:');
-    if (!name) return;
-    addPlan(name);
+  const handleNew = () => setNameDialog({ kind: 'plan' });
+  const handleNewVariant = (planId: string) => setNameDialog({ kind: 'variant', planId });
+
+  const handleNameSave = (name: string) => {
+    if (!nameDialog) return;
+    if (nameDialog.kind === 'plan') {
+      addPlan(name);
+    } else {
+      addVariant(nameDialog.planId, name);
+    }
+    setNameDialog(null);
   };
 
-  const handleNewVariant = (planId: string) => {
-    const name = prompt('Variant name (e.g. "US", "RoW", "EU"):');
-    if (!name) return;
-    addVariant(planId, name);
-  };
+  const existingPlanNames = useMemo(() => project?.plans.map((p) => p.name) ?? [], [project]);
+  const variantPlan = nameDialog?.kind === 'variant'
+    ? project?.plans.find((p) => p.id === nameDialog.planId)
+    : undefined;
+  const existingVariantNames = variantPlan?.variants.map((v) => v.name) ?? [];
 
   const toggleExpand = (planId: string) => {
     setExpandedPlans((prev) => {
@@ -147,6 +160,29 @@ export function PlanTree() {
           </div>
         ))}
       </div>
+
+      {nameDialog && nameDialog.kind === 'plan' && (
+        <NameDialog
+          title="New Range Plan"
+          label="Plan name"
+          placeholder="e.g. AW26 Storage"
+          submitLabel="Create Plan"
+          existingNames={existingPlanNames}
+          onSave={handleNameSave}
+          onClose={() => setNameDialog(null)}
+        />
+      )}
+      {nameDialog && nameDialog.kind === 'variant' && (
+        <NameDialog
+          title="New Variant"
+          label="Variant name"
+          placeholder='e.g. "US", "RoW", "EU"'
+          submitLabel="Create Variant"
+          existingNames={existingVariantNames}
+          onSave={handleNameSave}
+          onClose={() => setNameDialog(null)}
+        />
+      )}
     </div>
   );
 }

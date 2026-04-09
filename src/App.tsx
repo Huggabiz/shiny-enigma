@@ -395,7 +395,6 @@ function App() {
                   onAddPlaceholder={() => handleAddPlaceholder('current')}
                   onRailWidthChange={handleRailWidthChange}
                   onDoubleClickItem={handleCurrentDoubleClick}
-                  onViewDesign={() => { setDesignShelfId('current'); setActiveView('range-design'); }}
                   variantIncludedIds={variantCurrentIds}
                   showGhosted={showGhosted} />
 
@@ -417,7 +416,6 @@ function App() {
                 <Shelf shelf={activePlan.futureShelf} catalogue={project!.catalogue}
                   onAddPlaceholder={() => handleAddPlaceholder('future')}
                   onDoubleClickItem={handleFutureDoubleClick}
-                  onViewDesign={() => { setDesignShelfId('future'); setActiveView('range-design'); }}
                   variantIncludedIds={variantFutureIds}
                   showGhosted={showGhosted}
                   editableFuturePricing={true}

@@ -1,6 +1,6 @@
 .product-card {
   width: 100px;
-  min-height: 104px;
+  min-height: 112px;
   background: #fff;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
@@ -58,7 +58,8 @@
   cursor: grabbing;
 }
 
-/* New badge */
+/* New / Dev badge — absolute, pointer-events: none so it cannot push
+   the card's layout box or steal clicks from neighbours. */
 .card-new-badge {
   position: absolute;
   top: -6px;
@@ -73,9 +74,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2;
+  z-index: 3;
   letter-spacing: -0.2px;
   box-shadow: 0 1px 4px rgba(0, 151, 167, 0.4);
+  pointer-events: none;
 }
 
 .card-new-badge.dev {
@@ -231,7 +233,7 @@
 
 /* Compact mode for shrunk cards */
 .product-card.compact {
-  min-height: 90px;
+  min-height: 92px;
   padding: 4px;
 }
 
