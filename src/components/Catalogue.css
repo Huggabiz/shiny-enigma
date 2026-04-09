@@ -457,11 +457,12 @@
   background: #e8f0fe;
 }
 
-/* Live/Dev toggle row inside the filter block */
+/* Live/Dev/Hide Used toggle row inside the filter block */
 .catalogue-source-toggles {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 6px 12px;
   padding: 2px 0;
   font-size: 11px;
   color: #555;

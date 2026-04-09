@@ -382,6 +382,21 @@
   color: #1976d2;
 }
 
+.matrix-card-rrp.matrix-card-us { color: #1976d2; }
+.matrix-card-rrp.matrix-card-eu { color: #6a1b9a; }
+.matrix-card-rrp.matrix-card-aus { color: #ef6c00; }
+
+.matrix-card-rev {
+  font-size: 7px;
+  color: #555;
+}
+
+.matrix-card-category {
+  font-size: 7px;
+  color: #999;
+  font-style: italic;
+}
+
 /* Add buttons */
 .matrix-add-btn {
   width: 24px;

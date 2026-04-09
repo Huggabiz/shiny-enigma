@@ -13,6 +13,8 @@ interface CatalogueProps {
   otherFutureIds?: Set<string>;
   isDropTarget?: boolean;
   dropZoneId?: string;
+  /** When set the catalogue shows the "Hide Used" toggle, scoped to this shelf. */
+  designShelfId?: 'current' | 'future';
 }
 
 function UsageBadges({ productId, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds }: {
@@ -143,14 +145,14 @@ function groupByCategory(products: Product[]): GroupedProducts[] {
     }));
 }
 
-export function Catalogue({ products, onImport, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds, isDropTarget, dropZoneId }: CatalogueProps) {
+export function Catalogue({ products, onImport, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds, isDropTarget, dropZoneId, designShelfId }: CatalogueProps) {
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({ id: dropZoneId || 'catalogue-drop-zone' });
   const { catalogueFilters, setCatalogueFilters } = useProjectStore();
   const search = catalogueFilters.search;
   const categoryFilter = catalogueFilters.category;
   const subCategoryFilter = catalogueFilters.subCategory;
   const familyFilter = catalogueFilters.family;
-  const { showLive, showDev } = catalogueFilters;
+  const { showLive, showDev, hideUsed } = catalogueFilters;
   const setSearch = (v: string) => setCatalogueFilters({ search: v });
   const setCategoryFilter = (v: string) => setCatalogueFilters({ category: v, subCategory: '' });
   const setSubCategoryFilter = (v: string) => setCatalogueFilters({ subCategory: v });
@@ -189,9 +191,16 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
       // Live/Dev filter: anything without an explicit 'dev' source counts as live.
       const isDev = p.source === 'dev';
       const matchesSource = isDev ? showDev : showLive;
-      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource;
+      // Hide Used: only applies in range-design view (designShelfId set),
+      // and hides items already placed in the shelf being designed.
+      const matchesHideUsed = !designShelfId || !hideUsed
+        ? true
+        : (designShelfId === 'current'
+            ? !currentProductIds.has(p.id)
+            : !futureProductIds.has(p.id));
+      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource && matchesHideUsed;
     });
-  }, [products, search, categoryFilter, subCategoryFilter, familyFilter, showLive, showDev]);
+  }, [products, search, categoryFilter, subCategoryFilter, familyFilter, showLive, showDev, hideUsed, designShelfId, currentProductIds, futureProductIds]);
 
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
@@ -296,6 +305,16 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
             />
             <span>Dev</span>
           </label>
+          {designShelfId && (
+            <label title={`Hide items already placed in the ${designShelfId} shelf`}>
+              <input
+                type="checkbox"
+                checked={hideUsed}
+                onChange={(e) => setCatalogueFilters({ hideUsed: e.target.checked })}
+              />
+              <span>Hide Used</span>
+            </label>
+          )}
         </div>
       </div>
 

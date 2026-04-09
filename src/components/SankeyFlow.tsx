@@ -320,16 +320,93 @@ export function SankeyFlow({
           .on('mouseleave', function () { d3.select(this).attr('stroke-opacity', baseOpacity); })
           .on('click', () => { onClickFlow?.(flow.link.sourceItemId); });
 
-        // Label at midpoint
+        // Label at midpoint — initial position, may be nudged by the
+        // collision-avoidance pass below.
         const midX = (sx + tx) / 2;
+        const idealY = flowHeight / 2 - flow.strokeWidth / 2 - 3;
         const pct = flow.link.percent ?? 100;
         svg.append('text')
+          .attr('class', 'flow-label')
           .attr('x', midX)
-          .attr('y', flowHeight / 2 - flow.strokeWidth / 2 - 3)
+          .attr('y', idealY)
+          .attr('data-ideal-x', midX)
+          .attr('data-ideal-y', idealY)
           .attr('text-anchor', 'middle')
           .attr('font-size', '9px')
           .attr('fill', '#888')
           .text(`${pct}% (${flow.volume.toLocaleString()})`);
+      }
+    }
+
+    // ── Label collision avoidance ──
+    // Push overlapping labels apart on the Y axis so each one finds a
+    // readable spot. Draws thin leader lines back to the ideal midpoint
+    // when a label has been displaced far from its original position.
+    const labelNodes = svg.selectAll<SVGTextElement, unknown>('text.flow-label').nodes();
+    if (labelNodes.length > 1) {
+      interface LabelBox { node: SVGTextElement; x: number; y: number; w: number; h: number; idealY: number; }
+      const boxes: LabelBox[] = labelNodes.map((node) => {
+        const bbox = node.getBBox();
+        const y = parseFloat(node.getAttribute('y') || '0');
+        const idealY = parseFloat(node.getAttribute('data-ideal-y') || String(y));
+        return {
+          node,
+          x: bbox.x,
+          y,
+          w: bbox.width,
+          h: bbox.height,
+          idealY,
+        };
+      });
+
+      const pad = 2;
+      const minY = 6;
+      const maxY = flowHeight - 4;
+
+      for (let iter = 0; iter < 40; iter++) {
+        let moved = false;
+        for (let i = 0; i < boxes.length; i++) {
+          for (let j = i + 1; j < boxes.length; j++) {
+            const a = boxes[i];
+            const b = boxes[j];
+            // Horizontal overlap check
+            const hOverlap = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+            if (hOverlap <= pad) continue;
+            // Vertical overlap check (y is baseline, so the box top is y - h)
+            const aTop = a.y - a.h;
+            const bTop = b.y - b.h;
+            const vOverlap = Math.min(a.y, b.y) - Math.max(aTop, bTop);
+            if (vOverlap <= pad) continue;
+            const push = (vOverlap + pad) / 2;
+            // Move the higher one further up, the lower one further down
+            if (a.y < b.y) {
+              a.y = Math.max(minY, a.y - push);
+              b.y = Math.min(maxY, b.y + push);
+            } else {
+              a.y = Math.min(maxY, a.y + push);
+              b.y = Math.max(minY, b.y - push);
+            }
+            moved = true;
+          }
+        }
+        if (!moved) break;
+      }
+
+      // Write displaced positions back to the DOM and draw leader lines
+      // for labels that have moved far from their ideal spot.
+      for (const box of boxes) {
+        box.node.setAttribute('y', String(box.y));
+        if (Math.abs(box.y - box.idealY) > 6) {
+          const cx = box.x + box.w / 2;
+          svg.insert('line', 'text.flow-label')
+            .attr('x1', cx)
+            .attr('y1', box.idealY)
+            .attr('x2', cx)
+            .attr('y2', box.y - box.h + 1)
+            .attr('stroke', '#bbb')
+            .attr('stroke-width', 0.6)
+            .attr('stroke-opacity', 0.5);
+        }
       }
     }
   }, [flows, hasContent, effectiveWidth, flowHeight, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems, showDiscontinued, discontinuedItems, variantCurrentIds]);

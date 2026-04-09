@@ -1,5 +1,7 @@
 import PptxGenJS from 'pptxgenjs';
+import html2canvas from 'html2canvas';
 import type { Project, Product, Shelf, ShelfItem, SankeyLink } from '../types';
+import { useProjectStore } from '../store/useProjectStore';
 
 // ── Slide dimensions (LAYOUT_WIDE = 13.333 × 7.5 inches) ──
 const SLIDE_W = 13.333;
@@ -247,6 +249,7 @@ function drawShelfRow(
   labelY: number,
   labelBelow: boolean,
   shelfName: string,
+  cardImages: Map<string, string> | null,
 ) {
   // Shelf name — sub-heading, lower authority than the main slide title
   slide.addText(shelfName.toUpperCase(), {
@@ -288,17 +291,28 @@ function drawShelfRow(
     }
   }
 
-  // Cards
+  // Cards — prefer a live-DOM screenshot when available, fall back to the
+  // shape-based renderer if we don't have one (e.g. CORS-tainted image).
   shelf.items.forEach((item, idx) => {
     const cardX = layout.offsetLeft + idx * layout.slotWidth;
     const cardId = `${shelf.id}-${idx}-${(item.id || '').slice(0, 8).replace(/[^a-zA-Z0-9]/g, '_')}`;
-    drawCard(
-      slide,
-      { x: cardX, y: layout.topY, w: layout.cardWidth, h: layout.cardHeight },
-      item,
-      getProduct(catalogue, item.productId),
-      { cardId, compact: layout.cardWidth < 0.5 },
-    );
+    const dataUrl = cardImages?.get(item.id);
+    if (dataUrl) {
+      slide.addImage({
+        data: dataUrl,
+        x: cardX, y: layout.topY, w: layout.cardWidth, h: layout.cardHeight,
+        sizing: { type: 'contain', w: layout.cardWidth, h: layout.cardHeight },
+        objectName: `${cardId}-img`,
+      });
+    } else {
+      drawCard(
+        slide,
+        { x: cardX, y: layout.topY, w: layout.cardWidth, h: layout.cardHeight },
+        item,
+        getProduct(catalogue, item.productId),
+        { cardId, compact: layout.cardWidth < 0.5 },
+      );
+    }
   });
 }
 
@@ -343,7 +357,109 @@ function addFlowRibbon(
   }
 }
 
-function addTransformSlide(pptx: PptxGenJS, plan: { name: string; currentShelf: Shelf; futureShelf: Shelf; sankeyLinks: SankeyLink[] }, catalogue: Product[]) {
+// ───────────────────────────────────────────────────────────────
+// Hybrid capture — rasterise cards + sankey from the live transform
+// view so the exported slide matches the web pixel-for-pixel while
+// the title and shelf sub-labels remain editable pptxgen text objects.
+// ───────────────────────────────────────────────────────────────
+
+interface PlanCapture {
+  // Map<itemId, dataUrl> for both shelves combined
+  cardImages: Map<string, string>;
+  // PNG data URL for the whole sankey band, or null if nothing to draw
+  sankeyImage: string | null;
+}
+
+// Two requestAnimationFrame ticks — enough to flush React's commit and
+// let the d3 sankey re-render after we swap the active plan.
+function waitForNextPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  });
+}
+
+async function captureCardsInShelf(selector: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const cards = document.querySelectorAll<HTMLElement>(selector);
+  for (const card of Array.from(cards)) {
+    const id = card.getAttribute('data-item-id');
+    if (!id) continue;
+    try {
+      const canvas = await html2canvas(card, {
+        backgroundColor: null,
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      out.set(id, canvas.toDataURL('image/png'));
+    } catch (err) {
+      // Swallow CORS / tainted canvas errors — the caller will fall back to
+      // the shape-based drawCard() renderer for any card we couldn't capture.
+      console.warn('[exportPptx] failed to capture card', id, err);
+    }
+  }
+  return out;
+}
+
+async function captureSankey(): Promise<string | null> {
+  const svg = document.querySelector<SVGSVGElement>('.sankey-container svg');
+  if (!svg) return null;
+  const width = svg.clientWidth || svg.getBoundingClientRect().width;
+  const height = svg.clientHeight || svg.getBoundingClientRect().height;
+  if (width <= 0 || height <= 0) return null;
+
+  // Clone the SVG so we can inject the xmlns if it's missing before serialising
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  if (!clone.getAttribute('xmlns')) {
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  }
+  clone.setAttribute('width', String(width));
+  clone.setAttribute('height', String(height));
+
+  const svgString = new XMLSerializer().serializeToString(clone);
+  const svgBase64 = btoa(unescape(encodeURIComponent(svgString)));
+  const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+  // Rasterise the SVG into a 2× canvas for crispness
+  return new Promise<string | null>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width * 2;
+      canvas.height = height * 2;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+      ctx.scale(2, 2);
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+async function capturePlan(): Promise<PlanCapture> {
+  const cardImages = new Map<string, string>();
+  // Current shelf cards
+  const currentCards = await captureCardsInShelf('.shelf-container:not(.flipped) .product-card[data-item-id]');
+  for (const [id, url] of currentCards) cardImages.set(id, url);
+  // Future shelf cards
+  const futureCards = await captureCardsInShelf('.shelf-container.flipped .product-card[data-item-id]');
+  for (const [id, url] of futureCards) cardImages.set(id, url);
+
+  const sankeyImage = await captureSankey();
+  return { cardImages, sankeyImage };
+}
+
+function addTransformSlide(
+  pptx: PptxGenJS,
+  plan: { name: string; currentShelf: Shelf; futureShelf: Shelf; sankeyLinks: SankeyLink[] },
+  catalogue: Product[],
+  capture: PlanCapture | null,
+) {
   const slide = pptx.addSlide();
 
   // Slide title — editable text object
@@ -361,44 +477,55 @@ function addTransformSlide(pptx: PptxGenJS, plan: { name: string; currentShelf: 
   // Current range — pinned near the top
   const currentY = 1.2;
   const currentLayout = computeShelfLayout(plan.currentShelf.items.length, railLeft, railWidth, currentY, cardH);
-  drawShelfRow(slide, plan.currentShelf, catalogue, currentLayout, currentY - 0.48, false, 'Current Range');
+  drawShelfRow(slide, plan.currentShelf, catalogue, currentLayout, currentY - 0.48, false, 'Current Range', capture?.cardImages || null);
 
   // Future range — pinned near the bottom
   const futureCardY = SLIDE_H - 0.4 - cardH;
   const futureLayout = computeShelfLayout(plan.futureShelf.items.length, railLeft, railWidth, futureCardY, cardH);
-  drawShelfRow(slide, plan.futureShelf, catalogue, futureLayout, futureCardY + cardH + 0.26, true, 'Future Range');
+  drawShelfRow(slide, plan.futureShelf, catalogue, futureLayout, futureCardY + cardH + 0.26, true, 'Future Range', capture?.cardImages || null);
 
-  // Sankey ribbons bridging the middle
   const sankeyTop = currentLayout.bottomY + 0.05;
   const sankeyBottom = futureLayout.topY - 0.05;
 
-  // Scale ribbon width by volume, normalised against the max volume in play
-  const allVolumes = plan.sankeyLinks.map((l) => l.volume);
-  const maxVolume = Math.max(1, ...allVolumes);
-  const minRibbon = 0.04;
-  const maxRibbon = 0.22;
+  if (capture?.sankeyImage) {
+    // Hybrid path: one rasterised image spans the sankey band, placed
+    // against the same rail rect the web canvas uses.
+    slide.addImage({
+      data: capture.sankeyImage,
+      x: railLeft, y: sankeyTop, w: railWidth, h: sankeyBottom - sankeyTop,
+      sizing: { type: 'contain', w: railWidth, h: sankeyBottom - sankeyTop },
+      objectName: 'sankey-image',
+    });
+  } else {
+    // Fallback path: draw each link as a rotated filled ribbon rectangle
+    // (the v1.7.0 behaviour) when rasterisation wasn't possible.
+    const allVolumes = plan.sankeyLinks.map((l) => l.volume);
+    const maxVolume = Math.max(1, ...allVolumes);
+    const minRibbon = 0.04;
+    const maxRibbon = 0.22;
 
-  plan.sankeyLinks.forEach((link, idx) => {
-    const si = plan.currentShelf.items.findIndex((i) => i.id === link.sourceItemId);
-    const ti = plan.futureShelf.items.findIndex((i) => i.id === link.targetItemId);
-    if (si === -1 || ti === -1) return;
+    plan.sankeyLinks.forEach((link, idx) => {
+      const si = plan.currentShelf.items.findIndex((i) => i.id === link.sourceItemId);
+      const ti = plan.futureShelf.items.findIndex((i) => i.id === link.targetItemId);
+      if (si === -1 || ti === -1) return;
 
-    const sx = currentLayout.offsetLeft + si * currentLayout.slotWidth + currentLayout.cardWidth / 2;
-    const tx = futureLayout.offsetLeft + ti * futureLayout.slotWidth + futureLayout.cardWidth / 2;
-    const sy = sankeyTop;
-    const ty = sankeyBottom;
+      const sx = currentLayout.offsetLeft + si * currentLayout.slotWidth + currentLayout.cardWidth / 2;
+      const tx = futureLayout.offsetLeft + ti * futureLayout.slotWidth + futureLayout.cardWidth / 2;
+      const sy = sankeyTop;
+      const ty = sankeyBottom;
 
-    const ribbonWidth = minRibbon + (link.volume / maxVolume) * (maxRibbon - minRibbon);
-    const color = link.type === 'growth'
-      ? COLOUR_FLOW_GROWTH
-      : link.type === 'loss'
-        ? COLOUR_FLOW_LOSS
-        : COLOUR_FLOW_TRANSFER;
-    const pct = link.percent ?? 100;
-    const label = `${pct}% (${link.volume.toLocaleString()})`;
+      const ribbonWidth = minRibbon + (link.volume / maxVolume) * (maxRibbon - minRibbon);
+      const color = link.type === 'growth'
+        ? COLOUR_FLOW_GROWTH
+        : link.type === 'loss'
+          ? COLOUR_FLOW_LOSS
+          : COLOUR_FLOW_TRANSFER;
+      const pct = link.percent ?? 100;
+      const label = `${pct}% (${link.volume.toLocaleString()})`;
 
-    addFlowRibbon(slide, sx, sy, tx, ty, ribbonWidth, color, label, `flow-${idx}`);
-  });
+      addFlowRibbon(slide, sx, sy, tx, ty, ribbonWidth, color, label, `flow-${idx}`);
+    });
+  }
 }
 
 // ───────────────────────────────────────────────────────────────
@@ -639,19 +766,53 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], pla
 // Public entry point
 // ───────────────────────────────────────────────────────────────
 
-export function exportToPptx(project: Project): void {
+export async function exportToPptx(project: Project): Promise<void> {
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE';
   pptx.author = 'Range Planner';
   pptx.title = project.name;
 
+  // Attempt to capture each plan's transform view as cards + sankey images.
+  // Requires the transform canvas to be mounted in the DOM — if it isn't,
+  // tell the user to switch views and bail.
+  const hasCanvas = !!document.querySelector('.transform-16-9');
+  const captures = new Map<string, PlanCapture>();
+  if (hasCanvas) {
+    const store = useProjectStore.getState();
+    const originalActivePlanId = store.project?.activePlanId;
+    const originalVariantId = store.activeVariantId;
+
+    for (const plan of project.plans) {
+      store.setActivePlan(plan.id);
+      store.setActiveVariant(null);
+      // Two RAFs to flush React's commit phase and the d3 sankey re-draw
+      await waitForNextPaint();
+      await waitForNextPaint();
+      try {
+        const capture = await capturePlan();
+        captures.set(plan.id, capture);
+      } catch (err) {
+        console.warn('[exportPptx] capturePlan failed for', plan.name, err);
+      }
+    }
+
+    // Restore the original active-plan / variant so the user's session
+    // returns to the view they started from.
+    if (originalActivePlanId) store.setActivePlan(originalActivePlanId);
+    if (originalVariantId) store.setActiveVariant(originalVariantId);
+    await waitForNextPaint();
+  } else {
+    console.warn('[exportPptx] transform canvas not mounted; using fallback shape rendering');
+  }
+
   for (const plan of project.plans) {
-    addTransformSlide(pptx, plan, project.catalogue);
+    const capture = captures.get(plan.id) || null;
+    addTransformSlide(pptx, plan, project.catalogue, capture);
     addDesignSlide(pptx, plan.currentShelf, project.catalogue, plan.name, 'Current Range');
     addDesignSlide(pptx, plan.futureShelf, project.catalogue, plan.name, 'Future Range');
   }
 
-  pptx.writeFile({ fileName: `${project.name.replace(/\s+/g, '_')}_range_plan.pptx` });
+  await pptx.writeFile({ fileName: `${project.name.replace(/\s+/g, '_')}_range_plan.pptx` });
 }
 
 // Avoid "unused" TS errors on the card-radius constant which is referenced in templates above.

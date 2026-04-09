@@ -218,6 +218,7 @@ export function ProductCard({
       ref={setNodeRef}
       style={style}
       className={cardClass}
+      data-item-id={item.id}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       {...attributes}

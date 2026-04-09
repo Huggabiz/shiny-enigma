@@ -109,7 +109,24 @@ export function Toolbar({ activeView }: ToolbarProps) {
                   <button onClick={() => { if (project) saveProject(project); closeMenus(); }}>Save Full Project</button>
                   <button onClick={() => { if (project) saveRangeStructure(project); closeMenus(); }}>Save Range Structure</button>
                   <hr />
-                  <button onClick={() => { if (project) exportToPptx(project); closeMenus(); }}>Export PowerPoint</button>
+                  <button
+                    onClick={async () => {
+                      if (!project) return;
+                      closeMenus();
+                      if (!document.querySelector('.transform-16-9')) {
+                        alert('Switch to Transform view before exporting so the card snapshots can be captured.');
+                        return;
+                      }
+                      try {
+                        await exportToPptx(project);
+                      } catch (err) {
+                        console.error(err);
+                        alert('PowerPoint export failed. See browser console for details.');
+                      }
+                    }}
+                  >
+                    Export PowerPoint
+                  </button>
                   <button onClick={() => { if (project) exportToExcel(project); closeMenus(); }}>Export Excel</button>
                 </div>
               )}

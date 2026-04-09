@@ -402,12 +402,6 @@ function App() {
                   variantIncludedIds={variantCurrentIds}
                   showGhosted={showGhosted} />
 
-                {linkMode && linkSourceItem && (
-                  <LinkPanel sourceItem={linkSourceItem} sourceProduct={linkSourceProduct}
-                    links={activePlan.sankeyLinks} futureItems={activePlan.futureShelf.items}
-                    catalogue={project!.catalogue} />
-                )}
-
                 <SankeyFlow currentShelf={activePlan.currentShelf} futureShelf={activePlan.futureShelf}
                   links={activePlan.sankeyLinks} catalogue={project!.catalogue}
                   railWidth={shelfRailWidth}
@@ -427,6 +421,12 @@ function App() {
                   showDiscontinued={showDiscontinued}
                   flipped={true} />
               </div>
+
+              {linkMode && linkSourceItem && (
+                <LinkPanel sourceItem={linkSourceItem} sourceProduct={linkSourceProduct}
+                  links={activePlan.sankeyLinks} futureItems={activePlan.futureShelf.items}
+                  catalogue={project!.catalogue} />
+              )}
 
               {activeItem?.sourceShelf && overShelfId === 'catalogue' && (
                 <div className="cross-shelf-hint remove-hint">Drop to remove from range</div>

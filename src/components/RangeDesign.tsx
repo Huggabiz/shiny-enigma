@@ -211,6 +211,12 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   const displayVolume = isPlaceholder ? placeholderData?.volume : product?.volume;
   const displayForecast = isPlaceholder ? placeholderData?.forecastVolume : product?.forecastVolume;
   const displayRrp = isPlaceholder ? placeholderData?.rrp : product?.rrp;
+  const displayUsRrp = isPlaceholder ? placeholderData?.usRrp : product?.usRrp;
+  const displayEuRrp = isPlaceholder ? placeholderData?.euRrp : product?.euRrp;
+  const displayAusRrp = isPlaceholder ? placeholderData?.ausRrp : product?.ausRrp;
+  const displayRevenue = isPlaceholder ? placeholderData?.revenue : product?.revenue;
+  const displayFcstRev = isPlaceholder ? placeholderData?.forecastRevenue : product?.forecastRevenue;
+  const displayCategory = isPlaceholder ? placeholderData?.category : product?.category;
   const isDev = !isPlaceholder && product?.source === 'dev';
   const cardClasses = [
     'matrix-card',
@@ -238,9 +244,27 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
       {cardFormat.showName && <div className="matrix-card-name" title={displayName}>{displayName}</div>}
       {cardFormat.showSku && <div className="matrix-card-sku">{displaySku || '—'}</div>}
       {cardFormat.showRrp && <div className="matrix-card-rrp">{displayRrp ? `\u00A3${displayRrp}` : '—'}</div>}
+      {cardFormat.showUsRrp && displayUsRrp !== undefined && (
+        <div className="matrix-card-rrp matrix-card-us">${displayUsRrp}</div>
+      )}
+      {cardFormat.showEuRrp && displayEuRrp !== undefined && (
+        <div className="matrix-card-rrp matrix-card-eu">{'\u20AC'}{displayEuRrp}</div>
+      )}
+      {cardFormat.showAusRrp && displayAusRrp !== undefined && (
+        <div className="matrix-card-rrp matrix-card-aus">A${displayAusRrp}</div>
+      )}
       {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {displayVolume ? displayVolume.toLocaleString() : '—'}</div>}
       {cardFormat.showForecastVolume && displayForecast !== undefined && (
         <div className="matrix-card-forecast">Fcst: {displayForecast.toLocaleString()}</div>
+      )}
+      {cardFormat.showRevenue && displayRevenue !== undefined && displayRevenue > 0 && (
+        <div className="matrix-card-rev">Rev: {displayRevenue.toLocaleString()}</div>
+      )}
+      {cardFormat.showForecastRevenue && displayFcstRev !== undefined && (
+        <div className="matrix-card-forecast">Fcst Rev: {displayFcstRev.toLocaleString()}</div>
+      )}
+      {cardFormat.showCategory && displayCategory && (
+        <div className="matrix-card-category">{displayCategory}</div>
       )}
     </div>
   );
@@ -614,6 +638,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         <Catalogue products={catalogue} onImport={onImport}
           currentProductIds={currentProductIds} futureProductIds={futureProductIds}
           otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds}
+          designShelfId={shelfId}
           dropZoneId="catalogue-drop-zone-design" />
 
         <DragOverlay>

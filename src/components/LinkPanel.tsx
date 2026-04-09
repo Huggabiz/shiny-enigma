@@ -53,16 +53,10 @@ export function LinkPanel({ sourceItem, sourceProduct, links, futureItems, catal
 
       {outgoingLinks.length === 0 ? (
         <div className="link-panel-empty">
-          Click a product in the Future Range below to create a connection.
+          Click a product in the Future Range to create a connection.
         </div>
       ) : (
         <div className="link-panel-allocations">
-          <div className="link-alloc-header">
-            <span>Allocated to</span>
-            <span>%</span>
-            <span>Volume</span>
-            <span></span>
-          </div>
           {outgoingLinks.map((link) => {
             const targetItem = futureItems.find((fi) => fi.id === link.targetItemId);
             const targetProduct = targetItem ? catalogue.find((p) => p.id === targetItem.productId) : null;
@@ -83,9 +77,8 @@ export function LinkPanel({ sourceItem, sourceProduct, links, futureItems, catal
                     value={pct}
                     onChange={(e) => handlePercentChange(link.targetItemId, Number(e.target.value))}
                   />
-                  <span className={`link-alloc-percent-value ${pct > 100 ? 'growth' : ''}`}>{pct}%</span>
                 </div>
-                <span className="link-alloc-volume">{link.volume.toLocaleString()}</span>
+                <span className={`link-alloc-percent-value ${pct > 100 ? 'growth' : ''}`}>{pct}%</span>
                 <button
                   className="link-alloc-remove"
                   onClick={() => removeLink(sourceItem.id, link.targetItemId)}
@@ -93,22 +86,23 @@ export function LinkPanel({ sourceItem, sourceProduct, links, futureItems, catal
                 >
                   <CloseIcon size={8} color="currentColor" />
                 </button>
+                <span className="link-alloc-volume">{link.volume.toLocaleString()}</span>
               </div>
             );
           })}
 
           <div className="link-alloc-summary">
             <span>Total allocated</span>
-            <span className={totalAllocated > 100 ? 'over-allocated' : ''}>{totalAllocated}%</span>
-            <span>{Math.round(sourceVolume * totalAllocated / 100).toLocaleString()}</span>
-            <span></span>
+            <span className={`summary-pct ${totalAllocated > 100 ? 'over-allocated' : ''}`}>
+              {totalAllocated}% · {Math.round(sourceVolume * totalAllocated / 100).toLocaleString()}
+            </span>
           </div>
           {unallocated > 0 && (
             <div className="link-alloc-unallocated">
               <span>Unallocated (lost)</span>
-              <span className="lost">{unallocated}%</span>
-              <span className="lost">{Math.round(sourceVolume * unallocated / 100).toLocaleString()}</span>
-              <span></span>
+              <span className="lost">
+                {unallocated}% · {Math.round(sourceVolume * unallocated / 100).toLocaleString()}
+              </span>
             </div>
           )}
         </div>

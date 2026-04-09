@@ -30,8 +30,8 @@ interface ProjectStore {
   assumeContinuity: boolean;
   cardFormat: CardFormat;
   showPlanTree: boolean;
-  catalogueFilters: { search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean };
-  setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean }>) => void;
+  catalogueFilters: { search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; hideUsed: boolean };
+  setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; hideUsed: boolean }>) => void;
 
   // Card format
   setCardFormat: (format: Partial<CardFormat>) => void;
@@ -109,7 +109,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   showPlanTree: true,
   activeVariantId: null,
   showGhosted: true,
-  catalogueFilters: { search: '', category: '', subCategory: '', family: '', showLive: true, showDev: true },
+  catalogueFilters: { search: '', category: '', subCategory: '', family: '', showLive: true, showDev: true, hideUsed: false },
   setCatalogueFilters: (f) => set((s) => ({ catalogueFilters: { ...s.catalogueFilters, ...f } })),
 
   setCardFormat: (updates) => set((state) => ({ cardFormat: { ...state.cardFormat, ...updates } })),
