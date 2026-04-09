@@ -34,9 +34,11 @@
 
 .shelf-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: #1a1a2e;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7684;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
 }
 
 .shelf-actions {
@@ -125,6 +127,14 @@
   margin: 0 4px;
   flex-shrink: 0;
   align-self: stretch;
+  transition: margin-left 0.18s ease;
+}
+
+/* When the user hovers the shelf, squeeze the discontinued block right by
+   one card-width + gap so the absolutely-positioned add-placeholder tile
+   has a clear slot to live in between active and discontinued cards. */
+.shelf-container:hover .shelf-discontinued-separator {
+  margin-left: var(--add-gap, 0);
 }
 
 .shelf-empty {

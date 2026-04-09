@@ -24,6 +24,7 @@ import { LinkPanel } from './components/LinkPanel';
 import { RangeDesign } from './components/RangeDesign';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PlaceholderDialog } from './components/PlaceholderDialog';
+import { EditableTitle } from './components/EditableTitle';
 import { useProjectStore } from './store/useProjectStore';
 import { getActivePlan } from './types';
 import type { Product, ShelfItem, PlaceholderData } from './types';
@@ -49,6 +50,7 @@ function App() {
     activeVariantId,
     showGhosted,
     setShowGhosted,
+    renamePlan,
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
@@ -385,10 +387,12 @@ function App() {
 
               <div className="transform-16-9">
                 <div className="slide-title">
-                  <h2 className="transform-title">
-                    {activePlan.name}
-                    {activeVariant && <span className="variant-badge">{activeVariant.name}</span>}
-                  </h2>
+                  <EditableTitle
+                    className="transform-title"
+                    value={activePlan.name}
+                    onSave={(next) => renamePlan(activePlan.id, next)}
+                    trailing={activeVariant ? <span className="variant-badge">{activeVariant.name}</span> : null}
+                  />
                 </div>
 
                 <Shelf shelf={activePlan.currentShelf} catalogue={project!.catalogue}

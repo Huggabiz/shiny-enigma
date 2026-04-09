@@ -275,6 +275,10 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
         style={{
           justifyContent: 'flex-start',
           paddingLeft: totalVisibleCount === 0 ? '0px' : `${offsetLeft}px`,
+          // Consumed by .shelf-rail:hover .shelf-discontinued-separator to
+          // squeeze open a gap for the add-placeholder tile when the user
+          // hovers a shelf that already has discontinued ghost cards.
+          ['--add-gap' as string]: `${cardWidth + 6}px`,
         }}
       >
         <SortableContext items={shelf.items.map((i) => i.id)} strategy={horizontalListSortingStrategy}>

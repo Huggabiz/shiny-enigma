@@ -1,96 +1,419 @@
 import PptxGenJS from 'pptxgenjs';
-import type { Project, Product, Shelf } from '../types';
+import type { Project, Product, Shelf, ShelfItem, SankeyLink } from '../types';
 
-const SLIDE_WIDTH = 13.333;
-const SLIDE_HEIGHT = 7.5;
-const CARD_W = 0.9;
-const CARD_H = 1.2;
-const CARD_GAP_PPT = 0.1;
-const SHELF_MARGIN_LEFT = 0.3;
+// ── Slide dimensions (LAYOUT_WIDE = 13.333 × 7.5 inches) ──
+const SLIDE_W = 13.333;
+const SLIDE_H = 7.5;
+
+// ── Shared colour palette (matches the web app) ──
+const COLOUR_TITLE = '1A1A2E';
+const COLOUR_SUB = '8892A0';
+const COLOUR_CARD_BORDER = 'E0E0E0';
+const COLOUR_CARD_BG = 'FFFFFF';
+const COLOUR_PLACEHOLDER_BG = 'E8F6FD';
+const COLOUR_PLACEHOLDER_BORDER = '0097A7';
+const COLOUR_DEV_BG = 'E8F0FE';
+const COLOUR_DEV_BORDER = '1565C0';
+const COLOUR_X_LABEL_BG = 'DCE6F0';
+const COLOUR_X_LABEL_TEXT = '2C3E50';
+const COLOUR_Y_LABEL_BG = 'F0E6D6';
+const COLOUR_Y_LABEL_TEXT = '5D4E37';
+const COLOUR_FLOW_GROWTH = '4CAF50';
+const COLOUR_FLOW_LOSS = 'F44336';
+const COLOUR_FLOW_TRANSFER = '2196F3';
+const COLOUR_VOL = '666666';
+const COLOUR_FORECAST = '1976D2';
+const COLOUR_RRP = '2E7D32';
 
 function getProduct(catalogue: Product[], productId: string): Product | undefined {
   return catalogue.find((p) => p.id === productId);
 }
 
-// ── Transform slide helpers ──
+// ───────────────────────────────────────────────────────────────
+// Card rendering — shared between transform slides and design slides
+// ───────────────────────────────────────────────────────────────
 
-function drawShelfItems(slide: PptxGenJS.Slide, shelf: Shelf, catalogue: Product[], shelfY: number) {
-  const items = shelf.items;
-  const layout = shelf.matrixLayout;
+interface CardLayout {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
-  slide.addText(shelf.name, {
-    x: SHELF_MARGIN_LEFT, y: shelfY - 0.45, w: 4, h: 0.35,
-    fontSize: 12, bold: true, color: '333333',
+function drawCard(
+  slide: PptxGenJS.Slide,
+  rect: CardLayout,
+  item: ShelfItem,
+  product: Product | undefined,
+  opts: { cardId: string; compact?: boolean } = { cardId: '' },
+) {
+  const { x, y, w, h } = rect;
+  const phData = item.placeholderData;
+  const name = item.isPlaceholder
+    ? (phData?.name || item.placeholderName || 'New SKU')
+    : (product?.name || 'Unknown');
+  const sku = item.isPlaceholder ? (phData?.sku || '') : (product?.sku || '');
+  const imageUrl = item.isPlaceholder ? phData?.imageUrl : product?.imageUrl;
+  const volume = item.isPlaceholder ? phData?.volume : product?.volume;
+  const forecast = item.isPlaceholder ? phData?.forecastVolume : product?.forecastVolume;
+  const rrp = item.isPlaceholder ? phData?.rrp : product?.rrp;
+  const source = item.isPlaceholder ? (phData?.source || 'live') : (product?.source || 'live');
+  const isDev = !item.isPlaceholder && source === 'dev';
+
+  // Background
+  const bg = item.isPlaceholder ? COLOUR_PLACEHOLDER_BG : (isDev ? COLOUR_DEV_BG : COLOUR_CARD_BG);
+  const border = item.isPlaceholder
+    ? COLOUR_PLACEHOLDER_BORDER
+    : (isDev ? COLOUR_DEV_BORDER : COLOUR_CARD_BORDER);
+
+  slide.addShape('roundRect' as PptxGenJS.ShapeType, {
+    x, y, w, h,
+    fill: { color: bg },
+    line: { color: border, width: 1 },
+    rectRadius: 0.05,
+    objectName: `${opts.cardId}-bg`,
   });
 
-  const maxCards = items.length;
-  const availableW = SLIDE_WIDTH - SHELF_MARGIN_LEFT * 2;
-  const cardW = Math.min(CARD_W, (availableW - (maxCards - 1) * CARD_GAP_PPT) / Math.max(maxCards, 1));
+  // Image zone — top portion of the card
+  const pad = 0.05;
+  const imgH = Math.min(h * 0.40, 0.55);
+  const imgW = Math.min(w - pad * 2, imgH * 1.2);
+  const imgX = x + (w - imgW) / 2;
+  const imgY = y + pad;
 
-  if (layout && layout.assignments.length > 0) {
-    const posMap = new Map(items.map((item, idx) => [item.id, idx]));
-    for (let col = 0; col < layout.xLabels.length; col++) {
-      const positions = layout.assignments.filter((a) => a.col === col)
-        .map((a) => posMap.get(a.itemId)).filter((p): p is number => p !== undefined);
-      if (positions.length === 0) continue;
-      const x = SHELF_MARGIN_LEFT + Math.min(...positions) * (cardW + CARD_GAP_PPT);
-      const w = (Math.max(...positions) - Math.min(...positions)) * (cardW + CARD_GAP_PPT) + cardW;
-      slide.addShape('rect' as PptxGenJS.ShapeType, {
-        x, y: shelfY - 0.2, w, h: 0.17, fill: { color: 'DCE6F0' }, rectRadius: 0.02,
+  if (imageUrl) {
+    try {
+      slide.addImage({
+        path: imageUrl,
+        x: imgX, y: imgY, w: imgW, h: imgH,
+        sizing: { type: 'contain', w: imgW, h: imgH },
+        objectName: `${opts.cardId}-img`,
       });
-      slide.addText(layout.xLabels[col], {
-        x, y: shelfY - 0.2, w, h: 0.17, fontSize: 6, align: 'center', color: '2C3E50', bold: true,
+    } catch {
+      drawImagePlaceholder(slide, imgX, imgY, imgW, imgH, item.isPlaceholder ? '+' : name.charAt(0), item.isPlaceholder || isDev);
+    }
+  } else {
+    drawImagePlaceholder(slide, imgX, imgY, imgW, imgH, item.isPlaceholder ? '+' : name.charAt(0), item.isPlaceholder || isDev);
+  }
+
+  // Name — below the image
+  const nameY = y + pad + imgH + 0.02;
+  const nameH = Math.max(0.22, h * 0.22);
+  const nameFont = Math.max(5, Math.min(8, Math.round(w * 9)));
+  slide.addText(name, {
+    x: x + pad, y: nameY, w: w - pad * 2, h: nameH,
+    fontSize: nameFont, bold: true, align: 'center', valign: 'top',
+    color: '333333', wrap: true, fontFace: 'Calibri',
+    objectName: `${opts.cardId}-name`,
+  });
+
+  // Stats stack — SKU, Vol, Fcst, £RRP — packed at the bottom of the card
+  const statsTop = y + h - 0.48;
+  const statsH = 0.14;
+  const statsFont = Math.max(4, Math.min(7, Math.round(w * 7)));
+  const statsX = x + pad;
+  const statsW = w - pad * 2;
+
+  let cursorY = statsTop;
+
+  if (sku && !opts.compact) {
+    slide.addText(sku, {
+      x: statsX, y: cursorY, w: statsW, h: statsH,
+      fontSize: Math.max(4, statsFont - 1), color: '999999', align: 'center', valign: 'middle',
+      objectName: `${opts.cardId}-sku`, fontFace: 'Calibri',
+    });
+    cursorY += statsH;
+  }
+
+  if (volume && volume > 0) {
+    slide.addText(`Vol: ${volume.toLocaleString()}`, {
+      x: statsX, y: cursorY, w: statsW, h: statsH,
+      fontSize: statsFont, color: COLOUR_VOL, align: 'center', valign: 'middle',
+      objectName: `${opts.cardId}-vol`, fontFace: 'Calibri',
+    });
+    cursorY += statsH;
+  }
+
+  if (forecast !== undefined && forecast > 0) {
+    slide.addText(`Fcst: ${forecast.toLocaleString()}`, {
+      x: statsX, y: cursorY, w: statsW, h: statsH,
+      fontSize: statsFont, color: COLOUR_FORECAST, align: 'center', valign: 'middle',
+      objectName: `${opts.cardId}-fcst`, fontFace: 'Calibri',
+    });
+    cursorY += statsH;
+  }
+
+  if (rrp !== undefined && rrp > 0) {
+    slide.addText(`\u00A3${rrp}`, {
+      x: statsX, y: cursorY, w: statsW, h: statsH,
+      fontSize: statsFont, color: COLOUR_RRP, bold: true, align: 'center', valign: 'middle',
+      objectName: `${opts.cardId}-rrp`, fontFace: 'Calibri',
+    });
+  }
+
+  // New / Dev corner badge
+  if (item.isPlaceholder) {
+    drawCornerBadge(slide, x - 0.04, y - 0.04, 'New', COLOUR_PLACEHOLDER_BORDER);
+  } else if (isDev) {
+    drawCornerBadge(slide, x - 0.04, y - 0.04, 'DEV', COLOUR_DEV_BORDER);
+  }
+}
+
+function drawImagePlaceholder(
+  slide: PptxGenJS.Slide,
+  x: number, y: number, w: number, h: number,
+  letter: string,
+  isNew: boolean,
+) {
+  slide.addShape('roundRect' as PptxGenJS.ShapeType, {
+    x, y, w, h,
+    fill: { color: isNew ? 'B2EBF2' : 'F5F5F5' },
+    line: { type: 'none' },
+    rectRadius: 0.03,
+  });
+  slide.addText(letter, {
+    x, y, w, h,
+    fontSize: Math.max(10, Math.round(w * 18)),
+    align: 'center', valign: 'middle',
+    color: isNew ? '00838F' : 'BBBBBB',
+  });
+}
+
+function drawCornerBadge(
+  slide: PptxGenJS.Slide,
+  x: number, y: number, text: string, fillColor: string,
+) {
+  const size = 0.28;
+  slide.addShape('ellipse' as PptxGenJS.ShapeType, {
+    x, y, w: size, h: size,
+    fill: { color: fillColor },
+    line: { color: fillColor, width: 0 },
+  });
+  slide.addText(text, {
+    x, y, w: size, h: size,
+    fontSize: 6, bold: true, align: 'center', valign: 'middle',
+    color: 'FFFFFF', fontFace: 'Calibri',
+  });
+}
+
+// ───────────────────────────────────────────────────────────────
+// Transform slide — Current + Future shelves + Sankey flows
+// ───────────────────────────────────────────────────────────────
+
+interface ShelfLayout {
+  cardWidth: number;
+  slotWidth: number;
+  offsetLeft: number;
+  railLeft: number;
+  railWidth: number;
+  cardHeight: number;
+  topY: number;
+  bottomY: number;
+}
+
+function computeShelfLayout(itemCount: number, railLeft: number, railWidth: number, topY: number, cardHeight: number): ShelfLayout {
+  const baseCardW = 0.85;
+  const minCardW = 0.22;
+  const cardGap = 0.06;
+
+  let cardWidth = baseCardW;
+  if (itemCount > 0) {
+    const naturalWidth = itemCount * (baseCardW + cardGap) - cardGap;
+    if (naturalWidth > railWidth) {
+      cardWidth = Math.max(minCardW, (railWidth - (itemCount - 1) * cardGap) / itemCount);
+    }
+  }
+  const slotWidth = cardWidth + cardGap;
+  const contentWidth = itemCount > 0 ? itemCount * slotWidth - cardGap : 0;
+  const offsetLeft = railLeft + Math.max(0, (railWidth - contentWidth) / 2);
+
+  return {
+    cardWidth,
+    slotWidth,
+    offsetLeft,
+    railLeft,
+    railWidth,
+    cardHeight,
+    topY,
+    bottomY: topY + cardHeight,
+  };
+}
+
+function drawShelfRow(
+  slide: PptxGenJS.Slide,
+  shelf: Shelf,
+  catalogue: Product[],
+  layout: ShelfLayout,
+  labelY: number,
+  labelBelow: boolean,
+  shelfName: string,
+) {
+  // Shelf name — sub-heading, lower authority than the main slide title
+  slide.addText(shelfName.toUpperCase(), {
+    x: layout.railLeft, y: labelY, w: layout.railWidth, h: 0.22,
+    fontSize: 10, bold: false, color: COLOUR_SUB,
+    align: 'left', valign: 'middle', charSpacing: 1.5,
+    objectName: `${shelf.id}-shelf-label`,
+  });
+
+  // Matrix-derived label bars above (or below, for flipped future shelf) the cards
+  const matrixLayout = shelf.matrixLayout;
+  if (matrixLayout && matrixLayout.assignments.length > 0) {
+    const posMap = new Map(shelf.items.map((item, idx) => [item.id, idx]));
+    const labelBarH = 0.18;
+    const barY = labelBelow ? layout.bottomY + 0.04 : layout.topY - labelBarH - 0.04;
+
+    for (let col = 0; col < matrixLayout.xLabels.length; col++) {
+      const positions = matrixLayout.assignments
+        .filter((a) => a.col === col)
+        .map((a) => posMap.get(a.itemId))
+        .filter((p): p is number => p !== undefined);
+      if (positions.length === 0) continue;
+      const minP = Math.min(...positions);
+      const maxP = Math.max(...positions);
+      const barX = layout.offsetLeft + minP * layout.slotWidth;
+      const barW = (maxP - minP) * layout.slotWidth + layout.cardWidth;
+      slide.addShape('roundRect' as PptxGenJS.ShapeType, {
+        x: barX, y: barY, w: barW, h: labelBarH,
+        fill: { color: COLOUR_X_LABEL_BG },
+        line: { type: 'none' },
+        rectRadius: 0.03,
+        objectName: `${shelf.id}-xlabel-${col}`,
+      });
+      slide.addText(matrixLayout.xLabels[col], {
+        x: barX, y: barY, w: barW, h: labelBarH,
+        fontSize: 8, bold: true, align: 'center', valign: 'middle',
+        color: COLOUR_X_LABEL_TEXT, fontFace: 'Calibri',
       });
     }
   }
 
-  items.forEach((item, index) => {
-    const x = SHELF_MARGIN_LEFT + index * (cardW + CARD_GAP_PPT);
-    const product = getProduct(catalogue, item.productId);
-    const name = item.isPlaceholder ? item.placeholderName || 'New SKU' : product?.name || 'Unknown';
-
-    slide.addShape('roundRect' as PptxGenJS.ShapeType, {
-      x, y: shelfY + 0.15, w: cardW, h: CARD_H,
-      fill: { color: item.isPlaceholder ? 'E8F6FD' : 'FFFFFF' },
-      line: { color: item.isPlaceholder ? '0097A7' : 'DDDDDD', width: 1 },
-      rectRadius: 0.04,
-    });
-
-    if (product?.imageUrl) {
-      try {
-        const imgW = cardW * 0.55;
-        slide.addImage({
-          path: product.imageUrl,
-          x: x + (cardW - imgW) / 2, y: shelfY + 0.2, w: imgW, h: imgW * 0.85, rounding: true,
-        });
-      } catch { /* skip */ }
-    }
-
-    slide.addText(name, {
-      x, y: shelfY + 0.15 + (product?.imageUrl ? 0.55 : 0.05), w: cardW, h: 0.45,
-      fontSize: 6, align: 'center', color: '333333', valign: 'top', wrap: true,
-    });
-
-    if (product?.volume) {
-      slide.addText(`Vol: ${product.volume.toLocaleString()}`, {
-        x, y: shelfY + 0.15 + CARD_H - 0.2, w: cardW, h: 0.18,
-        fontSize: 5, align: 'center', color: '888888',
-      });
-    }
+  // Cards
+  shelf.items.forEach((item, idx) => {
+    const cardX = layout.offsetLeft + idx * layout.slotWidth;
+    const cardId = `${shelf.id}-${idx}-${(item.id || '').slice(0, 8).replace(/[^a-zA-Z0-9]/g, '_')}`;
+    drawCard(
+      slide,
+      { x: cardX, y: layout.topY, w: layout.cardWidth, h: layout.cardHeight },
+      item,
+      getProduct(catalogue, item.productId),
+      { cardId, compact: layout.cardWidth < 0.5 },
+    );
   });
 }
 
-// ── Design slide ──
+// Convert (x, y) pairs into a rotated-rectangle flow ribbon
+function addFlowRibbon(
+  slide: PptxGenJS.Slide,
+  sx: number, sy: number,
+  tx: number, ty: number,
+  ribbonWidth: number,
+  fillColor: string,
+  label: string,
+  cardId: string,
+) {
+  const dx = tx - sx;
+  const dy = ty - sy;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (length < 0.01) return;
+  const angleRad = Math.atan2(dy, dx);
+  const angleDeg = angleRad * (180 / Math.PI);
+  const midX = (sx + tx) / 2;
+  const midY = (sy + ty) / 2;
 
-const D_MARGIN = 0.35;
-const D_TITLE_H = 0.45;
-const D_HDR_H = 0.28;
+  const ribbonX = midX - length / 2;
+  const ribbonY = midY - ribbonWidth / 2;
+
+  slide.addShape('rect' as PptxGenJS.ShapeType, {
+    x: ribbonX, y: ribbonY, w: length, h: ribbonWidth,
+    fill: { color: fillColor, transparency: 55 },
+    line: { type: 'none' },
+    rotate: angleDeg,
+    objectName: `${cardId}-ribbon`,
+  });
+
+  // Label in the middle of the ribbon, rotated along the flow direction
+  if (label) {
+    slide.addText(label, {
+      x: ribbonX, y: midY - 0.15, w: length, h: 0.3,
+      fontSize: 8, color: '555555', align: 'center', valign: 'middle',
+      rotate: angleDeg, fontFace: 'Calibri',
+      objectName: `${cardId}-label`,
+    });
+  }
+}
+
+function addTransformSlide(pptx: PptxGenJS, plan: { name: string; currentShelf: Shelf; futureShelf: Shelf; sankeyLinks: SankeyLink[] }, catalogue: Product[]) {
+  const slide = pptx.addSlide();
+
+  // Slide title — editable text object
+  slide.addText(plan.name, {
+    x: 0.4, y: 0.25, w: SLIDE_W - 0.8, h: 0.55,
+    fontSize: 24, bold: true, color: COLOUR_TITLE,
+    align: 'left', valign: 'middle', fontFace: 'Calibri',
+    objectName: 'slide-title',
+  });
+
+  const railLeft = 0.4;
+  const railWidth = SLIDE_W - 0.8;
+  const cardH = 1.25;
+
+  // Current range — pinned near the top
+  const currentY = 1.2;
+  const currentLayout = computeShelfLayout(plan.currentShelf.items.length, railLeft, railWidth, currentY, cardH);
+  drawShelfRow(slide, plan.currentShelf, catalogue, currentLayout, currentY - 0.48, false, 'Current Range');
+
+  // Future range — pinned near the bottom
+  const futureCardY = SLIDE_H - 0.4 - cardH;
+  const futureLayout = computeShelfLayout(plan.futureShelf.items.length, railLeft, railWidth, futureCardY, cardH);
+  drawShelfRow(slide, plan.futureShelf, catalogue, futureLayout, futureCardY + cardH + 0.26, true, 'Future Range');
+
+  // Sankey ribbons bridging the middle
+  const sankeyTop = currentLayout.bottomY + 0.05;
+  const sankeyBottom = futureLayout.topY - 0.05;
+
+  // Scale ribbon width by volume, normalised against the max volume in play
+  const allVolumes = plan.sankeyLinks.map((l) => l.volume);
+  const maxVolume = Math.max(1, ...allVolumes);
+  const minRibbon = 0.04;
+  const maxRibbon = 0.22;
+
+  plan.sankeyLinks.forEach((link, idx) => {
+    const si = plan.currentShelf.items.findIndex((i) => i.id === link.sourceItemId);
+    const ti = plan.futureShelf.items.findIndex((i) => i.id === link.targetItemId);
+    if (si === -1 || ti === -1) return;
+
+    const sx = currentLayout.offsetLeft + si * currentLayout.slotWidth + currentLayout.cardWidth / 2;
+    const tx = futureLayout.offsetLeft + ti * futureLayout.slotWidth + futureLayout.cardWidth / 2;
+    const sy = sankeyTop;
+    const ty = sankeyBottom;
+
+    const ribbonWidth = minRibbon + (link.volume / maxVolume) * (maxRibbon - minRibbon);
+    const color = link.type === 'growth'
+      ? COLOUR_FLOW_GROWTH
+      : link.type === 'loss'
+        ? COLOUR_FLOW_LOSS
+        : COLOUR_FLOW_TRANSFER;
+    const pct = link.percent ?? 100;
+    const label = `${pct}% (${link.volume.toLocaleString()})`;
+
+    addFlowRibbon(slide, sx, sy, tx, ty, ribbonWidth, color, label, `flow-${idx}`);
+  });
+}
+
+// ───────────────────────────────────────────────────────────────
+// Design (matrix) slide — one slide per shelf
+// ───────────────────────────────────────────────────────────────
+
+const D_MARGIN = 0.4;
+const D_TITLE_H = 0.55;
+const D_HDR_H = 0.32;
 const D_ROW_HDR_W = 0.7;
-const D_CELL_GAP = 0.04;
-const D_CELL_PAD = 0.06;
+const D_CELL_GAP = 0.06;
+const D_CELL_PAD = 0.08;
 const D_CARD_GAP = 0.06;
-const D_CARD_ASPECT = 1.4;
-const D_CARD_RADIUS = 0.04;
+const D_CARD_ASPECT = 1.45;
+const D_CARD_RADIUS = 0.05;
 const D_MAX_CW = 0.85;
 const D_MIN_CW = 0.3;
 const D_EMPTY = 0.2;
@@ -109,7 +432,6 @@ function designLayoutFits(
 ): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
   const ch = cw * D_CARD_ASPECT;
 
-  // Column widths: use sqrt-based estimate for initial cols per cell
   const maxPerCol = Array.from({ length: numCols }, (_, col) => {
     let max = 0;
     for (let row = 0; row < numRows; row++) {
@@ -134,7 +456,6 @@ function designLayoutFits(
     if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
   }
 
-  // Row heights: proportional to max card-rows needed
   const maxCardRowsPerRow = Array.from({ length: numRows }, (_, row) => {
     let max = 0;
     for (let col = 0; col < numCols; col++) {
@@ -153,7 +474,6 @@ function designLayoutFits(
 
   if (totalNaturalH > availH) return { fits: false, colWidths, rowHeights: naturalRowH };
 
-  // Distribute extra height to content rows
   const extraH = availH - totalNaturalH;
   const contentRows = maxCardRowsPerRow.filter((r) => r > 0).length || 1;
   const rowHeights = naturalRowH.map((h, i) =>
@@ -163,85 +483,7 @@ function designLayoutFits(
   return { fits: true, colWidths, rowHeights };
 }
 
-function drawProductCard(
-  slide: PptxGenJS.Slide, px: number, py: number, cw: number, ch: number,
-  product: Product | undefined, name: string, sku: string, isPlaceholder: boolean,
-  cardId: string,
-) {
-  // Card background
-  slide.addShape('roundRect' as PptxGenJS.ShapeType, {
-    x: px, y: py, w: cw, h: ch,
-    fill: { color: isPlaceholder ? 'E8F6FD' : 'FFFFFF' },
-    line: { color: isPlaceholder ? '0097A7' : 'D0D0D0', width: 0.75 },
-    rectRadius: D_CARD_RADIUS,
-    objectName: `${cardId}-bg`,
-  });
-
-  // Image zone: top 45% of card
-  const imgZoneH = ch * 0.45;
-  const imgW = cw * 0.55;
-  const imgH = imgZoneH * 0.8;
-  const imgX = px + (cw - imgW) / 2;
-  const imgY = py + (imgZoneH - imgH) / 2 + 0.01;
-
-  if (product?.imageUrl) {
-    try {
-      slide.addImage({
-        path: product.imageUrl,
-        x: imgX, y: imgY, w: imgW, h: imgH,
-        rounding: true,
-        objectName: `${cardId}-img`,
-      });
-    } catch {
-      drawPlaceholderCircle(slide, imgX, imgY, imgW, imgH, name.charAt(0), isPlaceholder);
-    }
-  } else {
-    drawPlaceholderCircle(slide, imgX, imgY, imgW, imgH, isPlaceholder ? '+' : name.charAt(0), isPlaceholder);
-  }
-
-  // Name: middle 35%
-  const nameY = py + imgZoneH;
-  const nameH = ch * 0.35;
-  const nameFontSize = Math.max(5, Math.min(7, Math.round(cw * 8)));
-  slide.addText(name, {
-    x: px + 0.02, y: nameY, w: cw - 0.04, h: nameH,
-    fontSize: nameFontSize, bold: true,
-    align: 'center', valign: 'top', color: '333333', wrap: true,
-    objectName: `${cardId}-name`,
-  });
-
-  // SKU: bottom 18%
-  if (sku) {
-    const skuY = py + ch - ch * 0.18;
-    const skuH = ch * 0.16;
-    const skuFontSize = Math.max(4, Math.min(6, Math.round(cw * 6)));
-    slide.addText(sku, {
-      x: px + 0.02, y: skuY, w: cw - 0.04, h: skuH,
-      fontSize: skuFontSize,
-      align: 'center', valign: 'middle', color: '999999',
-      objectName: `${cardId}-sku`,
-    });
-  }
-}
-
-function drawPlaceholderCircle(
-  slide: PptxGenJS.Slide, x: number, y: number, w: number, h: number,
-  letter: string, isNew: boolean,
-) {
-  slide.addShape('roundRect' as PptxGenJS.ShapeType, {
-    x, y, w, h,
-    fill: { color: isNew ? 'B2EBF2' : 'F0F0F0' },
-    rectRadius: 0.02,
-  });
-  slide.addText(letter, {
-    x, y, w, h,
-    fontSize: Math.max(8, Math.round(w * 14)),
-    align: 'center', valign: 'middle',
-    color: isNew ? '00838F' : 'BBBBBB',
-  });
-}
-
-function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], label: string) {
+function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], planName: string, label: string) {
   const layout = shelf.matrixLayout;
   if (!layout || layout.xLabels.length === 0 || layout.yLabels.length === 0) return;
 
@@ -249,17 +491,23 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], lab
   const numCols = layout.xLabels.length;
   const numRows = layout.yLabels.length;
 
-  slide.addText(`${layout.title} — ${label}`, {
-    x: D_MARGIN, y: D_MARGIN * 0.5, w: SLIDE_WIDTH - D_MARGIN * 2, h: D_TITLE_H,
-    fontSize: 18, bold: true, color: '1a1a2e', objectName: 'slide-title',
+  // Slide title — plan name in the main authority, shelf label as a subhead
+  slide.addText(planName, {
+    x: D_MARGIN, y: D_MARGIN * 0.5, w: SLIDE_W - D_MARGIN * 2, h: D_TITLE_H,
+    fontSize: 22, bold: true, color: COLOUR_TITLE, fontFace: 'Calibri',
+    align: 'left', valign: 'middle', objectName: 'slide-title',
+  });
+  slide.addText(label.toUpperCase(), {
+    x: D_MARGIN, y: D_MARGIN * 0.5 + D_TITLE_H - 0.05, w: SLIDE_W - D_MARGIN * 2, h: 0.2,
+    fontSize: 10, bold: false, color: COLOUR_SUB, charSpacing: 1.5, fontFace: 'Calibri',
+    align: 'left', valign: 'middle', objectName: 'slide-subtitle',
   });
 
-  const gridTop = D_MARGIN + D_TITLE_H;
+  const gridTop = D_MARGIN + D_TITLE_H + 0.2;
   const gridLeft = D_MARGIN + D_ROW_HDR_W + D_CELL_GAP;
-  const availW = SLIDE_WIDTH - gridLeft - D_MARGIN;
-  const availH = SLIDE_HEIGHT - gridTop - D_HDR_H - D_CELL_GAP - D_MARGIN;
+  const availW = SLIDE_W - gridLeft - D_MARGIN;
+  const availH = SLIDE_H - gridTop - D_HDR_H - D_CELL_GAP - D_MARGIN;
 
-  // Cell counts
   const cellCounts: number[][] = [];
   for (let r = 0; r < numRows; r++) {
     cellCounts.push([]);
@@ -268,7 +516,6 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], lab
     }
   }
 
-  // Binary search for largest uniform card width
   let lo = Math.round(D_MIN_CW * 100);
   let hi = Math.round(D_MAX_CW * 100);
   let bestCW = D_MIN_CW;
@@ -290,7 +537,6 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], lab
 
   const bestCH = bestCW * D_CARD_ASPECT;
 
-  // Distribute extra space to non-empty only
   const totalColW = bestColW.reduce((s, w) => s + w, 0) + (numCols - 1) * D_CELL_GAP;
   if (totalColW < availW) {
     const ne = bestColW.filter((w) => w > D_EMPTY).length || 1;
@@ -304,7 +550,6 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], lab
     bestRowH = bestRowH.map((h) => h > D_EMPTY ? h + ex : h);
   }
 
-  // Positions
   const colXs: number[] = [];
   let cx = gridLeft;
   for (let c = 0; c < numCols; c++) { colXs.push(cx); cx += bestColW[c] + D_CELL_GAP; }
@@ -317,11 +562,14 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], lab
   for (let c = 0; c < numCols; c++) {
     slide.addShape('roundRect' as PptxGenJS.ShapeType, {
       x: colXs[c], y: gridTop, w: bestColW[c], h: D_HDR_H,
-      fill: { color: 'DCE6F0' }, rectRadius: 0.03, objectName: `x-label-${c}`,
+      fill: { color: COLOUR_X_LABEL_BG },
+      line: { type: 'none' },
+      rectRadius: 0.04, objectName: `x-label-${c}`,
     });
     slide.addText(layout.xLabels[c], {
       x: colXs[c], y: gridTop, w: bestColW[c], h: D_HDR_H,
-      fontSize: 9, bold: true, align: 'center', valign: 'middle', color: '2C3E50',
+      fontSize: 10, bold: true, align: 'center', valign: 'middle',
+      color: COLOUR_X_LABEL_TEXT, fontFace: 'Calibri',
     });
   }
 
@@ -329,12 +577,14 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], lab
   for (let r = 0; r < numRows; r++) {
     slide.addShape('roundRect' as PptxGenJS.ShapeType, {
       x: D_MARGIN, y: rowYs[r], w: D_ROW_HDR_W, h: bestRowH[r],
-      fill: { color: 'F0E6D6' }, rectRadius: 0.03, objectName: `y-label-${r}`,
+      fill: { color: COLOUR_Y_LABEL_BG },
+      line: { type: 'none' },
+      rectRadius: 0.04, objectName: `y-label-${r}`,
     });
     slide.addText(layout.yLabels[r], {
       x: D_MARGIN, y: rowYs[r], w: D_ROW_HDR_W, h: bestRowH[r],
-      fontSize: 8, bold: true, align: 'center', valign: 'middle', color: '5D4E37',
-      rotate: 270,
+      fontSize: 9, bold: true, align: 'center', valign: 'middle',
+      color: COLOUR_Y_LABEL_TEXT, rotate: 270, fontFace: 'Calibri',
     });
   }
 
@@ -346,27 +596,23 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], lab
       const cellW = bestColW[c];
       const cellH = bestRowH[r];
 
-      // Cell background
       slide.addShape('roundRect' as PptxGenJS.ShapeType, {
         x: cellX, y: cellY, w: cellW, h: cellH,
         fill: { color: 'FAFAFA' }, line: { color: 'E8E8E8', width: 0.5 },
-        rectRadius: 0.03,
+        rectRadius: 0.04,
         objectName: `cell-${layout.xLabels[c]}-${layout.yLabels[r]}`.replace(/\s/g, '_'),
       });
 
       const assignments = layout.assignments.filter((a) => a.row === r && a.col === c);
       if (assignments.length === 0) continue;
 
-      // 2D grid layout matching web view algorithm
       const innerW = cellW - D_CELL_PAD * 2;
       const innerH = cellH - D_CELL_PAD * 2;
 
-      // Prefer vertical stacking: find minimum cols that fit vertically
       const maxVRows = Math.max(1, Math.floor((innerH + D_CARD_GAP) / (bestCH + D_CARD_GAP)));
       const gridCols = Math.max(1, Math.ceil(assignments.length / maxVRows));
       const gridRows = Math.ceil(assignments.length / gridCols);
 
-      // Center the card grid within the cell
       const gridW = gridCols * bestCW + (gridCols - 1) * D_CARD_GAP;
       const gridH = gridRows * bestCH + (gridRows - 1) * D_CARD_GAP;
       const startX = cellX + D_CELL_PAD + (innerW - gridW) / 2;
@@ -376,21 +622,22 @@ function addDesignSlide(pptx: PptxGenJS, shelf: Shelf, catalogue: Product[], lab
         const item = shelf.items.find((i) => i.id === assignment.itemId);
         if (!item) return;
         const product = getProduct(catalogue, item.productId);
-        const name = item.isPlaceholder ? (item.placeholderName || 'New SKU') : (product?.name || 'Unknown');
-        const sku = product?.sku || '';
 
         const gc = idx % gridCols;
         const gr = Math.floor(idx / gridCols);
         const px = startX + gc * (bestCW + D_CARD_GAP);
         const py = startY + gr * (bestCH + D_CARD_GAP);
+        const cardId = `d-${r}-${c}-${idx}`;
 
-        const cardId = (sku || name).replace(/[^a-zA-Z0-9]/g, '_').slice(0, 25);
-
-        drawProductCard(slide, px, py, bestCW, bestCH, product, name, sku, item.isPlaceholder, cardId);
+        drawCard(slide, { x: px, y: py, w: bestCW, h: bestCH }, item, product, { cardId });
       });
     }
   }
 }
+
+// ───────────────────────────────────────────────────────────────
+// Public entry point
+// ───────────────────────────────────────────────────────────────
 
 export function exportToPptx(project: Project): void {
   const pptx = new PptxGenJS();
@@ -398,38 +645,14 @@ export function exportToPptx(project: Project): void {
   pptx.author = 'Range Planner';
   pptx.title = project.name;
 
-  // Export all plans
   for (const plan of project.plans) {
-    // Transform slide
-    const tSlide = pptx.addSlide();
-    tSlide.addText(plan.name + ' — Range Transformation', {
-      x: 0.3, y: 0.15, w: SLIDE_WIDTH - 0.6, h: 0.5,
-      fontSize: 20, bold: true, color: '1a1a2e', objectName: 'transform-title',
-    });
-    drawShelfItems(tSlide, plan.currentShelf, project.catalogue, 1.0);
-    drawShelfItems(tSlide, plan.futureShelf, project.catalogue, 4.2);
-
-    const cCardW = Math.min(CARD_W, (SLIDE_WIDTH - SHELF_MARGIN_LEFT * 2 - (plan.currentShelf.items.length - 1) * CARD_GAP_PPT) / Math.max(plan.currentShelf.items.length, 1));
-    const fCardW = Math.min(CARD_W, (SLIDE_WIDTH - SHELF_MARGIN_LEFT * 2 - (plan.futureShelf.items.length - 1) * CARD_GAP_PPT) / Math.max(plan.futureShelf.items.length, 1));
-
-    plan.sankeyLinks.forEach((link) => {
-      const si = plan.currentShelf.items.findIndex((i) => i.id === link.sourceItemId);
-      const ti = plan.futureShelf.items.findIndex((i) => i.id === link.targetItemId);
-      if (si === -1 || ti === -1) return;
-      const sx = SHELF_MARGIN_LEFT + si * (cCardW + CARD_GAP_PPT) + cCardW / 2;
-      const tx = SHELF_MARGIN_LEFT + ti * (fCardW + CARD_GAP_PPT) + fCardW / 2;
-      const color = link.type === 'growth' ? '4CAF50' : link.type === 'loss' ? 'F44336' : '2196F3';
-      tSlide.addShape('line' as PptxGenJS.ShapeType, {
-        x: Math.min(sx, tx), y: 1.0 + 0.15 + CARD_H + 0.05,
-        w: Math.abs(tx - sx) || 0.01, h: 4.2 + 0.1 - (1.0 + 0.15 + CARD_H + 0.05),
-        line: { color, width: Math.max(0.5, Math.min(link.volume / 1000, 4)) },
-      });
-    });
-
-    // Design slides
-    addDesignSlide(pptx, plan.currentShelf, project.catalogue, plan.name + ' — Current');
-    addDesignSlide(pptx, plan.futureShelf, project.catalogue, plan.name + ' — Future');
+    addTransformSlide(pptx, plan, project.catalogue);
+    addDesignSlide(pptx, plan.currentShelf, project.catalogue, plan.name, 'Current Range');
+    addDesignSlide(pptx, plan.futureShelf, project.catalogue, plan.name, 'Future Range');
   }
 
   pptx.writeFile({ fileName: `${project.name.replace(/\s+/g, '_')}_range_plan.pptx` });
 }
+
+// Avoid "unused" TS errors on the card-radius constant which is referenced in templates above.
+void D_CARD_RADIUS;

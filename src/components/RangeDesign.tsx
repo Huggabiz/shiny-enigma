@@ -16,6 +16,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { CloseIcon } from './Icons';
 import { PillToggle } from './PillToggle';
 import { PlaceholderDialog } from './PlaceholderDialog';
+import { EditableTitle } from './EditableTitle';
 import type { Product, Shelf, MatrixLayout, PlaceholderData } from '../types';
 import { getActivePlan } from '../types';
 import './RangeDesign.css';
@@ -264,7 +265,6 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     activeVariantId, showGhosted,
   } = useProjectStore();
 
-  const [editingTitle, setEditingTitle] = useState(false);
   const [placeholderDialog, setPlaceholderDialog] = useState<
     | { mode: 'create'; row: number; col: number }
     | { mode: 'edit'; itemId: string; data: PlaceholderData }
@@ -508,7 +508,6 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     // Sync title to both shelves and plan name
     updateMatrixLayout('current', { title: newTitle });
     updateMatrixLayout('future', { title: newTitle });
-    setEditingTitle(false);
   }, [activePlan, updateMatrixLayout]);
 
   // Build set of existing SKUs for placeholder validation
@@ -542,16 +541,12 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
           <div className="matrix-16-9">
             <div className="slide-title">
-              {editingTitle ? (
-                <input className="range-design-title-input" defaultValue={activePlan?.name || layout.title} autoFocus
-                  onBlur={(e) => updateTitle(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && updateTitle((e.target as HTMLInputElement).value)} />
-              ) : (
-                <h2 className="range-design-title" onDoubleClick={() => setEditingTitle(true)} title="Double-click to edit">
-                  {activePlan?.name || layout.title}
-                  {activeVariant && <span className="variant-badge">{activeVariant.name}</span>}
-                </h2>
-              )}
+              <EditableTitle
+                className="range-design-title"
+                value={activePlan?.name || layout.title}
+                onSave={(next) => updateTitle(next)}
+                trailing={activeVariant ? <span className="variant-badge">{activeVariant.name}</span> : null}
+              />
             </div>
             <div className="matrix-wrapper" ref={wrapperRef}>
               <div className="matrix-header-row" style={{ gridTemplateColumns: gridCols }}>

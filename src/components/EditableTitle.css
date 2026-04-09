@@ -1,0 +1,57 @@
+/* EditableTitle renders an inner .editable-title-row span so the consumer
+   h2 keeps its own font / display styling and only the internal row runs
+   the flex layout for the title text + pencil. */
+
+.editable-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: text;
+  max-width: 100%;
+}
+
+.editable-title-row.editing {
+  cursor: default;
+}
+
+.editable-title-text {
+  display: inline-block;
+}
+
+.editable-title-pencil {
+  border: none;
+  background: transparent;
+  color: #8892a0;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.editable-title-row:hover .editable-title-pencil {
+  opacity: 1;
+}
+
+.editable-title-pencil:hover {
+  background: #eef2f7;
+  color: #1976d2;
+}
+
+.editable-title-input {
+  font: inherit;
+  color: inherit;
+  border: 1px solid #90caf9;
+  border-radius: 4px;
+  padding: 2px 8px;
+  background: #fff;
+  outline: none;
+  min-width: 200px;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.12);
+}
