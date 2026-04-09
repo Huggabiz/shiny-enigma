@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import type { Shelf, SankeyLink, Product } from '../types';
 import { computeShelfLayout } from '../utils/layout';
@@ -18,7 +18,7 @@ interface SankeyFlowProps {
   onClickFlow?: (sourceItemId: string) => void;
 }
 
-const FLOW_HEIGHT = 84;
+const FLOW_HEIGHT_FALLBACK = 84;
 
 interface FlowSpec {
   link: SankeyLink;
@@ -44,6 +44,21 @@ export function SankeyFlow({
   onClickFlow,
 }: SankeyFlowProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [flowHeight, setFlowHeight] = useState(FLOW_HEIGHT_FALLBACK);
+
+  // Measure the container's height so the d3 paths stretch to fill the gap
+  // between the current and future shelves (which varies with the canvas).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const h = entry.borderBoxSize?.[0]?.blockSize ?? el.offsetHeight;
+      if (h > 0) setFlowHeight(h);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Use the shelf's railWidth directly — the SVG is positioned to match
   const effectiveWidth = railWidth;
@@ -141,7 +156,7 @@ export function SankeyFlow({
     svg.selectAll('*').remove();
     if (!hasContent) return;
 
-    svg.attr('width', effectiveWidth).attr('height', FLOW_HEIGHT);
+    svg.attr('width', effectiveWidth).attr('height', flowHeight);
 
     // Gradient for loss flows
     const defs = svg.append('defs');
@@ -236,7 +251,7 @@ export function SankeyFlow({
 
           const path = d3.path();
           path.moveTo(sx, 0);
-          path.bezierCurveTo(sx, FLOW_HEIGHT * 0.4, tx, FLOW_HEIGHT * 0.6, tx, FLOW_HEIGHT);
+          path.bezierCurveTo(sx, flowHeight * 0.4, tx, flowHeight * 0.6, tx, flowHeight);
 
           svg.append('path')
             .attr('d', path.toString())
@@ -251,7 +266,7 @@ export function SankeyFlow({
           const midX = (sx + tx) / 2;
           svg.append('text')
             .attr('x', midX)
-            .attr('y', FLOW_HEIGHT / 2 - flow.strokeWidth / 2 - 3)
+            .attr('y', flowHeight / 2 - flow.strokeWidth / 2 - 3)
             .attr('text-anchor', 'middle')
             .attr('font-size', '8px')
             .attr('fill', '#e53935')
@@ -261,7 +276,7 @@ export function SankeyFlow({
           // No discontinued card — fade out vertically
           const path = d3.path();
           path.moveTo(sx, 0);
-          path.bezierCurveTo(sx, FLOW_HEIGHT * 0.3, sx, FLOW_HEIGHT * 0.6, sx, FLOW_HEIGHT);
+          path.bezierCurveTo(sx, flowHeight * 0.3, sx, flowHeight * 0.6, sx, flowHeight);
 
           svg.append('path')
             .attr('d', path.toString())
@@ -291,7 +306,7 @@ export function SankeyFlow({
 
         const path = d3.path();
         path.moveTo(sx, 0);
-        path.bezierCurveTo(sx, FLOW_HEIGHT * 0.4, tx, FLOW_HEIGHT * 0.6, tx, FLOW_HEIGHT);
+        path.bezierCurveTo(sx, flowHeight * 0.4, tx, flowHeight * 0.6, tx, flowHeight);
 
         svg.append('path')
           .attr('d', path.toString())
@@ -310,25 +325,27 @@ export function SankeyFlow({
         const pct = flow.link.percent ?? 100;
         svg.append('text')
           .attr('x', midX)
-          .attr('y', FLOW_HEIGHT / 2 - flow.strokeWidth / 2 - 3)
+          .attr('y', flowHeight / 2 - flow.strokeWidth / 2 - 3)
           .attr('text-anchor', 'middle')
           .attr('font-size', '9px')
           .attr('fill', '#888')
           .text(`${pct}% (${flow.volume.toLocaleString()})`);
       }
     }
-  }, [flows, hasContent, effectiveWidth, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems, showDiscontinued, discontinuedItems, variantCurrentIds]);
+  }, [flows, hasContent, effectiveWidth, flowHeight, currentLayout, futureLayout, onClickFlow, visibleCurrentItems, visibleFutureItems, showDiscontinued, discontinuedItems, variantCurrentIds]);
 
   if (!hasContent) {
     return (
-      <div className="sankey-empty">
-        <span>Connect products between shelves using Link Mode.</span>
+      <div ref={containerRef} className="sankey-container sankey-empty-container">
+        <div className="sankey-empty">
+          <span>Connect products between shelves using Link Mode.</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="sankey-container" style={{ width: railWidth, marginLeft: 16 }}>
+    <div ref={containerRef} className="sankey-container" style={{ width: railWidth, marginLeft: 16 }}>
       <svg ref={svgRef} className="sankey-svg" />
     </div>
   );

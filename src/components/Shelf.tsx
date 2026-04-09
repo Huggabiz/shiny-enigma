@@ -161,13 +161,15 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
     }
   };
 
-  // Track rail width
+  // Track rail width using the border box so the inline paddingLeft we apply
+  // below does not feed back into the measured width (which would left-shift
+  // the cards). borderBoxSize is stable under padding changes.
   const [railWidth, setRailWidth] = useState(0);
   useEffect(() => {
     const el = railRef.current;
     if (!el) return;
     const observer = new ResizeObserver(([entry]) => {
-      const w = entry.contentRect.width;
+      const w = entry.borderBoxSize?.[0]?.inlineSize ?? el.offsetWidth;
       setRailWidth(w);
       onRailWidthChange?.(w);
     });
@@ -273,7 +275,10 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
       <div
         ref={(node) => { setNodeRef(node); (railRef as React.MutableRefObject<HTMLDivElement | null>).current = node; }}
         className="shelf-rail"
-        style={{ justifyContent: 'flex-start', paddingLeft: `${offsetLeft}px` }}
+        style={{
+          justifyContent: 'flex-start',
+          paddingLeft: totalVisibleCount === 0 ? '0px' : `${offsetLeft}px`,
+        }}
       >
         <SortableContext items={shelf.items.map((i) => i.id)} strategy={horizontalListSortingStrategy}>
           {shelf.items

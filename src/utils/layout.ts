@@ -1,8 +1,8 @@
 // Shared layout constants and computation for shelf + sankey alignment
 
 export const BASE_CARD_WIDTH = 100;
-export const CARD_GAP = 10;
-export const MIN_CARD_WIDTH = 54;
+export const CARD_GAP = 6;
+export const MIN_CARD_WIDTH = 28;
 export const RAIL_PADDING = 8;
 
 export interface ShelfLayout {
@@ -14,16 +14,29 @@ export interface ShelfLayout {
 }
 
 export function computeShelfLayout(itemCount: number, railWidth: number): ShelfLayout {
-  const availableWidth = railWidth - RAIL_PADDING * 2;
-  const naturalContentWidth = itemCount * (BASE_CARD_WIDTH + CARD_GAP) - (itemCount > 0 ? CARD_GAP : 0);
-  const needsShrink = itemCount > 0 && naturalContentWidth > availableWidth;
+  if (itemCount <= 0) {
+    return { cardWidth: BASE_CARD_WIDTH, slotWidth: BASE_CARD_WIDTH + CARD_GAP, offsetLeft: 0, needsShrink: false, contentWidth: 0 };
+  }
 
-  const cardWidth = needsShrink
-    ? Math.max(MIN_CARD_WIDTH, Math.floor((availableWidth - (itemCount - 1) * CARD_GAP) / itemCount))
-    : BASE_CARD_WIDTH;
+  const availableWidth = Math.max(0, railWidth - RAIL_PADDING * 2);
+  const naturalContentWidth = itemCount * (BASE_CARD_WIDTH + CARD_GAP) - CARD_GAP;
+  const needsShrink = naturalContentWidth > availableWidth;
+
+  // Fluid shrink: let cards compress freely so they always fit on screen.
+  // MIN_CARD_WIDTH is a soft target; honour it when space permits but don't
+  // clamp above it, otherwise a large shelf would overflow horizontally.
+  let cardWidth: number;
+  if (!needsShrink) {
+    cardWidth = BASE_CARD_WIDTH;
+  } else {
+    const fluid = Math.floor((availableWidth - (itemCount - 1) * CARD_GAP) / itemCount);
+    cardWidth = Math.max(12, fluid);
+  }
+
   const slotWidth = cardWidth + CARD_GAP;
-  const contentWidth = itemCount * slotWidth - (itemCount > 0 ? CARD_GAP : 0);
-  const offsetLeft = needsShrink ? RAIL_PADDING : RAIL_PADDING + Math.max(0, (availableWidth - contentWidth) / 2);
+  const contentWidth = itemCount * slotWidth - CARD_GAP;
+  // Always centre the row of cards horizontally within the rail.
+  const offsetLeft = RAIL_PADDING + Math.max(0, (availableWidth - contentWidth) / 2);
 
   return { cardWidth, slotWidth, offsetLeft, needsShrink, contentWidth };
 }

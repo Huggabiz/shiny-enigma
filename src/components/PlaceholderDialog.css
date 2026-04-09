@@ -90,6 +90,12 @@
   font-weight: 700;
 }
 
+.ph-label .optional {
+  color: #999;
+  font-weight: 400;
+  font-size: 10px;
+}
+
 .ph-field input[type="text"],
 .ph-field input[type="number"] {
   padding: 6px 10px;

@@ -39,9 +39,9 @@ export function PlaceholderDialog({ mode, initialData, existingSkus, onSave, onC
   const handleSave = () => {
     const sku = data.sku.trim();
     const name = data.name.trim();
-    if (!sku) { setError('SKU is required'); return; }
     if (!name) { setError('Product Name is required'); return; }
-    if (existingSkus.has(sku)) { setError(`SKU "${sku}" already exists in this project`); return; }
+    // SKU is optional; only enforce uniqueness when a non-blank value is given.
+    if (sku && existingSkus.has(sku)) { setError(`SKU "${sku}" already exists in this project`); return; }
     onSave({ ...data, sku, name });
   };
 
@@ -63,8 +63,8 @@ export function PlaceholderDialog({ mode, initialData, existingSkus, onSave, onC
         <div className="dialog-body">
           <div className="ph-field-grid">
             <label className="ph-field full">
-              <span className="ph-label">SKU <span className="req">*</span></span>
-              <input type="text" value={data.sku} onChange={(e) => update('sku', e.target.value)} placeholder="e.g. NEW-001" />
+              <span className="ph-label">SKU <span className="optional">(optional)</span></span>
+              <input type="text" value={data.sku} onChange={(e) => update('sku', e.target.value)} placeholder="e.g. NEW-001 — leave blank if not yet assigned" />
             </label>
             <label className="ph-field full">
               <span className="ph-label">Product Name <span className="req">*</span></span>
