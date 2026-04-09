@@ -185,14 +185,15 @@ export function ProductCard({
         name: phData.name,
         category: phData.category,
         subCategory: phData.subCategory,
-        function: phData.function,
         productFamily: phData.productFamily,
         volume: phData.volume,
+        forecastVolume: phData.forecastVolume,
         rrp: phData.rrp,
         usRrp: phData.usRrp,
         euRrp: phData.euRrp,
         ausRrp: phData.ausRrp,
         revenue: phData.revenue,
+        forecastRevenue: phData.forecastRevenue,
         imageUrl: phData.imageUrl,
         source: phData.source,
       }
@@ -237,17 +238,26 @@ export function ProductCard({
         <div className="card-stats">
           {cardFormat.showSku && <span className="card-sku">{displaySku || '—'}</span>}
           {cardFormat.showVolume && <span className="card-volume">Vol: {cardProduct.volume ? cardProduct.volume.toLocaleString() : '—'}</span>}
+          {cardFormat.showForecastVolume && cardProduct.forecastVolume !== undefined && (
+            <span className="card-forecast">Fcst: {cardProduct.forecastVolume.toLocaleString()}</span>
+          )}
           {cardFormat.showRrp && <RrpRow product={cardProduct} region="ukRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={true} />}
           {cardFormat.showUsRrp && <RrpRow product={cardProduct} region="usRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={true} />}
           {cardFormat.showEuRrp && <RrpRow product={cardProduct} region="euRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={true} />}
           {cardFormat.showAusRrp && <RrpRow product={cardProduct} region="ausRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={true} />}
           {cardFormat.showRevenue && <span className="card-revenue">Rev: {cardProduct.revenue ? cardProduct.revenue.toLocaleString() : '—'}</span>}
+          {cardFormat.showForecastRevenue && cardProduct.forecastRevenue !== undefined && (
+            <span className="card-forecast-revenue">Fcst Rev: {cardProduct.forecastRevenue.toLocaleString()}</span>
+          )}
           {cardFormat.showCategory && <span className="card-category">{cardProduct.category || '—'}</span>}
         </div>
       )}
       {cardProduct && isCompact && (
         <div className="card-stats">
           {cardFormat.showVolume && <span className="card-volume">{cardProduct.volume ? cardProduct.volume.toLocaleString() : '—'}</span>}
+          {cardFormat.showForecastVolume && cardProduct.forecastVolume !== undefined && (
+            <span className="card-forecast">{cardProduct.forecastVolume.toLocaleString()}</span>
+          )}
           {cardFormat.showRrp && <span className="card-rrp">{cardProduct.rrp || '—'}</span>}
         </div>
       )}
@@ -256,6 +266,7 @@ export function ProductCard({
           <span className="card-placeholder-tag">Planned</span>
           {cardFormat.showSku && <span className="card-sku">—</span>}
           {cardFormat.showVolume && <span className="card-volume">Vol: —</span>}
+          {cardFormat.showForecastVolume && <span className="card-forecast">Fcst: —</span>}
           {cardFormat.showRrp && <span className="card-rrp">RRP: —</span>}
         </div>
       )}

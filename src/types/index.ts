@@ -13,14 +13,15 @@ export interface Product {
   name: string;
   category: string;
   subCategory: string;
-  function: string;
   productFamily: string;
-  volume: number;
-  rrp: number;        // UK RRP
+  volume: number;           // last year's volume (actual)
+  forecastVolume?: number;  // next year's volume (forecast)
+  rrp: number;              // UK RRP
   usRrp?: number;
   euRrp?: number;
   ausRrp?: number;
-  revenue: number;
+  revenue: number;          // last year's revenue (actual)
+  forecastRevenue?: number; // next year's revenue (forecast)
   imageUrl?: string;
   source?: 'live' | 'dev';
   // Keyed by horizon — 'default' for the immediate next future range.
@@ -36,14 +37,15 @@ export interface PlaceholderData {
   name: string;
   category: string;
   subCategory: string;
-  function: string;
   productFamily: string;
   volume: number;
+  forecastVolume?: number;
   rrp: number;
   usRrp?: number;
   euRrp?: number;
   ausRrp?: number;
   revenue: number;
+  forecastRevenue?: number;
   imageUrl?: string;
   source: 'live' | 'dev';
 }
@@ -168,11 +170,13 @@ export interface CardFormat {
   showName: boolean;
   showSku: boolean;
   showVolume: boolean;
+  showForecastVolume: boolean;
   showRrp: boolean;       // UK
   showUsRrp: boolean;
   showEuRrp: boolean;
   showAusRrp: boolean;
   showRevenue: boolean;
+  showForecastRevenue: boolean;
   showCategory: boolean;
 }
 
@@ -181,11 +185,13 @@ export const DEFAULT_CARD_FORMAT: CardFormat = {
   showName: true,
   showSku: true,
   showVolume: true,
+  showForecastVolume: true,
   showRrp: true,
   showUsRrp: false,
   showEuRrp: false,
   showAusRrp: false,
   showRevenue: false,
+  showForecastRevenue: false,
   showCategory: false,
 };
 
@@ -195,14 +201,15 @@ export interface ColumnMapping {
   name: string;
   category: string;
   subCategory: string;
-  function: string;
   productFamily: string;
   volume: string;
+  forecastVolume: string;
   rrp: string;
   usRrp: string;
   euRrp: string;
   ausRrp: string;
   revenue: string;
+  forecastRevenue: string;
   imageUrl: string;
   source: string;
 }
@@ -212,14 +219,15 @@ export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
   name: 'Name',
   category: 'Category',
   subCategory: 'Sub-Category',
-  function: 'Function',
   productFamily: 'Product Family',
   volume: 'Volume',
+  forecastVolume: 'Forecast Volume',
   rrp: 'RRP',
   usRrp: 'US RRP',
   euRrp: 'EU RRP',
   ausRrp: 'AUS RRP',
   revenue: 'Revenue',
+  forecastRevenue: 'Forecast Revenue',
   imageUrl: 'Image URL',
   source: 'Source',
 };

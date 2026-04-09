@@ -208,6 +208,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   const displaySku = isPlaceholder ? (placeholderData?.sku || '') : (product?.sku || '');
   const displayImageUrl = isPlaceholder ? placeholderData?.imageUrl : product?.imageUrl;
   const displayVolume = isPlaceholder ? placeholderData?.volume : product?.volume;
+  const displayForecast = isPlaceholder ? placeholderData?.forecastVolume : product?.forecastVolume;
   const displayRrp = isPlaceholder ? placeholderData?.rrp : product?.rrp;
   const isDev = !isPlaceholder && product?.source === 'dev';
   const cardClasses = [
@@ -237,6 +238,9 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
       {cardFormat.showSku && <div className="matrix-card-sku">{displaySku || '—'}</div>}
       {cardFormat.showRrp && <div className="matrix-card-rrp">RRP: {displayRrp || '—'}</div>}
       {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {displayVolume ? displayVolume.toLocaleString() : '—'}</div>}
+      {cardFormat.showForecastVolume && displayForecast !== undefined && (
+        <div className="matrix-card-forecast">Fcst: {displayForecast.toLocaleString()}</div>
+      )}
     </div>
   );
 }
@@ -448,8 +452,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     const item = shelf.items.find((i) => i.id === itemId);
     if (!item || !item.isPlaceholder) return;
     const data: PlaceholderData = item.placeholderData || {
-      sku: '', name: item.placeholderName || '', category: '', subCategory: '', function: '',
-      productFamily: '', volume: 0, rrp: 0, revenue: 0, source: 'live',
+      sku: '', name: item.placeholderName || '', category: '', subCategory: '',
+      productFamily: '', volume: 0, forecastVolume: 0, rrp: 0, revenue: 0, source: 'live',
     };
     setPlaceholderDialog({ mode: 'edit', itemId, data });
   }, [shelf]);

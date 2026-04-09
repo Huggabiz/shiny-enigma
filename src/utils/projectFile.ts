@@ -51,8 +51,10 @@ export function loadProjectFile(file: File): Promise<Project> {
         if (data.type === 'range-structure') {
           const catalogue: Product[] = (data.productSnapshots || []).map((s: Record<string, unknown>) => ({
             id: s.id as string, sku: s.sku as string, name: s.name as string,
-            category: '', subCategory: '', function: '', productFamily: '',
-            volume: s.volume as number, rrp: s.rrp as number, revenue: s.revenue as number,
+            category: '', subCategory: '', productFamily: '',
+            volume: s.volume as number,
+            forecastVolume: (s.forecastVolume as number | undefined) ?? 0,
+            rrp: s.rrp as number, revenue: s.revenue as number,
           }));
           resolve({
             name: data.name,

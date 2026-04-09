@@ -77,12 +77,14 @@ export function Toolbar({ activeView }: ToolbarProps) {
                     ['showImage', 'Image'],
                     ['showName', 'Product Name'],
                     ['showSku', 'SKU Code'],
-                    ['showVolume', 'Volume'],
+                    ['showVolume', 'Volume (last year)'],
+                    ['showForecastVolume', 'Forecast Volume (next year)'],
                     ['showRrp', 'UK RRP'],
                     ['showUsRrp', 'US RRP'],
                     ['showEuRrp', 'EU RRP'],
                     ['showAusRrp', 'AUS RRP'],
-                    ['showRevenue', 'Revenue'],
+                    ['showRevenue', 'Revenue (last year)'],
+                    ['showForecastRevenue', 'Forecast Revenue (next year)'],
                     ['showCategory', 'Category'],
                   ] as const).map(([key, label]) => (
                     <label key={key} className="dropdown-checkbox">

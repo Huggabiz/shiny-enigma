@@ -377,6 +377,11 @@
   color: #666;
 }
 
+.matrix-card-forecast {
+  font-size: 7px;
+  color: #1976d2;
+}
+
 /* Add buttons */
 .matrix-add-btn {
   width: 24px;

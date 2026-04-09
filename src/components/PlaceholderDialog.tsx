@@ -16,9 +16,10 @@ const EMPTY_DATA: PlaceholderData = {
   name: '',
   category: '',
   subCategory: '',
-  function: '',
   productFamily: '',
   volume: 0,
+  forecastVolume: undefined,
+  forecastRevenue: undefined,
   rrp: 0,
   usRrp: undefined,
   euRrp: undefined,
@@ -80,22 +81,27 @@ export function PlaceholderDialog({ mode, initialData, existingSkus, onSave, onC
               <input type="text" value={data.subCategory} onChange={(e) => update('subCategory', e.target.value)} />
             </label>
 
-            <label className="ph-field">
-              <span className="ph-label">Function</span>
-              <input type="text" value={data.function} onChange={(e) => update('function', e.target.value)} />
-            </label>
-            <label className="ph-field">
+            <label className="ph-field full">
               <span className="ph-label">Product Family</span>
               <input type="text" value={data.productFamily} onChange={(e) => update('productFamily', e.target.value)} />
             </label>
 
             <label className="ph-field">
-              <span className="ph-label">Volume</span>
+              <span className="ph-label">Volume <span className="optional">(last year)</span></span>
               <input type="number" value={numberInput(data.volume)} onChange={(e) => update('volume', Number(e.target.value) || 0)} />
             </label>
             <label className="ph-field">
-              <span className="ph-label">Revenue</span>
+              <span className="ph-label">Forecast Volume <span className="optional">(next year)</span></span>
+              <input type="number" value={numberInput(data.forecastVolume)} onChange={(e) => update('forecastVolume', toNumOrUndef(e.target.value))} />
+            </label>
+
+            <label className="ph-field">
+              <span className="ph-label">Revenue <span className="optional">(last year)</span></span>
               <input type="number" value={numberInput(data.revenue)} onChange={(e) => update('revenue', Number(e.target.value) || 0)} />
+            </label>
+            <label className="ph-field">
+              <span className="ph-label">Forecast Revenue <span className="optional">(next year)</span></span>
+              <input type="number" value={numberInput(data.forecastRevenue)} onChange={(e) => update('forecastRevenue', toNumOrUndef(e.target.value))} />
             </label>
 
             <label className="ph-field">

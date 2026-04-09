@@ -157,8 +157,8 @@ function App() {
     const item = shelf.items.find((i) => i.id === itemId);
     if (!item || !item.isPlaceholder) return;
     const data: PlaceholderData = item.placeholderData || {
-      sku: '', name: item.placeholderName || '', category: '', subCategory: '', function: '',
-      productFamily: '', volume: 0, rrp: 0, revenue: 0, source: 'live',
+      sku: '', name: item.placeholderName || '', category: '', subCategory: '',
+      productFamily: '', volume: 0, forecastVolume: 0, rrp: 0, revenue: 0, source: 'live',
     };
     setPlaceholderDialog({ mode: 'edit', shelfId, itemId, data });
   }, [activePlan]);
