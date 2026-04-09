@@ -3,6 +3,17 @@
   border-radius: 12px;
   padding: 16px;
   transition: background-color 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.shelf-container.flipped {
+  flex-direction: column-reverse;
+}
+
+.shelf-container.flipped .shelf-derived-labels {
+  display: flex;
+  flex-direction: column-reverse;
 }
 
 .shelf-container.shelf-over {
@@ -13,7 +24,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.shelf-container.flipped .shelf-header {
+  margin-bottom: 0;
+  margin-top: 4px;
 }
 
 .shelf-title {
@@ -94,8 +110,8 @@
   display: flex;
   justify-content: flex-start;
   gap: 10px;
-  min-height: 140px;
-  padding: 10px 0;
+  min-height: 108px;
+  padding: 4px 0;
   align-items: flex-end;
   position: relative;
 }
@@ -118,14 +134,7 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 130px;
+  min-height: 100px;
   border: 2px dashed #ddd;
   border-radius: 8px;
-}
-
-.shelf-meta {
-  margin-top: 8px;
-  font-size: 11px;
-  color: #888;
-  text-align: center;
 }

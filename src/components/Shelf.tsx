@@ -23,6 +23,7 @@ interface ShelfProps {
   editableFuturePricing?: boolean;
   discontinuedItems?: ShelfItem[];
   showDiscontinued?: boolean;
+  flipped?: boolean;
 }
 
 interface DerivedLabel {
@@ -109,7 +110,7 @@ function deriveLabelsFromMatrix(
   return { xLabels, yLabels };
 }
 
-export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp, editableFuturePricing, discontinuedItems, showDiscontinued }: ShelfProps) {
+export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp, editableFuturePricing, discontinuedItems, showDiscontinued, flipped }: ShelfProps) {
   const {
     selectedItemId,
     setSelectedItem,
@@ -216,10 +217,10 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
   // Pack X labels (top row) and Y labels (second row)
   const xLabelRows = useMemo(() => packLabelsIntoRows(derivedXLabels), [derivedXLabels]);
   const yLabelRows = useMemo(() => packLabelsIntoRows(derivedYLabels), [derivedYLabels]);
-  const LABEL_ROW_HEIGHT = 22;
+  const LABEL_ROW_HEIGHT = 18;
 
   return (
-    <div className={`shelf-container ${isOver ? 'shelf-over' : ''}`}>
+    <div className={`shelf-container ${isOver ? 'shelf-over' : ''} ${flipped ? 'flipped' : ''}`}>
       <div className="shelf-header">
         <h3 className="shelf-title">{shelf.name}</h3>
         <div className="shelf-actions">
@@ -331,11 +332,6 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
             Drag products here from the catalogue or use Design view
           </div>
         )}
-      </div>
-
-      <div className="shelf-meta">
-        {shelf.items.length} SKUs &middot; Total Volume:{' '}
-        {shelf.items.reduce((sum, item) => sum + (getProduct(item)?.volume || 0), 0).toLocaleString()}
       </div>
     </div>
   );

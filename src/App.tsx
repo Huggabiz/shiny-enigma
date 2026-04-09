@@ -422,7 +422,8 @@ function App() {
                   showGhosted={showGhosted}
                   editableFuturePricing={true}
                   discontinuedItems={discontinuedItems}
-                  showDiscontinued={showDiscontinued} />
+                  showDiscontinued={showDiscontinued}
+                  flipped={true} />
               </div>
 
               {activeItem?.sourceShelf && overShelfId === 'catalogue' && (

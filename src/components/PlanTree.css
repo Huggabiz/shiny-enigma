@@ -189,14 +189,14 @@
 }
 
 .plan-tree-add-variant {
-  height: 22px;
-  padding: 0 10px;
-  font-size: 11px;
-  font-weight: 700;
+  height: 16px;
+  padding: 0 7px;
+  font-size: 9px;
+  font-weight: 600;
   background: #4caf50;
   color: #fff;
   border: none;
-  border-radius: 11px;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -204,6 +204,7 @@
   flex-shrink: 0;
   line-height: 1;
   white-space: nowrap;
+  margin-left: auto;
 }
 
 .plan-tree-add-variant:hover {

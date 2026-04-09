@@ -18,7 +18,7 @@ interface SankeyFlowProps {
   onClickFlow?: (sourceItemId: string) => void;
 }
 
-const FLOW_HEIGHT = 120;
+const FLOW_HEIGHT = 84;
 
 interface FlowSpec {
   link: SankeyLink;

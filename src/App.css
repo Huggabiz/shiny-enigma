@@ -57,16 +57,18 @@
 
 .transform-16-9 .slide-title {
   flex-shrink: 0;
-  padding: 10px 16px 4px;
+  padding: 6px 16px 2px;
 }
 
 .transform-16-9 .shelf-container {
   background: transparent;
-  padding: 6px 16px;
+  padding: 2px 16px;
 }
 
 .transform-16-9 .sankey-container {
   flex-shrink: 0;
+  margin-top: -4px;
+  margin-bottom: -4px;
 }
 
 .transform-title-actions {
