@@ -26,13 +26,15 @@
 }
 
 /* Placeholder = New product — blue/cyan theme */
-.product-card.placeholder {
+.product-card.placeholder,
+.product-card.dev-product {
   background: #e8f6fd;
   border-color: #0097a7;
   border-style: solid;
 }
 
-.product-card.placeholder:hover {
+.product-card.placeholder:hover,
+.product-card.dev-product:hover {
   border-color: #00838f;
   box-shadow: 0 2px 8px rgba(0, 151, 167, 0.2);
 }
@@ -74,6 +76,12 @@
   z-index: 2;
   letter-spacing: -0.2px;
   box-shadow: 0 1px 4px rgba(0, 151, 167, 0.4);
+}
+
+.card-new-badge.dev {
+  background: #1565c0;
+  font-size: 7px;
+  box-shadow: 0 1px 4px rgba(21, 101, 192, 0.4);
 }
 
 .card-remove {
@@ -170,6 +178,27 @@
   font-size: 9px;
   color: #2e7d32;
   font-weight: 500;
+}
+
+.card-rrp-us { color: #1976d2; }
+.card-rrp-eu { color: #6a1b9a; }
+.card-rrp-aus { color: #ef6c00; }
+
+.card-rrp-delta {
+  font-weight: 700;
+  margin-left: 2px;
+}
+.card-rrp-delta.up { color: #2e7d32; }
+.card-rrp-delta.down { color: #c62828; }
+
+.card-rrp-input {
+  width: 50px;
+  font-size: 9px;
+  padding: 0 2px;
+  border: 1px solid #1976d2;
+  border-radius: 2px;
+  outline: none;
+  font-family: inherit;
 }
 
 .card-revenue {

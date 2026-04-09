@@ -222,7 +222,7 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
             onClick={() => setExpanded(!expanded)}
             title={expanded ? 'Compact view' : 'Expanded view with larger images'}
           >
-            {expanded ? '◀' : '▶'}
+            {expanded ? '▶' : '◀'}
           </button>
           <button className="import-btn" onClick={onImport}>
             Import Data

@@ -20,6 +20,7 @@ interface ShelfProps {
   onViewDesign?: () => void;
   variantIncludedIds?: Set<string> | null;
   showGhosted?: boolean;
+  editableFuturePricing?: boolean;
   discontinuedItems?: ShelfItem[];
   showDiscontinued?: boolean;
 }
@@ -108,7 +109,7 @@ function deriveLabelsFromMatrix(
   return { xLabels, yLabels };
 }
 
-export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp, discontinuedItems, showDiscontinued }: ShelfProps) {
+export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp, editableFuturePricing, discontinuedItems, showDiscontinued }: ShelfProps) {
   const {
     selectedItemId,
     setSelectedItem,
@@ -297,9 +298,10 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
                 isDimmed={isDimmed}
                 isGhosted={isGhosted}
                 isLinkHighlight={isLinkHighlight}
+                editableFuturePricing={editableFuturePricing}
                 onClick={() => handleCardClick(item)}
                 onDoubleClick={() => {
-                  if (shelf.id === 'current' && onDoubleClickItem) onDoubleClickItem(item.id);
+                  if (onDoubleClickItem) onDoubleClickItem(item.id);
                 }}
                 onRemove={() => removeItemFromShelf(shelf.id, item.id)}
                 cardWidth={cardWidth}

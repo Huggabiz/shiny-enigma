@@ -77,9 +77,39 @@
   flex-direction: column;
 }
 
+.slide-title {
+  flex-shrink: 0;
+  padding: 10px 16px 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slide-title .range-design-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: default;
+}
+
+.slide-title .range-design-title-input {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  border: 1px solid #1976d2;
+  border-radius: 4px;
+  padding: 2px 8px;
+  outline: none;
+  width: 280px;
+}
+
 .matrix-wrapper {
   flex: 1;
-  padding: 12px;
+  padding: 4px 12px 12px;
   display: flex;
   flex-direction: column;
   overflow: hidden; /* no scrollbars — content must fit */
@@ -235,9 +265,23 @@
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
 }
 
-.matrix-card.placeholder {
+.matrix-card.placeholder,
+.matrix-card.dev-product {
   background: #e8f6fd;
   border-color: #0097a7;
+}
+
+.matrix-card-dev-badge {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  background: #1565c0;
+  color: #fff;
+  font-size: 7px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 6px;
+  z-index: 2;
 }
 
 .matrix-card.dragging {

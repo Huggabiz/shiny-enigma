@@ -78,7 +78,10 @@ export function Toolbar({ activeView }: ToolbarProps) {
                     ['showName', 'Product Name'],
                     ['showSku', 'SKU Code'],
                     ['showVolume', 'Volume'],
-                    ['showRrp', 'RRP'],
+                    ['showRrp', 'UK RRP'],
+                    ['showUsRrp', 'US RRP'],
+                    ['showEuRrp', 'EU RRP'],
+                    ['showAusRrp', 'AUS RRP'],
                     ['showRevenue', 'Revenue'],
                     ['showCategory', 'Category'],
                   ] as const).map(([key, label]) => (

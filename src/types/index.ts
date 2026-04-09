@@ -1,3 +1,11 @@
+// Future pricing — supports multiple time horizons via the keyed object
+export interface FuturePricing {
+  ukRrp?: number;
+  usRrp?: number;
+  euRrp?: number;
+  ausRrp?: number;
+}
+
 // Core product type matching the data schema
 export interface Product {
   id: string;
@@ -8,11 +16,36 @@ export interface Product {
   function: string;
   productFamily: string;
   volume: number;
-  rrp: number;
+  rrp: number;        // UK RRP
+  usRrp?: number;
+  euRrp?: number;
+  ausRrp?: number;
   revenue: number;
   imageUrl?: string;
+  source?: 'live' | 'dev';
+  // Keyed by horizon — 'default' for the immediate next future range.
+  // Future-proofed for multiple horizons (e.g. 'h1-2026', 'h2-2026').
+  futurePricing?: { [horizon: string]: FuturePricing };
   // Extensible for future attributes
   [key: string]: unknown;
+}
+
+// Data carried by a placeholder shelf item — mirrors Product fields
+export interface PlaceholderData {
+  sku: string;
+  name: string;
+  category: string;
+  subCategory: string;
+  function: string;
+  productFamily: string;
+  volume: number;
+  rrp: number;
+  usRrp?: number;
+  euRrp?: number;
+  ausRrp?: number;
+  revenue: number;
+  imageUrl?: string;
+  source: 'live' | 'dev';
 }
 
 // A product placed on a shelf, with position info
@@ -21,7 +54,8 @@ export interface ShelfItem {
   productId: string;
   position: number;
   isPlaceholder: boolean;
-  placeholderName?: string;
+  placeholderName?: string;          // legacy: simple text-only placeholder
+  placeholderData?: PlaceholderData; // full data for new placeholders
 }
 
 // A labelled section on a shelf
@@ -134,7 +168,10 @@ export interface CardFormat {
   showName: boolean;
   showSku: boolean;
   showVolume: boolean;
-  showRrp: boolean;
+  showRrp: boolean;       // UK
+  showUsRrp: boolean;
+  showEuRrp: boolean;
+  showAusRrp: boolean;
   showRevenue: boolean;
   showCategory: boolean;
 }
@@ -145,6 +182,9 @@ export const DEFAULT_CARD_FORMAT: CardFormat = {
   showSku: true,
   showVolume: true,
   showRrp: true,
+  showUsRrp: false,
+  showEuRrp: false,
+  showAusRrp: false,
   showRevenue: false,
   showCategory: false,
 };
@@ -159,8 +199,12 @@ export interface ColumnMapping {
   productFamily: string;
   volume: string;
   rrp: string;
+  usRrp: string;
+  euRrp: string;
+  ausRrp: string;
   revenue: string;
   imageUrl: string;
+  source: string;
 }
 
 export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
@@ -172,6 +216,10 @@ export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
   productFamily: 'Product Family',
   volume: 'Volume',
   rrp: 'RRP',
+  usRrp: 'US RRP',
+  euRrp: 'EU RRP',
+  ausRrp: 'AUS RRP',
   revenue: 'Revenue',
   imageUrl: 'Image URL',
+  source: 'Source',
 };

@@ -1,0 +1,171 @@
+/* Reuses .dialog-overlay and .dialog from ImportDialog.css (loaded when ImportDialog is imported)
+   We re-declare here so the modal works even if ImportDialog isn't loaded. */
+
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.placeholder-dialog {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 560px;
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.placeholder-dialog .dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #eee;
+}
+
+.placeholder-dialog .dialog-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.dialog-close-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 0;
+}
+
+.dialog-close-btn:hover {
+  background: #f0f0f0;
+}
+
+.placeholder-dialog .dialog-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ph-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+}
+
+.ph-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ph-field.full {
+  grid-column: 1 / -1;
+}
+
+.ph-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+}
+
+.ph-label .req {
+  color: #ef5350;
+  font-weight: 700;
+}
+
+.ph-field input[type="text"],
+.ph-field input[type="number"] {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.ph-field input:focus {
+  outline: none;
+  border-color: #1976d2;
+}
+
+.ph-radio-group {
+  display: flex;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.ph-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #333;
+  cursor: pointer;
+}
+
+.ph-radio input {
+  cursor: pointer;
+}
+
+.ph-error {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 6px;
+  color: #c62828;
+  font-size: 12px;
+}
+
+.placeholder-dialog .dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid #eee;
+}
+
+.placeholder-dialog .btn-primary {
+  padding: 7px 18px;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.placeholder-dialog .btn-primary:hover {
+  background: #1565c0;
+}
+
+.placeholder-dialog .btn-secondary {
+  padding: 7px 18px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #555;
+}
+
+.placeholder-dialog .btn-secondary:hover {
+  background: #eee;
+}

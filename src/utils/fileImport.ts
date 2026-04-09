@@ -17,19 +17,33 @@ export function parseSpreadsheet(
 
   const headers = Object.keys(json[0]);
 
-  const products: Product[] = json.map((row, index) => ({
-    id: `product-${index}-${String(row[mapping.sku] ?? index)}`,
-    sku: String(row[mapping.sku] ?? ''),
-    name: String(row[mapping.name] ?? ''),
-    category: String(row[mapping.category] ?? ''),
-    subCategory: String(row[mapping.subCategory] ?? ''),
-    function: String(row[mapping.function] ?? ''),
-    productFamily: String(row[mapping.productFamily] ?? ''),
-    volume: Number(row[mapping.volume]) || 0,
-    rrp: Number(row[mapping.rrp]) || 0,
-    revenue: Number(row[mapping.revenue]) || 0,
-    imageUrl: row[mapping.imageUrl] ? String(row[mapping.imageUrl]) : undefined,
-  }));
+  const numOrUndef = (v: unknown): number | undefined => {
+    if (v === undefined || v === null || v === '') return undefined;
+    const n = Number(v);
+    return isNaN(n) ? undefined : n;
+  };
+
+  const products: Product[] = json.map((row, index) => {
+    const sourceRaw = row[mapping.source];
+    const source: 'live' | 'dev' = sourceRaw && String(sourceRaw).toLowerCase().startsWith('dev') ? 'dev' : 'live';
+    return {
+      id: `product-${index}-${String(row[mapping.sku] ?? index)}`,
+      sku: String(row[mapping.sku] ?? ''),
+      name: String(row[mapping.name] ?? ''),
+      category: String(row[mapping.category] ?? ''),
+      subCategory: String(row[mapping.subCategory] ?? ''),
+      function: String(row[mapping.function] ?? ''),
+      productFamily: String(row[mapping.productFamily] ?? ''),
+      volume: Number(row[mapping.volume]) || 0,
+      rrp: Number(row[mapping.rrp]) || 0,
+      usRrp: numOrUndef(row[mapping.usRrp]),
+      euRrp: numOrUndef(row[mapping.euRrp]),
+      ausRrp: numOrUndef(row[mapping.ausRrp]),
+      revenue: Number(row[mapping.revenue]) || 0,
+      imageUrl: row[mapping.imageUrl] ? String(row[mapping.imageUrl]) : undefined,
+      source,
+    };
+  });
 
   return { products, headers };
 }

@@ -63,6 +63,7 @@ interface ProjectStore {
   // Catalogue actions
   setCatalogue: (products: Product[]) => void;
   clearCatalogue: () => void;
+  setFuturePricing: (productId: string, region: 'ukRrp' | 'usRrp' | 'euRrp' | 'ausRrp', value: number | undefined) => void;
 
   // Shelf actions (operate on active plan)
   addItemToShelf: (shelfId: string, item: ShelfItem) => void;
@@ -313,6 +314,35 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const { project } = get();
     if (!project) return;
     set({ project: { ...project, catalogue: [], updatedAt: new Date().toISOString() } });
+  },
+
+  // Set/clear a future pricing override on the catalogue product (default horizon)
+  setFuturePricing: (productId, region, value) => {
+    const { project } = get();
+    if (!project) return;
+    const newCatalogue = project.catalogue.map((p) => {
+      if (p.id !== productId) return p;
+      const existing = p.futurePricing || {};
+      const defaultHorizon = { ...(existing.default || {}) };
+      if (value === undefined || value === null || isNaN(value)) {
+        delete defaultHorizon[region];
+      } else {
+        defaultHorizon[region] = value;
+      }
+      const newFuturePricing = { ...existing };
+      if (Object.keys(defaultHorizon).length === 0) {
+        delete newFuturePricing.default;
+      } else {
+        newFuturePricing.default = defaultHorizon;
+      }
+      return {
+        ...p,
+        futurePricing: Object.keys(newFuturePricing).length === 0 ? undefined : newFuturePricing,
+      };
+    });
+    set({
+      project: { ...project, catalogue: newCatalogue, updatedAt: new Date().toISOString() },
+    });
   },
 
   // Shelf actions — operate on active plan

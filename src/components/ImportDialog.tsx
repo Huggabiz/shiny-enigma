@@ -10,17 +10,21 @@ interface ImportDialogProps {
   onClose: () => void;
 }
 
-const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: string; required: boolean }> = {
-  sku: { label: 'SKU', hint: 'Unique product identifier (e.g. "SKU-001")', required: true },
-  name: { label: 'Product Name', hint: 'Display name of the product', required: true },
+const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: string; required: boolean; aliases?: string[] }> = {
+  sku: { label: 'SKU', hint: 'Unique product identifier (e.g. "SKU-001")', required: true, aliases: ['product code', 'productcode'] },
+  name: { label: 'Product Name', hint: 'Display name of the product', required: true, aliases: ['display name', 'displayname'] },
   category: { label: 'Category', hint: 'Top-level product category (e.g. "Skincare")', required: true },
-  subCategory: { label: 'Sub-Category', hint: 'Category subdivision (e.g. "Moisturisers")', required: false },
+  subCategory: { label: 'Sub-Category', hint: 'Category subdivision (e.g. "Moisturisers")', required: false, aliases: ['sub category', 'subcategory'] },
   function: { label: 'Function', hint: 'Product function or purpose', required: false },
   productFamily: { label: 'Product Family', hint: 'Product family grouping', required: false },
-  volume: { label: 'Volume', hint: 'Sales volume (numeric)', required: true },
-  rrp: { label: 'RRP', hint: 'Recommended retail price (numeric)', required: false },
-  revenue: { label: 'Revenue', hint: 'Total revenue (numeric)', required: false },
+  volume: { label: 'Volume', hint: 'Sales volume (numeric)', required: true, aliases: ['units'] },
+  rrp: { label: 'UK RRP', hint: 'UK recommended retail price (numeric)', required: false, aliases: ['rrp', 'uk rrp'] },
+  usRrp: { label: 'US RRP', hint: 'US recommended retail price (numeric)', required: false, aliases: ['us rrp', 'usa rrp'] },
+  euRrp: { label: 'EU RRP', hint: 'EU recommended retail price (numeric)', required: false, aliases: ['eu rrp', 'europe rrp'] },
+  ausRrp: { label: 'AUS RRP', hint: 'Australia recommended retail price (numeric)', required: false, aliases: ['aus rrp', 'australia rrp'] },
+  revenue: { label: 'Revenue', hint: 'Total revenue (numeric)', required: false, aliases: ['ytd'] },
   imageUrl: { label: 'Image URL', hint: 'Web URL to product image', required: false },
+  source: { label: 'Source', hint: 'Live or Dev — set Dev for in-development products', required: false, aliases: ['status', 'product status'] },
 };
 
 export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
@@ -45,14 +49,22 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
     setPreview(products.slice(0, 5));
     setTotalCount(products.length);
 
-    // Auto-match headers to fields
+    // Auto-match headers to fields (label, key, aliases, then substring fallback)
     const newMapping = { ...mapping };
     const lowerHeaders = hdrs.map(h => h.toLowerCase().trim());
     for (const [key, desc] of Object.entries(FIELD_DESCRIPTIONS)) {
       const label = desc.label.toLowerCase();
-      const matchIndex = lowerHeaders.findIndex(h =>
-        h === label || h === key.toLowerCase() || h.includes(label) || label.includes(h)
+      const aliases = (desc.aliases || []).map(a => a.toLowerCase());
+      // Exact matches first
+      let matchIndex = lowerHeaders.findIndex(h =>
+        h === label || h === key.toLowerCase() || aliases.includes(h)
       );
+      // Substring fallback
+      if (matchIndex === -1) {
+        matchIndex = lowerHeaders.findIndex(h =>
+          h.includes(label) || label.includes(h) || aliases.some(a => h.includes(a) || a.includes(h))
+        );
+      }
       if (matchIndex !== -1) {
         (newMapping as Record<string, string>)[key] = hdrs[matchIndex];
       }

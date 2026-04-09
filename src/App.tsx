@@ -23,9 +23,10 @@ import { ProductCard } from './components/ProductCard';
 import { LinkPanel } from './components/LinkPanel';
 import { RangeDesign } from './components/RangeDesign';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { PlaceholderDialog } from './components/PlaceholderDialog';
 import { useProjectStore } from './store/useProjectStore';
 import { getActivePlan } from './types';
-import type { Product, ShelfItem } from './types';
+import type { Product, ShelfItem, PlaceholderData } from './types';
 import './App.css';
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
     addItemToShelf,
     removeItemFromShelf,
     reorderShelfItems,
+    updateShelfItem,
     addLink,
     linkMode,
     linkSource,
@@ -65,6 +67,11 @@ function App() {
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [shelfRailWidth, setShelfRailWidth] = useState(0);
   const [showDiscontinued, setShowDiscontinued] = useState(true);
+  const [placeholderDialog, setPlaceholderDialog] = useState<
+    | { mode: 'create'; shelfId: string }
+    | { mode: 'edit'; shelfId: string; itemId: string; data: PlaceholderData }
+    | null
+  >(null);
 
   // Build usage sets across ALL plans for catalogue badges
   const { currentPlanProductIds, futurePlanProductIds, otherPlansCurrentIds, otherPlansFutureIds } = useMemo(() => {
@@ -141,14 +148,58 @@ function App() {
   };
 
   const handleAddPlaceholder = useCallback((shelfId: string) => {
-    const name = prompt('Placeholder name (e.g. "New Premium SKU"):');
-    if (name === null) return;
-    addItemToShelf(shelfId, {
-      id: `placeholder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      productId: '', position: activePlan?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf']?.items?.length || 0,
-      isPlaceholder: true, placeholderName: name || 'New SKU',
+    setPlaceholderDialog({ mode: 'create', shelfId });
+  }, []);
+
+  const handleEditPlaceholder = useCallback((shelfId: string, itemId: string) => {
+    if (!activePlan) return;
+    const shelf = shelfId === 'current' ? activePlan.currentShelf : activePlan.futureShelf;
+    const item = shelf.items.find((i) => i.id === itemId);
+    if (!item || !item.isPlaceholder) return;
+    const data: PlaceholderData = item.placeholderData || {
+      sku: '', name: item.placeholderName || '', category: '', subCategory: '', function: '',
+      productFamily: '', volume: 0, rrp: 0, revenue: 0, source: 'live',
+    };
+    setPlaceholderDialog({ mode: 'edit', shelfId, itemId, data });
+  }, [activePlan]);
+
+  // Build set of existing SKUs for placeholder validation (catalogue + other placeholders, excluding the one being edited)
+  const existingSkusForDialog = useMemo(() => {
+    if (!project) return new Set<string>();
+    const skus = new Set<string>();
+    project.catalogue.forEach((p) => p.sku && skus.add(p.sku));
+    project.plans.forEach((plan) => {
+      [...plan.currentShelf.items, ...plan.futureShelf.items].forEach((item) => {
+        if (!item.isPlaceholder || !item.placeholderData) return;
+        // Exclude the item being edited
+        if (placeholderDialog?.mode === 'edit' && placeholderDialog.itemId === item.id) return;
+        if (item.placeholderData.sku) skus.add(item.placeholderData.sku);
+      });
     });
-  }, [activePlan, addItemToShelf]);
+    return skus;
+  }, [project, placeholderDialog]);
+
+  const handlePlaceholderSave = (data: PlaceholderData) => {
+    if (!placeholderDialog) return;
+    if (placeholderDialog.mode === 'create') {
+      const shelfId = placeholderDialog.shelfId;
+      const shelfItems = activePlan?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf']?.items || [];
+      addItemToShelf(shelfId, {
+        id: `placeholder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        productId: '',
+        position: shelfItems.length,
+        isPlaceholder: true,
+        placeholderName: data.name,
+        placeholderData: data,
+      });
+    } else {
+      updateShelfItem(placeholderDialog.shelfId, placeholderDialog.itemId, {
+        placeholderName: data.name,
+        placeholderData: data,
+      });
+    }
+    setPlaceholderDialog(null);
+  };
 
   const showDuplicateWarning = (productName: string) => {
     setDuplicateWarning(`"${productName}" is already in this range`);
@@ -161,6 +212,24 @@ function App() {
     setLinkMode(true);
     setLinkSource(itemId);
   }, [setLinkMode, setLinkSource]);
+
+  // Double-click on a current shelf item: edit if placeholder, otherwise enter link mode
+  const handleCurrentDoubleClick = useCallback((itemId: string) => {
+    const item = activePlan?.currentShelf.items.find((i) => i.id === itemId);
+    if (item?.isPlaceholder) {
+      handleEditPlaceholder('current', itemId);
+    } else {
+      enterLinkModeFor(itemId);
+    }
+  }, [activePlan, enterLinkModeFor, handleEditPlaceholder]);
+
+  // Double-click on a future shelf item: edit if placeholder
+  const handleFutureDoubleClick = useCallback((itemId: string) => {
+    const item = activePlan?.futureShelf.items.find((i) => i.id === itemId);
+    if (item?.isPlaceholder) {
+      handleEditPlaceholder('future', itemId);
+    }
+  }, [activePlan, handleEditPlaceholder]);
 
   const handleSankeyClick = useCallback((sourceItemId: string) => enterLinkModeFor(sourceItemId), [enterLinkModeFor]);
 
@@ -299,10 +368,6 @@ function App() {
             onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="shelves-area">
               <div className="transform-title-bar">
-                <h2 className="transform-title">
-                  {activePlan.name}
-                  {activeVariant && <span className="variant-badge">{activeVariant.name}</span>}
-                </h2>
                 <div className="transform-title-actions">
                   {activeVariant && (
                     <label className="ghost-toggle" title="Show products not in this variant">
@@ -318,36 +383,47 @@ function App() {
                 </div>
               </div>
 
-              <Shelf shelf={activePlan.currentShelf} catalogue={project!.catalogue}
-                onAddPlaceholder={() => handleAddPlaceholder('current')}
-                onRailWidthChange={handleRailWidthChange}
-                onDoubleClickItem={enterLinkModeFor}
-                onViewDesign={() => { setDesignShelfId('current'); setActiveView('range-design'); }}
-                variantIncludedIds={variantCurrentIds}
-                showGhosted={showGhosted} />
+              <div className="transform-16-9">
+                <div className="slide-title">
+                  <h2 className="transform-title">
+                    {activePlan.name}
+                    {activeVariant && <span className="variant-badge">{activeVariant.name}</span>}
+                  </h2>
+                </div>
 
-              {linkMode && linkSourceItem && (
-                <LinkPanel sourceItem={linkSourceItem} sourceProduct={linkSourceProduct}
-                  links={activePlan.sankeyLinks} futureItems={activePlan.futureShelf.items}
-                  catalogue={project!.catalogue} />
-              )}
+                <Shelf shelf={activePlan.currentShelf} catalogue={project!.catalogue}
+                  onAddPlaceholder={() => handleAddPlaceholder('current')}
+                  onRailWidthChange={handleRailWidthChange}
+                  onDoubleClickItem={handleCurrentDoubleClick}
+                  onViewDesign={() => { setDesignShelfId('current'); setActiveView('range-design'); }}
+                  variantIncludedIds={variantCurrentIds}
+                  showGhosted={showGhosted} />
 
-              <SankeyFlow currentShelf={activePlan.currentShelf} futureShelf={activePlan.futureShelf}
-                links={activePlan.sankeyLinks} catalogue={project!.catalogue}
-                railWidth={shelfRailWidth}
-                variantCurrentIds={variantCurrentIds} variantFutureIds={variantFutureIds}
-                showGhosted={showGhosted}
-                discontinuedItems={discontinuedItems}
-                showDiscontinued={showDiscontinued}
-                onClickFlow={handleSankeyClick} />
+                {linkMode && linkSourceItem && (
+                  <LinkPanel sourceItem={linkSourceItem} sourceProduct={linkSourceProduct}
+                    links={activePlan.sankeyLinks} futureItems={activePlan.futureShelf.items}
+                    catalogue={project!.catalogue} />
+                )}
 
-              <Shelf shelf={activePlan.futureShelf} catalogue={project!.catalogue}
-                onAddPlaceholder={() => handleAddPlaceholder('future')}
-                onViewDesign={() => { setDesignShelfId('future'); setActiveView('range-design'); }}
-                variantIncludedIds={variantFutureIds}
-                showGhosted={showGhosted}
-                discontinuedItems={discontinuedItems}
-                showDiscontinued={showDiscontinued} />
+                <SankeyFlow currentShelf={activePlan.currentShelf} futureShelf={activePlan.futureShelf}
+                  links={activePlan.sankeyLinks} catalogue={project!.catalogue}
+                  railWidth={shelfRailWidth}
+                  variantCurrentIds={variantCurrentIds} variantFutureIds={variantFutureIds}
+                  showGhosted={showGhosted}
+                  discontinuedItems={discontinuedItems}
+                  showDiscontinued={showDiscontinued}
+                  onClickFlow={handleSankeyClick} />
+
+                <Shelf shelf={activePlan.futureShelf} catalogue={project!.catalogue}
+                  onAddPlaceholder={() => handleAddPlaceholder('future')}
+                  onDoubleClickItem={handleFutureDoubleClick}
+                  onViewDesign={() => { setDesignShelfId('future'); setActiveView('range-design'); }}
+                  variantIncludedIds={variantFutureIds}
+                  showGhosted={showGhosted}
+                  editableFuturePricing={true}
+                  discontinuedItems={discontinuedItems}
+                  showDiscontinued={showDiscontinued} />
+              </div>
 
               {activeItem?.sourceShelf && overShelfId === 'catalogue' && (
                 <div className="cross-shelf-hint remove-hint">Drop to remove from range</div>
@@ -378,6 +454,15 @@ function App() {
       </div>
 
       {showImport && <ImportDialog onImport={handleImport} onClose={() => setShowImport(false)} />}
+      {placeholderDialog && (
+        <PlaceholderDialog
+          mode={placeholderDialog.mode}
+          initialData={placeholderDialog.mode === 'edit' ? placeholderDialog.data : undefined}
+          existingSkus={existingSkusForDialog}
+          onSave={handlePlaceholderSave}
+          onClose={() => setPlaceholderDialog(null)}
+        />
+      )}
     </div>
   );
 }

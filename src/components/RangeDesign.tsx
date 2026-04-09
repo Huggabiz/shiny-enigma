@@ -15,7 +15,8 @@ import { Catalogue } from './Catalogue';
 import { useProjectStore } from '../store/useProjectStore';
 import { CloseIcon } from './Icons';
 import { PillToggle } from './PillToggle';
-import type { Product, Shelf, MatrixLayout } from '../types';
+import { PlaceholderDialog } from './PlaceholderDialog';
+import type { Product, Shelf, MatrixLayout, PlaceholderData } from '../types';
 import { getActivePlan } from '../types';
 import './RangeDesign.css';
 
@@ -144,11 +145,12 @@ function computeLayout(
   return { fits: true, colWidths, rowHeights };
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder, variantIncludedIds, showGhostedProp }: {
+function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp }: {
   row: number; col: number; itemIds: string[];
   shelf: Shelf; catalogue: Product[];
   cardWidth: number;
   onAddPlaceholder: (row: number, col: number) => void;
+  onEditPlaceholder?: (itemId: string) => void;
   variantIncludedIds: Set<string> | null;
   showGhostedProp: boolean;
 }) {
@@ -173,7 +175,9 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
         return (
           <MatrixProductCard key={item.id} itemId={item.id} product={product}
             isPlaceholder={item.isPlaceholder} placeholderName={item.placeholderName}
+            placeholderData={item.placeholderData}
             isGhosted={isGhosted}
+            onEdit={item.isPlaceholder && onEditPlaceholder ? () => onEditPlaceholder(item.id) : undefined}
             onRemove={() => {
               if (storeVariantId) {
                 toggleVariantItem(storeVariantId, shelf.id, item.id);
@@ -189,33 +193,50 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
   );
 }
 
-function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, isGhosted, onRemove }: {
+function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, placeholderData, isGhosted, onRemove, onEdit }: {
   itemId: string; product?: Product; isPlaceholder: boolean;
-  placeholderName?: string; isGhosted?: boolean; onRemove: () => void;
+  placeholderName?: string; placeholderData?: import('../types').PlaceholderData;
+  isGhosted?: boolean; onRemove: () => void; onEdit?: () => void;
 }) {
   const cardFormat = useProjectStore((s) => s.cardFormat);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `matrix-item-${itemId}`, data: { itemId },
   });
-  const name = isPlaceholder ? (placeholderName || 'New SKU') : (product?.name || 'Unknown');
+  const displayName = isPlaceholder
+    ? (placeholderData?.name || placeholderName || 'New SKU')
+    : (product?.name || 'Unknown');
+  const displaySku = isPlaceholder ? (placeholderData?.sku || '') : (product?.sku || '');
+  const displayImageUrl = isPlaceholder ? placeholderData?.imageUrl : product?.imageUrl;
+  const displayVolume = isPlaceholder ? placeholderData?.volume : product?.volume;
+  const displayRrp = isPlaceholder ? placeholderData?.rrp : product?.rrp;
+  const isDev = !isPlaceholder && product?.source === 'dev';
+  const cardClasses = [
+    'matrix-card',
+    isDragging ? 'dragging' : '',
+    isPlaceholder ? 'placeholder' : '',
+    isDev ? 'dev-product' : '',
+    isGhosted ? 'ghosted' : '',
+  ].filter(Boolean).join(' ');
 
   return (
-    <div ref={setNodeRef} className={`matrix-card ${isDragging ? 'dragging' : ''} ${isPlaceholder ? 'placeholder' : ''} ${isGhosted ? 'ghosted' : ''}`}
+    <div ref={setNodeRef} className={cardClasses}
+      onDoubleClick={(e) => { if (isPlaceholder && onEdit) { e.stopPropagation(); onEdit(); } }}
       {...attributes} {...listeners}>
       <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}><CloseIcon size={8} color="#fff" /></button>
+      {isDev && <div className="matrix-card-dev-badge">DEV</div>}
       {cardFormat.showImage && (
         <div className="matrix-card-image">
-          {product?.imageUrl ? (
-            <img src={product.imageUrl} alt={name} />
+          {displayImageUrl ? (
+            <img src={displayImageUrl} alt={displayName} />
           ) : (
-            <div className="matrix-card-image-ph">{isPlaceholder ? '+' : name.charAt(0)}</div>
+            <div className="matrix-card-image-ph">{isPlaceholder ? '+' : displayName.charAt(0)}</div>
           )}
         </div>
       )}
-      {cardFormat.showName && <div className="matrix-card-name" title={name}>{name}</div>}
-      {cardFormat.showSku && <div className="matrix-card-sku">{product?.sku || '—'}</div>}
-      {cardFormat.showRrp && <div className="matrix-card-rrp">RRP: {product?.rrp || '—'}</div>}
-      {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {product?.volume ? product.volume.toLocaleString() : '—'}</div>}
+      {cardFormat.showName && <div className="matrix-card-name" title={displayName}>{displayName}</div>}
+      {cardFormat.showSku && <div className="matrix-card-sku">{displaySku || '—'}</div>}
+      {cardFormat.showRrp && <div className="matrix-card-rrp">RRP: {displayRrp || '—'}</div>}
+      {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {displayVolume ? displayVolume.toLocaleString() : '—'}</div>}
     </div>
   );
 }
@@ -234,12 +255,17 @@ function UnassignedDraggable({ itemId, name }: { itemId: string; name: string })
 
 export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignProps) {
   const {
-    project, addItemToShelf,
+    project, addItemToShelf, updateShelfItem,
     updateMatrixLayout, setMatrixAssignment,
     activeVariantId, showGhosted,
   } = useProjectStore();
 
   const [editingTitle, setEditingTitle] = useState(false);
+  const [placeholderDialog, setPlaceholderDialog] = useState<
+    | { mode: 'create'; row: number; col: number }
+    | { mode: 'edit'; itemId: string; data: PlaceholderData }
+    | null
+  >(null);
   const [editingAxis, setEditingAxis] = useState<{ axis: 'x' | 'y'; index: number } | null>(null);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -414,15 +440,37 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
   const handleAddPlaceholder = useCallback((row: number, col: number) => {
     if (!shelf) return;
-    const name = prompt('Placeholder name (e.g. "New Premium SKU"):');
-    if (name === null) return;
-    const newItemId = `placeholder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    addItemToShelf(shelfId, {
-      id: newItemId, productId: '', position: shelf.items.length,
-      isPlaceholder: true, placeholderName: name || 'New SKU',
-    });
-    setTimeout(() => setMatrixAssignment(shelfId, newItemId, row, col), 0);
-  }, [shelf, shelfId, addItemToShelf, setMatrixAssignment]);
+    setPlaceholderDialog({ mode: 'create', row, col });
+  }, [shelf]);
+
+  const handleEditPlaceholder = useCallback((itemId: string) => {
+    if (!shelf) return;
+    const item = shelf.items.find((i) => i.id === itemId);
+    if (!item || !item.isPlaceholder) return;
+    const data: PlaceholderData = item.placeholderData || {
+      sku: '', name: item.placeholderName || '', category: '', subCategory: '', function: '',
+      productFamily: '', volume: 0, rrp: 0, revenue: 0, source: 'live',
+    };
+    setPlaceholderDialog({ mode: 'edit', itemId, data });
+  }, [shelf]);
+
+  const handlePlaceholderSave = useCallback((data: PlaceholderData) => {
+    if (!placeholderDialog || !shelf) return;
+    if (placeholderDialog.mode === 'create') {
+      const newItemId = `placeholder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      addItemToShelf(shelfId, {
+        id: newItemId, productId: '', position: shelf.items.length,
+        isPlaceholder: true, placeholderName: data.name, placeholderData: data,
+      });
+      setTimeout(() => setMatrixAssignment(shelfId, newItemId, placeholderDialog.row, placeholderDialog.col), 0);
+    } else {
+      updateShelfItem(shelfId, placeholderDialog.itemId, {
+        placeholderName: data.name,
+        placeholderData: data,
+      });
+    }
+    setPlaceholderDialog(null);
+  }, [placeholderDialog, shelf, shelfId, addItemToShelf, setMatrixAssignment, updateShelfItem]);
 
   const addLabel = useCallback((axis: 'x' | 'y') => {
     const text = prompt(`New ${axis === 'x' ? 'column' : 'row'} label:`);
@@ -459,6 +507,21 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     setEditingTitle(false);
   }, [activePlan, updateMatrixLayout]);
 
+  // Build set of existing SKUs for placeholder validation
+  const existingSkusForDialog = useMemo(() => {
+    if (!project) return new Set<string>();
+    const skus = new Set<string>();
+    project.catalogue.forEach((p) => p.sku && skus.add(p.sku));
+    project.plans.forEach((plan) => {
+      [...plan.currentShelf.items, ...plan.futureShelf.items].forEach((item) => {
+        if (!item.isPlaceholder || !item.placeholderData) return;
+        if (placeholderDialog?.mode === 'edit' && placeholderDialog.itemId === item.id) return;
+        if (item.placeholderData.sku) skus.add(item.placeholderData.sku);
+      });
+    });
+    return skus;
+  }, [project, placeholderDialog]);
+
   if (!shelf || !project) return null;
 
   const assignedItemIds = new Set(layout.assignments.map((a) => a.itemId));
@@ -470,22 +533,22 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="range-design-canvas">
           <div className="range-design-title-bar">
-            {editingTitle ? (
-              <input className="range-design-title-input" defaultValue={activePlan?.name || layout.title} autoFocus
-                onBlur={(e) => updateTitle(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && updateTitle((e.target as HTMLInputElement).value)} />
-            ) : (
-              <>
+            <PillToggle value={shelfId} onChange={onShelfChange} />
+          </div>
+
+          <div className="matrix-16-9">
+            <div className="slide-title">
+              {editingTitle ? (
+                <input className="range-design-title-input" defaultValue={activePlan?.name || layout.title} autoFocus
+                  onBlur={(e) => updateTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && updateTitle((e.target as HTMLInputElement).value)} />
+              ) : (
                 <h2 className="range-design-title" onDoubleClick={() => setEditingTitle(true)} title="Double-click to edit">
                   {activePlan?.name || layout.title}
                   {activeVariant && <span className="variant-badge">{activeVariant.name}</span>}
                 </h2>
-                <PillToggle value={shelfId} onChange={onShelfChange} />
-              </>
-            )}
-          </div>
-
-          <div className="matrix-16-9">
+              )}
+            </div>
             <div className="matrix-wrapper" ref={wrapperRef}>
               <div className="matrix-header-row" style={{ gridTemplateColumns: gridCols }}>
                 <div />
@@ -519,6 +582,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                       shelf={shelf} catalogue={catalogue}
                       cardWidth={cardWidth}
                       onAddPlaceholder={handleAddPlaceholder}
+                      onEditPlaceholder={handleEditPlaceholder}
                       variantIncludedIds={variantIncludedIds}
                       showGhostedProp={showGhosted} />
                   ))}
@@ -559,6 +623,15 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
           )}
         </DragOverlay>
       </DndContext>
+      {placeholderDialog && (
+        <PlaceholderDialog
+          mode={placeholderDialog.mode}
+          initialData={placeholderDialog.mode === 'edit' ? placeholderDialog.data : undefined}
+          existingSkus={existingSkusForDialog}
+          onSave={handlePlaceholderSave}
+          onClose={() => setPlaceholderDialog(null)}
+        />
+      )}
     </div>
   );
 }
