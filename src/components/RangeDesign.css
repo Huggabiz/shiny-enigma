@@ -6,13 +6,13 @@
 
 .range-design-canvas {
   flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  padding: 16px 16px 0 16px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
   background: #f0f0f0;
+  min-width: 0;
+  position: relative;
 }
 
 /* Title */
@@ -78,6 +78,7 @@
    --slide-base-scale CSS variable so the matrix view grows to fit dense
    range plans; visually scaled by --slide-zoom for panning/zooming. */
 .matrix-16-9 {
+  --ui-scale: var(--slide-base-scale, 1);
   width: calc(1100px * var(--slide-base-scale, 1));
   height: calc(619px * var(--slide-base-scale, 1));
   background: #fff;
@@ -93,15 +94,15 @@
 
 .slide-title {
   flex-shrink: 0;
-  padding: 10px 16px 4px;
+  padding: calc(10px * var(--ui-scale, 1)) calc(16px * var(--ui-scale, 1)) calc(4px * var(--ui-scale, 1));
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: calc(10px * var(--ui-scale, 1));
 }
 
 .slide-title .range-design-title {
   margin: 0;
-  font-size: 16px;
+  font-size: calc(16px * var(--ui-scale, 1));
   font-weight: 700;
   color: #1a1a2e;
   display: flex;
@@ -111,19 +112,19 @@
 }
 
 .slide-title .range-design-title-input {
-  font-size: 16px;
+  font-size: calc(16px * var(--ui-scale, 1));
   font-weight: 700;
   color: #1a1a2e;
   border: 1px solid #1976d2;
   border-radius: 4px;
   padding: 2px 8px;
   outline: none;
-  width: 280px;
+  width: calc(280px * var(--ui-scale, 1));
 }
 
 .matrix-wrapper {
   flex: 1;
-  padding: 4px 12px 12px;
+  padding: calc(4px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1)) calc(12px * var(--ui-scale, 1));
   display: flex;
   flex-direction: column;
   overflow: hidden; /* no scrollbars — content must fit */
@@ -132,17 +133,17 @@
 /* Header row */
 .matrix-header-row {
   display: grid;
-  gap: 3px;
-  margin-bottom: 3px;
+  gap: calc(3px * var(--ui-scale, 1));
+  margin-bottom: calc(3px * var(--ui-scale, 1));
   flex-shrink: 0;
 }
 
 .matrix-col-header {
   background: #dce6f0;
-  border-radius: 4px;
-  padding: 6px 4px;
+  border-radius: calc(4px * var(--ui-scale, 1));
+  padding: calc(6px * var(--ui-scale, 1)) calc(4px * var(--ui-scale, 1));
   text-align: center;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-scale, 1));
   font-weight: 700;
   color: #2c3e50;
   position: relative;
@@ -156,19 +157,19 @@
 /* Grid rows — explicit height from JS */
 .matrix-row {
   display: grid;
-  gap: 3px;
-  margin-bottom: 3px;
+  gap: calc(3px * var(--ui-scale, 1));
+  margin-bottom: calc(3px * var(--ui-scale, 1));
   min-height: 0;
 }
 
 .matrix-row-header {
   background: #f0e6d6;
-  border-radius: 4px;
-  padding: 6px 4px;
+  border-radius: calc(4px * var(--ui-scale, 1));
+  padding: calc(6px * var(--ui-scale, 1)) calc(4px * var(--ui-scale, 1));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-scale, 1));
   font-weight: 700;
   color: #5d4e37;
   position: relative;
@@ -215,11 +216,11 @@
 .matrix-cell {
   background: #fafafa;
   border: 1px solid #e8e8e8;
-  border-radius: 6px;
-  padding: 3px;
+  border-radius: calc(6px * var(--ui-scale, 1));
+  padding: calc(3px * var(--ui-scale, 1));
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: calc(3px * var(--ui-scale, 1));
   align-content: flex-start;
   justify-content: center;
   min-height: 0;

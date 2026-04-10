@@ -26,13 +26,6 @@ interface ProductCardProps {
 
 type RrpRegion = 'ukRrp' | 'usRrp' | 'euRrp' | 'ausRrp';
 
-const REGION_LABEL: Record<RrpRegion, string> = {
-  ukRrp: 'UK',
-  usRrp: 'US',
-  euRrp: 'EU',
-  ausRrp: 'AUS',
-};
-
 const REGION_SYMBOL: Record<RrpRegion, string> = {
   ukRrp: '\u00A3',   // £
   usRrp: '$',
@@ -76,13 +69,16 @@ function RrpRow({ product, region, editable, showLabel }: RrpRowProps) {
   }
 
   const symbol = REGION_SYMBOL[region];
-  const regionLabel = showLabel ? `${REGION_LABEL[region]} ` : '';
+  // Matrix view shows the currency symbol only (no "UK " prefix); match it
+  // here so both views read the same. showLabel is kept as a prop for API
+  // stability but currently unused.
+  void showLabel;
   const className = `card-rrp ${region === 'ukRrp' ? '' : `card-rrp-${region.replace('Rrp', '')}`}`;
 
   if (editing && editable) {
     return (
       <span className={className} onClick={(e) => e.stopPropagation()}>
-        {regionLabel}{symbol}
+        {symbol}
         <input
           type="number"
           step="0.01"
@@ -116,7 +112,7 @@ function RrpRow({ product, region, editable, showLabel }: RrpRowProps) {
       onClick={editable ? (e) => { e.stopPropagation(); setEditing(true); } : undefined}
       style={editable ? { cursor: 'pointer' } : undefined}
     >
-      {regionLabel}{displayVal !== undefined && displayVal !== 0 ? formatCurrency(symbol, displayVal) : '—'}
+      {displayVal !== undefined && displayVal !== 0 ? formatCurrency(symbol, displayVal) : '\u2014'}
       {delta !== null && (
         <span className={`card-rrp-delta ${delta > 0 ? 'up' : 'down'}`}>
           {' '}{delta > 0 ? '\u2191' : '\u2193'}{formatCurrency(symbol, Math.abs(delta))}
@@ -249,31 +245,26 @@ export function ProductCard({
           {displayName}
         </div>
       )}
-      {cardProduct && !isCompact && (
+      {cardProduct && (
         <div className="card-stats">
-          {cardFormat.showSku && <span className="card-sku">{displaySku || '—'}</span>}
-          {cardFormat.showVolume && <span className="card-volume">Vol: {cardProduct.volume ? cardProduct.volume.toLocaleString() : '—'}</span>}
-          {cardFormat.showForecastVolume && cardProduct.forecastVolume !== undefined && (
-            <span className="card-forecast">Fcst: {cardProduct.forecastVolume.toLocaleString()}</span>
+          {cardFormat.showSku && !isCompact && <span className="card-sku">{displaySku || '\u2014'}</span>}
+          {cardFormat.showVolume && (
+            <span className="card-volume">{isCompact ? '' : 'Vol: '}{cardProduct.volume ? cardProduct.volume.toLocaleString() : '\u2014'}</span>
           )}
-          {cardFormat.showRrp && <RrpRow product={cardProduct} region="ukRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={true} />}
-          {cardFormat.showUsRrp && <RrpRow product={cardProduct} region="usRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={true} />}
-          {cardFormat.showEuRrp && <RrpRow product={cardProduct} region="euRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={true} />}
-          {cardFormat.showAusRrp && <RrpRow product={cardProduct} region="ausRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={true} />}
-          {cardFormat.showRevenue && <span className="card-revenue">Rev: {cardProduct.revenue ? cardProduct.revenue.toLocaleString() : '—'}</span>}
+          {cardFormat.showForecastVolume && cardProduct.forecastVolume !== undefined && (
+            <span className="card-forecast">{isCompact ? '' : 'Fcst: '}{cardProduct.forecastVolume.toLocaleString()}</span>
+          )}
+          {cardFormat.showRrp && <RrpRow product={cardProduct} region="ukRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={false} />}
+          {cardFormat.showUsRrp && <RrpRow product={cardProduct} region="usRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={false} />}
+          {cardFormat.showEuRrp && <RrpRow product={cardProduct} region="euRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={false} />}
+          {cardFormat.showAusRrp && <RrpRow product={cardProduct} region="ausRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={false} />}
+          {cardFormat.showRevenue && cardProduct.revenue > 0 && (
+            <span className="card-revenue">{isCompact ? '' : 'Rev: '}{cardProduct.revenue.toLocaleString()}</span>
+          )}
           {cardFormat.showForecastRevenue && cardProduct.forecastRevenue !== undefined && (
-            <span className="card-forecast-revenue">Fcst Rev: {cardProduct.forecastRevenue.toLocaleString()}</span>
+            <span className="card-forecast-revenue">{isCompact ? '' : 'Fcst Rev: '}{cardProduct.forecastRevenue.toLocaleString()}</span>
           )}
-          {cardFormat.showCategory && <span className="card-category">{cardProduct.category || '—'}</span>}
-        </div>
-      )}
-      {cardProduct && isCompact && (
-        <div className="card-stats">
-          {cardFormat.showVolume && <span className="card-volume">{cardProduct.volume ? cardProduct.volume.toLocaleString() : '—'}</span>}
-          {cardFormat.showForecastVolume && cardProduct.forecastVolume !== undefined && (
-            <span className="card-forecast">{cardProduct.forecastVolume.toLocaleString()}</span>
-          )}
-          {cardFormat.showRrp && <span className="card-rrp">{cardProduct.rrp || '—'}</span>}
+          {cardFormat.showCategory && !isCompact && <span className="card-category">{cardProduct.category || '\u2014'}</span>}
         </div>
       )}
       {item.isPlaceholder && !cardProduct && !isCompact && (

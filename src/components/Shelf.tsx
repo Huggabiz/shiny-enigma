@@ -219,7 +219,8 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
   // Pack X labels (top row) and Y labels (second row)
   const xLabelRows = useMemo(() => packLabelsIntoRows(derivedXLabels), [derivedXLabels]);
   const yLabelRows = useMemo(() => packLabelsIntoRows(derivedYLabels), [derivedYLabels]);
-  const LABEL_ROW_HEIGHT = 18;
+  const slideBaseScale = useProjectStore((s) => s.slideBaseScale);
+  const LABEL_ROW_HEIGHT = Math.round(18 * slideBaseScale);
 
   return (
     <div className={`shelf-container ${isOver ? 'shelf-over' : ''} ${flipped ? 'flipped' : ''}`}>

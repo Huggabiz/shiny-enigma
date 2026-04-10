@@ -289,7 +289,17 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     project, addItemToShelf, updateShelfItem,
     updateMatrixLayout, setMatrixAssignment,
     activeVariantId, showGhosted,
+    slideBaseScale,
   } = useProjectStore();
+
+  // Scale the chrome dimensions (row/column headers, gaps) with the
+  // slide resolution tier so the labels keep their visual proportions
+  // when the canvas grows.
+  const uiScale = slideBaseScale;
+  const scaledRowHeaderW = Math.round(ROW_HEADER_WIDTH * uiScale);
+  const scaledAddBtnW = Math.round(ADD_BTN_WIDTH * uiScale);
+  const scaledHeaderRowH = Math.round(HEADER_ROW_HEIGHT * uiScale);
+  const scaledAddRowH = Math.round(ADD_ROW_HEIGHT * uiScale);
 
   const [placeholderDialog, setPlaceholderDialog] = useState<
     | { mode: 'create'; row: number; col: number }
@@ -357,8 +367,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     }
 
     const wPad = 24;
-    const availW = wrapperSize.w - wPad - ROW_HEADER_WIDTH - ADD_BTN_WIDTH - (numCols + 1) * GAP;
-    const availH = wrapperSize.h - wPad - HEADER_ROW_HEIGHT - ADD_ROW_HEIGHT - (numRows + 1) * GAP;
+    const availW = wrapperSize.w - wPad - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * GAP;
+    const availH = wrapperSize.h - wPad - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * GAP;
 
     const cellCounts: number[][] = [];
     for (let row = 0; row < numRows; row++) {
@@ -410,9 +420,10 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     }
 
     return { columnWidths: bestColW, rowHeights: bestRowH, cardWidth: bestCW };
-  }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize, variantIncludedIds, showGhosted]);
+  }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize, variantIncludedIds, showGhosted,
+      scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH]);
 
-  const gridCols = `${ROW_HEADER_WIDTH}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${ADD_BTN_WIDTH}px`;
+  const gridCols = `${scaledRowHeaderW}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${scaledAddBtnW}px`;
 
   const cellMap = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -564,12 +575,14 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
           <div className="range-design-title-bar">
             <PillToggle value={shelfId} onChange={onShelfChange} />
             <div className="range-design-canvas-controls">
-              <SlideCanvasControls />
+              <SlideCanvasControls scrollAreaSelector=".range-view-scroll" />
             </div>
           </div>
 
-          <div className="slide-canvas-wrapper">
-          <div className="matrix-16-9">
+          <div className="slide-scroll-area range-view-scroll">
+            <div className="slide-scroll-spacer">
+              <div className="slide-canvas-wrapper">
+              <div className="matrix-16-9">
             <div className="slide-title">
               <EditableTitle
                 className="range-design-title"
@@ -623,7 +636,9 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                 <button className="matrix-add-btn wide" onClick={() => addLabel('y')}>+ Row</button>
               </div>
             </div>
-          </div>
+              </div>
+              </div>
+            </div>
           </div>
 
           {unassigned.length > 0 && (

@@ -109,19 +109,46 @@ function App() {
     };
   }, [slideBaseScale, slideZoom]);
 
-  // Ctrl + scroll anywhere in the workspace zooms the slide. Attach a
-  // non-passive listener via effect so we can preventDefault on the
-  // native wheel event (React's SyntheticEvent is passive by default).
+  // Ctrl + scroll zooms the slide, anchored to the cursor position so the
+  // point under the mouse stays put (PowerPoint-style). Attached at the
+  // window level with non-passive so we can preventDefault the native
+  // wheel event and scroll manually afterwards.
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
-      // Only intercept when the target is inside the shelves-area
-      const target = e.target as HTMLElement;
-      if (!target.closest('.shelves-area')) return;
+      const scrollArea = (e.target as HTMLElement | null)?.closest('.slide-scroll-area') as HTMLElement | null;
+      if (!scrollArea) return;
       e.preventDefault();
-      const delta = e.deltaY < 0 ? 0.08 : -0.08;
+
+      const rect = scrollArea.getBoundingClientRect();
+      const mx = e.clientX - rect.left; // cursor x relative to scroll viewport
+      const my = e.clientY - rect.top;
+      const C = rect.width;
+      const R = rect.height;
+
       const current = useProjectStore.getState().slideZoom;
-      useProjectStore.getState().setSlideZoom(current + delta);
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const next = Math.max(0.3, Math.min(3, current * factor));
+      if (Math.abs(next - current) < 1e-4) return;
+      const ratio = next / current;
+
+      const oldScrollLeft = scrollArea.scrollLeft;
+      const oldScrollTop = scrollArea.scrollTop;
+      // Canvas sits at (C/2, R/2) inside the spacer so the (ratio - 1)
+      // term gets multiplied by cursor offset from viewport centre.
+      const newScrollLeft = ratio * oldScrollLeft + (ratio - 1) * (mx - C / 2);
+      const newScrollTop = ratio * oldScrollTop + (ratio - 1) * (my - R / 2);
+
+      useProjectStore.getState().setSlideZoom(next);
+      // Apply scroll after React commits the zoom and the DOM reflows so
+      // the new scroll bounds are in place. Two RAFs is conservative but
+      // rock-solid across browsers.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollArea.scrollLeft = newScrollLeft;
+          scrollArea.scrollTop = newScrollTop;
+        });
+      });
     };
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
@@ -438,20 +465,22 @@ function App() {
                     <input type="checkbox" checked={showDiscontinued} onChange={(e) => setShowDiscontinued(e.target.checked)} />
                     <span>Show discontinued</span>
                   </label>
-                  <SlideCanvasControls />
+                  <SlideCanvasControls scrollAreaSelector=".transform-view-scroll" />
                   <button className="transform-copy-btn" onClick={copyCurrentToFuture}>Copy Current → Future</button>
                 </div>
               </div>
 
-              <div className="slide-canvas-wrapper">
-              <div className="transform-16-9">
-                <div className="slide-title">
-                  <EditableTitle
-                    className="transform-title"
-                    value={activePlan.name}
-                    onSave={(next) => renamePlan(activePlan.id, next)}
-                    trailing={activeVariant ? <span className="variant-badge">{activeVariant.name}</span> : null}
-                  />
+              <div className="slide-scroll-area transform-view-scroll">
+                <div className="slide-scroll-spacer">
+                  <div className="slide-canvas-wrapper">
+                  <div className="transform-16-9">
+                    <div className="slide-title">
+                      <EditableTitle
+                        className="transform-title"
+                        value={activePlan.name}
+                        onSave={(next) => renamePlan(activePlan.id, next)}
+                        trailing={activeVariant ? <span className="variant-badge">{activeVariant.name}</span> : null}
+                      />
                 </div>
 
                 <Shelf shelf={activePlan.currentShelf} catalogue={project!.catalogue}
@@ -479,7 +508,9 @@ function App() {
                   discontinuedItems={discontinuedItems}
                   showDiscontinued={showDiscontinued}
                   flipped={true} />
-              </div>
+                  </div>
+                  </div>
+                </div>
               </div>
 
               {linkMode && linkSourceItem && (

@@ -14,13 +14,64 @@
 
 .shelves-area {
   flex: 1;
-  padding: 16px;
-  overflow: auto;
+  padding: 16px 16px 0 16px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: center;
   position: relative;
+  min-width: 0;
+}
+
+/* Scroll area for the canvas — has its own x+y scroll independent of the
+   title bar so the title stays pinned and the slide itself pans. */
+.slide-scroll-area {
+  flex: 1 1 auto;
+  overflow: auto;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Spacer fills the scroll area with padding of half the viewport on each
+   side so the slide's edges can be scrolled to the middle of the screen
+   (and the slide is centred when it fits). Min dimensions are the slide
+   size plus a full viewport of bleed. */
+.slide-scroll-spacer {
+  min-width: calc(1100px * var(--slide-base-scale, 1) * var(--slide-zoom, 1) + 100%);
+  min-height: calc(619px * var(--slide-base-scale, 1) * var(--slide-zoom, 1) + 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* 16:9 transform canvas — width/height multiplied by --slide-base-scale
+   so the canvas grows to fit denser range plans, and visually scaled by
+   --slide-zoom for panning/zooming without changing layout. The outer
+   wrapper takes the final scaled bounds so scroll still works. */
+.slide-canvas-wrapper {
+  width: calc(1100px * var(--slide-base-scale, 1) * var(--slide-zoom, 1));
+  height: calc(619px * var(--slide-base-scale, 1) * var(--slide-zoom, 1));
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.transform-16-9 {
+  --ui-scale: var(--slide-base-scale, 1);
+  width: calc(1100px * var(--slide-base-scale, 1));
+  height: calc(619px * var(--slide-base-scale, 1));
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  transform: scale(var(--slide-zoom, 1));
+  transform-origin: top left;
 }
 
 .transform-title-bar {
@@ -43,41 +94,49 @@
   gap: 8px;
 }
 
-/* 16:9 transform canvas — width/height multiplied by --slide-base-scale
-   so the canvas grows to fit denser range plans, and visually scaled by
-   --slide-zoom for panning/zooming without changing layout. The outer
-   wrapper takes the final scaled bounds so scroll still works. */
-.slide-canvas-wrapper {
-  width: calc(1100px * var(--slide-base-scale, 1) * var(--slide-zoom, 1));
-  height: calc(619px * var(--slide-base-scale, 1) * var(--slide-zoom, 1));
-  flex-shrink: 0;
-  display: flex;
-  justify-content: flex-start;
-}
-
-.transform-16-9 {
-  width: calc(1100px * var(--slide-base-scale, 1));
-  height: calc(619px * var(--slide-base-scale, 1));
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  flex-shrink: 0;
-  transform: scale(var(--slide-zoom, 1));
-  transform-origin: top left;
-}
-
 .transform-16-9 .slide-title {
   flex-shrink: 0;
-  padding: 8px 16px 4px;
+  padding: calc(8px * var(--ui-scale, 1)) calc(16px * var(--ui-scale, 1)) calc(4px * var(--ui-scale, 1));
+}
+
+.transform-16-9 .transform-title {
+  font-size: calc(18px * var(--ui-scale, 1));
+}
+
+.transform-16-9 .variant-badge {
+  font-size: calc(11px * var(--ui-scale, 1));
+  padding: calc(2px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  border-radius: calc(10px * var(--ui-scale, 1));
 }
 
 .transform-16-9 .shelf-container {
   background: transparent;
-  padding: 4px 16px;
+  padding: calc(4px * var(--ui-scale, 1)) calc(16px * var(--ui-scale, 1));
   flex-shrink: 0;
+}
+
+.transform-16-9 .shelf-title {
+  font-size: calc(12px * var(--ui-scale, 1));
+  letter-spacing: calc(0.3px * var(--ui-scale, 1));
+}
+
+.transform-16-9 .shelf-header {
+  margin-bottom: calc(4px * var(--ui-scale, 1));
+}
+
+.transform-16-9 .shelf-container.flipped .shelf-header {
+  margin-bottom: 0;
+  margin-top: calc(4px * var(--ui-scale, 1));
+}
+
+.transform-16-9 .shelf-derived-label {
+  font-size: calc(9px * var(--ui-scale, 1));
+  padding: 0 calc(4px * var(--ui-scale, 1));
+  border-radius: calc(4px * var(--ui-scale, 1));
+}
+
+.transform-16-9 .shelf-derived-label.y-label {
+  font-size: calc(8px * var(--ui-scale, 1));
 }
 
 .transform-16-9 .sankey-container {
