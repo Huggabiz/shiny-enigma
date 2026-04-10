@@ -16,6 +16,12 @@ const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: str
   category: { label: 'Category', hint: 'Top-level product category (e.g. "Skincare")', required: true },
   subCategory: { label: 'Sub-Category', hint: 'Category subdivision (e.g. "Moisturisers")', required: false, aliases: ['sub category', 'subcategory'] },
   productFamily: { label: 'Product Family', hint: 'Product family grouping', required: false },
+  sapCollection: {
+    label: 'SAP Collection',
+    hint: 'Core or Duo — used as a catalogue filter',
+    required: false,
+    aliases: ['collection', 'sap collection'],
+  },
   volume: {
     label: 'Volume',
     hint: 'Last year\'s actual sales volume (numeric)',

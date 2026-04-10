@@ -18,7 +18,7 @@ import { PillToggle } from './PillToggle';
 import { PlaceholderDialog } from './PlaceholderDialog';
 import { EditableTitle } from './EditableTitle';
 import { SlideCanvasControls } from './SlideCanvasControls';
-import type { Product, Shelf, MatrixLayout, PlaceholderData } from '../types';
+import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem } from '../types';
 import { getActivePlan } from '../types';
 import './RangeDesign.css';
 
@@ -147,7 +147,7 @@ function computeLayout(
   return { fits: true, colWidths, rowHeights };
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp }: {
+function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf }: {
   row: number; col: number; itemIds: string[];
   shelf: Shelf; catalogue: Product[];
   cardWidth: number;
@@ -155,6 +155,10 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
   onEditPlaceholder?: (itemId: string) => void;
   variantIncludedIds: Set<string> | null;
   showGhostedProp: boolean;
+  /** Current-shelf ShelfItems that aren't in the future shelf. Only
+   * rendered when this cell is in the future matrix. */
+  discontinuedItems?: ShelfItem[];
+  isFutureShelf: boolean;
 }) {
   const cellId = `matrix-cell-${row}-${col}`;
   const { setNodeRef, isOver } = useDroppable({ id: cellId });
@@ -179,6 +183,7 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
             isPlaceholder={item.isPlaceholder} placeholderName={item.placeholderName}
             placeholderData={item.placeholderData}
             isGhosted={isGhosted}
+            isFutureShelf={isFutureShelf}
             onEdit={item.isPlaceholder && onEditPlaceholder ? () => onEditPlaceholder(item.id) : undefined}
             onRemove={() => {
               if (storeVariantId) {
@@ -190,15 +195,30 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
             }} />
         );
       })}
+      {/* Discontinued ghost cards — rendered at the current-shelf position
+          but styled red so the user can see what dropped out of the range. */}
+      {discontinuedItems?.map((item) => {
+        const product = catalogue.find((p) => p.id === item.productId);
+        return (
+          <MatrixProductCard key={`disc-${item.id}`} itemId={item.id} product={product}
+            isPlaceholder={false}
+            isDiscontinued={true}
+            isFutureShelf={true}
+            onRemove={() => { /* discontinued cards are read-only */ }} />
+        );
+      })}
       <button className="matrix-cell-add-ph" onClick={() => onAddPlaceholder(row, col)} title="Add placeholder SKU">+</button>
     </div>
   );
 }
 
-function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, placeholderData, isGhosted, onRemove, onEdit }: {
+function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, placeholderData, isGhosted, isDiscontinued, isFutureShelf, onRemove, onEdit }: {
   itemId: string; product?: Product; isPlaceholder: boolean;
   placeholderName?: string; placeholderData?: import('../types').PlaceholderData;
-  isGhosted?: boolean; onRemove: () => void; onEdit?: () => void;
+  isGhosted?: boolean;
+  isDiscontinued?: boolean;
+  isFutureShelf?: boolean;
+  onRemove: () => void; onEdit?: () => void;
 }) {
   const cardFormat = useProjectStore((s) => s.cardFormat);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -211,10 +231,21 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   const displayImageUrl = isPlaceholder ? placeholderData?.imageUrl : product?.imageUrl;
   const displayVolume = isPlaceholder ? placeholderData?.volume : product?.volume;
   const displayForecast = isPlaceholder ? placeholderData?.forecastVolume : product?.forecastVolume;
-  const displayRrp = isPlaceholder ? placeholderData?.rrp : product?.rrp;
-  const displayUsRrp = isPlaceholder ? placeholderData?.usRrp : product?.usRrp;
-  const displayEuRrp = isPlaceholder ? placeholderData?.euRrp : product?.euRrp;
-  const displayAusRrp = isPlaceholder ? placeholderData?.ausRrp : product?.ausRrp;
+  // Future-shelf cards read the future-pricing override when present so
+  // edits made in the transform view's future shelf ripple through here.
+  const futureOverride = !isPlaceholder && isFutureShelf ? product?.futurePricing?.default : undefined;
+  const displayRrp = isPlaceholder
+    ? placeholderData?.rrp
+    : (futureOverride?.ukRrp ?? product?.rrp);
+  const displayUsRrp = isPlaceholder
+    ? placeholderData?.usRrp
+    : (futureOverride?.usRrp ?? product?.usRrp);
+  const displayEuRrp = isPlaceholder
+    ? placeholderData?.euRrp
+    : (futureOverride?.euRrp ?? product?.euRrp);
+  const displayAusRrp = isPlaceholder
+    ? placeholderData?.ausRrp
+    : (futureOverride?.ausRrp ?? product?.ausRrp);
   const displayRevenue = isPlaceholder ? placeholderData?.revenue : product?.revenue;
   const displayFcstRev = isPlaceholder ? placeholderData?.forecastRevenue : product?.forecastRevenue;
   const displayCategory = isPlaceholder ? placeholderData?.category : product?.category;
@@ -225,6 +256,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
     isPlaceholder ? 'placeholder' : '',
     isDev ? 'dev-product' : '',
     isGhosted ? 'ghosted' : '',
+    isDiscontinued ? 'ghosted-discontinued' : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -580,6 +612,26 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     });
   }, [activePlan, shelfId, showDiscontinued]);
 
+  // Group discontinued items by the cell they occupied in the CURRENT
+  // shelf's matrix so we can render them as ghost cards in the future
+  // matrix at their original (row, col) positions.
+  const discontinuedByCell = useMemo(() => {
+    const map = new Map<string, ShelfItem[]>();
+    if (discontinuedItems.length === 0 || !activePlan) return map;
+    const currentLayout = activePlan.currentShelf.matrixLayout;
+    if (!currentLayout) return map;
+    const byId = new Map<string, ShelfItem>(discontinuedItems.map((i) => [i.id, i]));
+    for (const a of currentLayout.assignments) {
+      const item = byId.get(a.itemId);
+      if (!item) continue;
+      const key = `${a.row}-${a.col}`;
+      const arr = map.get(key) || [];
+      arr.push(item);
+      map.set(key, arr);
+    }
+    return map;
+  }, [discontinuedItems, activePlan]);
+
   return (
     <div className="range-design">
       <DndContext sensors={sensors} collisionDetection={closestCenter}
@@ -649,7 +701,9 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                       onAddPlaceholder={handleAddPlaceholder}
                       onEditPlaceholder={handleEditPlaceholder}
                       variantIncludedIds={variantIncludedIds}
-                      showGhostedProp={showGhosted} />
+                      showGhostedProp={showGhosted}
+                      discontinuedItems={discontinuedByCell.get(`${row}-${col}`)}
+                      isFutureShelf={shelfId === 'future'} />
                   ))}
                   <div />
                 </div>
@@ -679,21 +733,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
             </div>
           )}
 
-          {discontinuedItems.length > 0 && (
-            <div className="unassigned-tray discontinued-tray">
-              <span className="unassigned-label">Discontinued from current range ({discontinuedItems.length}):</span>
-              <div className="unassigned-items">
-                {discontinuedItems.map((item) => {
-                  const product = catalogue.find((p) => p.id === item.productId);
-                  return (
-                    <span key={item.id} className="unassigned-item discontinued">
-                      {product?.name || item.productId}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+
+
         </div>
 
         <Catalogue products={catalogue} onImport={onImport}

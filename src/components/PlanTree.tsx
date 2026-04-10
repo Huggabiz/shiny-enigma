@@ -28,7 +28,9 @@ export function PlanTree() {
     project, addPlan, removePlan, setActivePlan, setShowPlanTree,
     activeVariantId, setActiveVariant, addVariant, removeVariant,
   } = useProjectStore();
-  const [expandedPlans, setExpandedPlans] = useState<Set<string>>(new Set());
+  // Track collapsed plans (not expanded) so new plans default to
+  // expanded — the user expects to see variants straight away.
+  const [collapsedPlans, setCollapsedPlans] = useState<Set<string>>(new Set());
   const [nameDialog, setNameDialog] = useState<
     | { kind: 'plan' }
     | { kind: 'variant'; planId: string }
@@ -69,7 +71,7 @@ export function PlanTree() {
   const existingVariantNames = variantPlan?.variants.map((v) => v.name) ?? [];
 
   const toggleExpand = (planId: string) => {
-    setExpandedPlans((prev) => {
+    setCollapsedPlans((prev) => {
       const next = new Set(prev);
       if (next.has(planId)) next.delete(planId); else next.add(planId);
       return next;
@@ -92,7 +94,7 @@ export function PlanTree() {
             <div className="plan-tree-category">{category}</div>
             {plans.map((plan) => {
               const isActive = plan.id === project.activePlanId;
-              const isExpanded = expandedPlans.has(plan.id);
+              const isExpanded = !collapsedPlans.has(plan.id);
               const itemCount = plan.currentShelf.items.length + plan.futureShelf.items.length;
 
               return (

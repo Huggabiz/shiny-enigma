@@ -423,12 +423,17 @@ interface CapturedCard {
 }
 
 interface PlanCapture {
-  // Map<itemId, CapturedCard> for both shelves combined (transform slide)
-  cardImages: Map<string, CapturedCard>;
-  // Map<itemId, CapturedCard> for matrix cards in each shelf (design slides)
+  /** Transform-slide current-shelf cards keyed by item.id */
+  transformCurrentCards: Map<string, CapturedCard>;
+  /** Transform-slide future-shelf cards (including discontinued
+   * ghost cards) keyed by item.id. Discontinued cards share their
+   * item.id with the current shelf, so this map is separate from
+   * transformCurrentCards to avoid cross-shelf key collisions. */
+  transformFutureCards: Map<string, CapturedCard>;
+  /** Matrix design-slide cards for each shelf */
   matrixCurrentCards: Map<string, CapturedCard>;
   matrixFutureCards: Map<string, CapturedCard>;
-  // PNG data URL for the whole sankey band, or null if nothing to draw
+  /** PNG data URL for the whole sankey band, or null if nothing to draw */
   sankeyImage: string | null;
 }
 
@@ -443,13 +448,16 @@ function waitForNextPaint(): Promise<void> {
 async function captureCardsInShelf(selector: string): Promise<Map<string, CapturedCard>> {
   const out = new Map<string, CapturedCard>();
   const cards = document.querySelectorAll<HTMLElement>(selector);
+  // 8px margin around each card so the full border + any overflowing
+  // New / DEV badges (which live at top/left: -6px) are included in the
+  // rasterised image. The aspect ratio is computed from the canvas's
+  // actual pixel dimensions so the PPT side places the image at the
+  // correct proportions.
+  const PAD_CSS_PX = 8;
   for (const card of Array.from(cards)) {
     const id = card.getAttribute('data-item-id');
     if (!id) continue;
     try {
-      // Grab the card's DOM pixel box BEFORE rasterising so we have the
-      // exact aspect ratio to use on the PPT side. offsetWidth/offsetHeight
-      // exclude CSS transform: scale() — we're in layout pixel space.
       const widthPx = card.offsetWidth;
       const heightPx = card.offsetHeight;
       if (widthPx <= 0 || heightPx <= 0) continue;
@@ -458,17 +466,16 @@ async function captureCardsInShelf(selector: string): Promise<Map<string, Captur
         scale: 2,
         useCORS: true,
         logging: false,
-        // Clip html2canvas to the card's bounding box so overflowing
-        // badges (New / DEV circles that extend past the corner) don't
-        // inflate the canvas and skew the aspect ratio.
-        width: widthPx,
-        height: heightPx,
-        x: 0,
-        y: 0,
+        width: widthPx + PAD_CSS_PX * 2,
+        height: heightPx + PAD_CSS_PX * 2,
+        x: -PAD_CSS_PX,
+        y: -PAD_CSS_PX,
       });
       out.set(id, {
         dataUrl: canvas.toDataURL('image/png'),
-        aspect: heightPx / widthPx,
+        // Use the actual canvas dimensions so PPT placement uses the
+        // same aspect as the rasterised image, not the card's inner box.
+        aspect: canvas.height / canvas.width,
       });
     } catch (err) {
       // Swallow CORS / tainted canvas errors — the caller will fall back to
@@ -519,17 +526,18 @@ async function captureSankey(): Promise<string | null> {
   });
 }
 
-async function captureTransformSlide(): Promise<{ cardImages: Map<string, CapturedCard>; sankeyImage: string | null }> {
-  const cardImages = new Map<string, CapturedCard>();
-  // Current shelf cards
-  const currentCards = await captureCardsInShelf('.shelf-container:not(.flipped) .product-card[data-item-id]');
-  for (const [id, cap] of currentCards) cardImages.set(id, cap);
-  // Future shelf cards (includes discontinued ghost cards)
-  const futureCards = await captureCardsInShelf('.shelf-container.flipped .product-card[data-item-id]');
-  for (const [id, cap] of futureCards) cardImages.set(id, cap);
-
+async function captureTransformSlide(): Promise<{
+  current: Map<string, CapturedCard>;
+  future: Map<string, CapturedCard>;
+  sankeyImage: string | null;
+}> {
+  // Keep current and future captures separate so a discontinued ghost
+  // card rendered in the future shelf doesn't overwrite the regular
+  // current-shelf capture for the same item.id.
+  const current = await captureCardsInShelf('.shelf-container:not(.flipped) .product-card[data-item-id]');
+  const future = await captureCardsInShelf('.shelf-container.flipped .product-card[data-item-id]');
   const sankeyImage = await captureSankey();
-  return { cardImages, sankeyImage };
+  return { current, future, sankeyImage };
 }
 
 async function captureMatrixCards(): Promise<Map<string, CapturedCard>> {
@@ -560,7 +568,7 @@ function addTransformSlide(
   // Current range — pinned near the top
   const currentY = 1.2;
   const currentLayout = computeShelfLayout(plan.currentShelf.items.length, railLeft, railWidth, currentY, cardH);
-  drawShelfRow(slide, plan.currentShelf, catalogue, currentLayout, currentY - 0.48, false, 'Current Range', capture?.cardImages || null);
+  drawShelfRow(slide, plan.currentShelf, catalogue, currentLayout, currentY - 0.48, false, 'Current Range', capture?.transformCurrentCards || null);
 
   // Discontinued items — products present in the current shelf whose
   // productId is missing from the future shelf. The web canvas shows these
@@ -585,7 +593,7 @@ function addTransformSlide(
     futureCardY + cardH + 0.26,
     true,
     'Future Range',
-    capture?.cardImages || null,
+    capture?.transformFutureCards || null,
     discontinuedItems.length > 0 ? discontinuedItems : undefined,
   );
 
@@ -929,7 +937,7 @@ export async function exportToPptx(
     report(`${step} — transform slide\u2026`);
     store.setActiveView('transform');
     await settle();
-    let transform: { cardImages: Map<string, CapturedCard>; sankeyImage: string | null } | null = null;
+    let transform: { current: Map<string, CapturedCard>; future: Map<string, CapturedCard>; sankeyImage: string | null } | null = null;
     try {
       transform = await captureTransformSlide();
     } catch (err) {
@@ -960,7 +968,8 @@ export async function exportToPptx(
     }
 
     captures.set(plan.id, {
-      cardImages: transform?.cardImages ?? new Map(),
+      transformCurrentCards: transform?.current ?? new Map(),
+      transformFutureCards: transform?.future ?? new Map(),
       sankeyImage: transform?.sankeyImage ?? null,
       matrixCurrentCards,
       matrixFutureCards,

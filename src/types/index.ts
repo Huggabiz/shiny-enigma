@@ -6,6 +6,8 @@ export interface FuturePricing {
   ausRrp?: number;
 }
 
+export type SapCollection = 'Core' | 'Duo';
+
 // Core product type matching the data schema
 export interface Product {
   id: string;
@@ -14,6 +16,7 @@ export interface Product {
   category: string;
   subCategory: string;
   productFamily: string;
+  sapCollection?: SapCollection;  // "Collection" column from the SAP export
   volume: number;           // last year's volume (actual)
   forecastVolume?: number;  // next year's volume (forecast)
   rrp: number;              // UK RRP
@@ -38,6 +41,7 @@ export interface PlaceholderData {
   category: string;
   subCategory: string;
   productFamily: string;
+  sapCollection?: SapCollection;
   volume: number;
   forecastVolume?: number;
   rrp: number;
@@ -223,6 +227,7 @@ export interface ColumnMapping {
   category: string;
   subCategory: string;
   productFamily: string;
+  sapCollection: string;
   volume: string;
   forecastVolume: string;
   rrp: string;
@@ -241,6 +246,7 @@ export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
   category: 'Category',
   subCategory: 'Sub-Category',
   productFamily: 'Product Family',
+  sapCollection: 'SAP Collection',
   volume: 'Volume',
   forecastVolume: 'Forecast Volume',
   rrp: 'RRP',

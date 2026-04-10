@@ -1,6 +1,14 @@
 import * as XLSX from 'xlsx';
-import type { Product, ColumnMapping } from '../types';
+import type { Product, ColumnMapping, SapCollection } from '../types';
 import { DEFAULT_COLUMN_MAPPING } from '../types';
+
+function normaliseSapCollection(raw: unknown): SapCollection | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const v = String(raw).trim().toLowerCase();
+  if (v === 'core') return 'Core';
+  if (v === 'duo') return 'Duo';
+  return undefined;
+}
 
 export function parseSpreadsheet(
   data: ArrayBuffer,
@@ -33,6 +41,7 @@ export function parseSpreadsheet(
       category: String(row[mapping.category] ?? ''),
       subCategory: String(row[mapping.subCategory] ?? ''),
       productFamily: String(row[mapping.productFamily] ?? ''),
+      sapCollection: normaliseSapCollection(row[mapping.sapCollection]),
       volume: Number(row[mapping.volume]) || 0,
       forecastVolume: numOrUndef(row[mapping.forecastVolume]),
       rrp: Number(row[mapping.rrp]) || 0,

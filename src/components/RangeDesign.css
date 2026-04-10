@@ -311,6 +311,29 @@
   pointer-events: none;
 }
 
+/* Discontinued ghost — product was in the current shelf but not in the
+   future shelf. Rendered at the current-shelf matrix position in red so
+   the user can see what dropped out of the range in context. */
+.matrix-card.ghosted-discontinued {
+  background: rgba(244, 67, 54, 0.12) !important;
+  border: 2px dashed #f44336 !important;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.matrix-card.ghosted-discontinued .matrix-card-image,
+.matrix-card.ghosted-discontinued .matrix-card-name,
+.matrix-card.ghosted-discontinued .matrix-card-sku,
+.matrix-card.ghosted-discontinued .matrix-card-rrp,
+.matrix-card.ghosted-discontinued .matrix-card-vol,
+.matrix-card.ghosted-discontinued .matrix-card-forecast {
+  opacity: 0.7;
+}
+
+.matrix-card.ghosted-discontinued .matrix-card-remove {
+  display: none;
+}
+
 .matrix-card-remove {
   position: absolute;
   top: -5px;

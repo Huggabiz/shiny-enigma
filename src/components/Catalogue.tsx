@@ -152,7 +152,7 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   const categoryFilter = catalogueFilters.category;
   const subCategoryFilter = catalogueFilters.subCategory;
   const familyFilter = catalogueFilters.family;
-  const { showLive, showDev, hideUsed } = catalogueFilters;
+  const { showLive, showDev, showCore, showDuo, hideUsed } = catalogueFilters;
   const setSearch = (v: string) => setCatalogueFilters({ search: v });
   const setCategoryFilter = (v: string) => setCatalogueFilters({ category: v, subCategory: '' });
   const setSubCategoryFilter = (v: string) => setCatalogueFilters({ subCategory: v });
@@ -191,6 +191,12 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
       // Live/Dev filter: anything without an explicit 'dev' source counts as live.
       const isDev = p.source === 'dev';
       const matchesSource = isDev ? showDev : showLive;
+      // SAP Collection filter (Core / Duo). Products without a collection
+      // tag stay visible regardless of the toggle state.
+      let matchesCollection: boolean;
+      if (p.sapCollection === 'Core') matchesCollection = showCore;
+      else if (p.sapCollection === 'Duo') matchesCollection = showDuo;
+      else matchesCollection = true;
       // Hide Used: only applies in range-design view (designShelfId set),
       // and hides items already placed in the shelf being designed.
       const matchesHideUsed = !designShelfId || !hideUsed
@@ -198,9 +204,9 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
         : (designShelfId === 'current'
             ? !currentProductIds.has(p.id)
             : !futureProductIds.has(p.id));
-      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource && matchesHideUsed;
+      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource && matchesCollection && matchesHideUsed;
     });
-  }, [products, search, categoryFilter, subCategoryFilter, familyFilter, showLive, showDev, hideUsed, designShelfId, currentProductIds, futureProductIds]);
+  }, [products, search, categoryFilter, subCategoryFilter, familyFilter, showLive, showDev, showCore, showDuo, hideUsed, designShelfId, currentProductIds, futureProductIds]);
 
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
@@ -304,6 +310,22 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
               onChange={(e) => setCatalogueFilters({ showDev: e.target.checked })}
             />
             <span>Dev</span>
+          </label>
+          <label title="Show products tagged as SAP Collection: Core">
+            <input
+              type="checkbox"
+              checked={showCore}
+              onChange={(e) => setCatalogueFilters({ showCore: e.target.checked })}
+            />
+            <span>Core</span>
+          </label>
+          <label title="Show products tagged as SAP Collection: Duo">
+            <input
+              type="checkbox"
+              checked={showDuo}
+              onChange={(e) => setCatalogueFilters({ showDuo: e.target.checked })}
+            />
+            <span>Duo</span>
           </label>
           {designShelfId && (
             <label title={`Hide items already placed in the ${designShelfId} shelf`}>

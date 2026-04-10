@@ -30,8 +30,8 @@ interface ProjectStore {
   assumeContinuity: boolean;
   cardFormat: CardFormat;
   showPlanTree: boolean;
-  catalogueFilters: { search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; hideUsed: boolean };
-  setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; hideUsed: boolean }>) => void;
+  catalogueFilters: { search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean };
+  setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean }>) => void;
 
   // Views — lifted out of App local state so the export loop can drive them
   activeView: 'transform' | 'range-design';
@@ -137,7 +137,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   activeVariantId: null,
   showGhosted: true,
   showDiscontinued: true,
-  catalogueFilters: { search: '', category: '', subCategory: '', family: '', showLive: true, showDev: true, hideUsed: false },
+  catalogueFilters: { search: '', category: '', subCategory: '', family: '', showLive: true, showDev: true, showCore: true, showDuo: true, hideUsed: false },
   setCatalogueFilters: (f) => set((s) => ({ catalogueFilters: { ...s.catalogueFilters, ...f } })),
 
   activeView: 'range-design',
