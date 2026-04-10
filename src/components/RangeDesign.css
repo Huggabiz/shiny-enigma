@@ -494,6 +494,24 @@
   opacity: 0.3;
 }
 
+/* Discontinued tray — reuses .unassigned-tray skeleton but with a red
+   tint so it's clearly distinct from the "not placed in matrix" tray. */
+.unassigned-tray.discontinued-tray {
+  background: rgba(244, 67, 54, 0.08);
+  border-color: #ef9a9a;
+}
+
+.unassigned-tray.discontinued-tray .unassigned-label {
+  color: #c62828;
+}
+
+.unassigned-item.discontinued {
+  border: 1px dashed #ef9a9a;
+  background: rgba(244, 67, 54, 0.05);
+  color: #c62828;
+  font-style: italic;
+}
+
 /* Drag preview */
 .matrix-drag-preview {
   background: #fff;

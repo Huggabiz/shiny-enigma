@@ -17,8 +17,21 @@ export function Toolbar({ activeView }: ToolbarProps) {
     assumeContinuity, setAssumeContinuity,
     clearCatalogue, clearRanges,
     cardFormat, setCardFormat,
+    activeVariantId,
   } = useProjectStore();
   const [exportProgress, setExportProgress] = useState<string | null>(null);
+
+  // Resolve the scope the current format edits apply to — helps the user
+  // know whether they're editing the plan default or the active variant.
+  const activePlan = project ? project.plans.find((p) => p.id === project.activePlanId) : undefined;
+  const activeVariant = activePlan && activeVariantId
+    ? activePlan.variants.find((v) => v.id === activeVariantId)
+    : undefined;
+  const formatScopeLabel = activeVariant
+    ? `Saving to variant: ${activeVariant.name}`
+    : activePlan
+      ? `Saving to plan: ${activePlan.name}`
+      : 'Saving to default';
   const loadRef = useRef<HTMLInputElement>(null);
   const [openMenu, setOpenMenu] = useState<'save' | 'manage' | 'format' | null>(null);
 
@@ -74,6 +87,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
               {openMenu === 'format' && (
                 <div className="toolbar-dropdown format-dropdown" onMouseLeave={closeMenus}>
                   <div className="dropdown-title">Show on cards</div>
+                  <div className="dropdown-scope">{formatScopeLabel}</div>
                   {([
                     ['showImage', 'Image'],
                     ['showName', 'Product Name'],

@@ -107,6 +107,10 @@ export interface RangeVariant {
   name: string;
   includedCurrentItemIds: string[]; // references ShelfItem.id in currentShelf
   includedFutureItemIds: string[];  // references ShelfItem.id in futureShelf
+  /** Optional card-format override — if set, used instead of the
+   * parent plan's format (or the global default) when this variant is
+   * active. Lets e.g. a "US" variant show USD instead of GBP. */
+  cardFormat?: Partial<CardFormat>;
 }
 
 // Per-view slide canvas size settings. 'auto' picks a tier from the
@@ -131,6 +135,9 @@ export interface RangePlan {
   sankeyLinks: SankeyLink[];
   variants: RangeVariant[];
   slideSettings?: PlanSlideSettings;
+  /** Optional card-format override for this plan. Variants within the
+   * plan can further override by setting their own cardFormat. */
+  cardFormat?: Partial<CardFormat>;
 }
 
 // The full project state — now holds multiple range plans

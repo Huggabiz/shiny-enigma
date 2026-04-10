@@ -78,8 +78,10 @@ interface ProjectStore {
   // Variant management
   activeVariantId: string | null;
   showGhosted: boolean;
+  showDiscontinued: boolean;
   setActiveVariant: (variantId: string | null) => void;
   setShowGhosted: (show: boolean) => void;
+  setShowDiscontinued: (show: boolean) => void;
   addVariant: (planId: string, name: string) => void;
   removeVariant: (planId: string, variantId: string) => void;
   renameVariant: (planId: string, variantId: string, name: string) => void;
@@ -134,6 +136,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   showPlanTree: true,
   activeVariantId: null,
   showGhosted: true,
+  showDiscontinued: true,
   catalogueFilters: { search: '', category: '', subCategory: '', family: '', showLive: true, showDev: true, hideUsed: false },
   setCatalogueFilters: (f) => set((s) => ({ catalogueFilters: { ...s.catalogueFilters, ...f } })),
 
@@ -166,7 +169,43 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     });
   },
 
-  setCardFormat: (updates) => set((state) => ({ cardFormat: { ...state.cardFormat, ...updates } })),
+  setCardFormat: (updates) => {
+    const state = get();
+    // Always update the mirrored effective cardFormat so readers
+    // immediately see the change.
+    const nextMirror = { ...state.cardFormat, ...updates };
+    const { project, activeVariantId } = state;
+    if (!project) {
+      set({ cardFormat: nextMirror });
+      return;
+    }
+    const plan = getActivePlan(project);
+    if (!plan) {
+      set({ cardFormat: nextMirror });
+      return;
+    }
+    // Persist: when a variant is active, write to the variant's
+    // cardFormat override; otherwise write to the plan's cardFormat
+    // override. Either way we merge on top of the existing patch so
+    // partial updates stack cleanly.
+    const updatedProject = updatePlan(project, plan.id, (p) => {
+      if (activeVariantId) {
+        return {
+          ...p,
+          variants: p.variants.map((v) =>
+            v.id === activeVariantId
+              ? { ...v, cardFormat: { ...(v.cardFormat || {}), ...updates } }
+              : v,
+          ),
+        };
+      }
+      return {
+        ...p,
+        cardFormat: { ...(p.cardFormat || {}), ...updates },
+      };
+    });
+    set({ project: updatedProject, cardFormat: nextMirror });
+  },
   setShowPlanTree: (show) => set({ showPlanTree: show }),
 
   createProject: (name, catalogue) => {
@@ -262,6 +301,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   // Variant management
   setActiveVariant: (variantId) => set({ activeVariantId: variantId }),
   setShowGhosted: (show) => set({ showGhosted: show }),
+  setShowDiscontinued: (show) => set({ showDiscontinued: show }),
 
   addVariant: (planId, name) => {
     const { project } = get();

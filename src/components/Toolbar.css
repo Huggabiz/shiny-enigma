@@ -201,6 +201,15 @@
   letter-spacing: 0.5px;
 }
 
+.dropdown-scope {
+  padding: 0 14px 6px;
+  font-size: 10px;
+  color: #1976d2;
+  font-style: italic;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 4px;
+}
+
 .dropdown-checkbox {
   display: flex;
   align-items: center;

@@ -288,7 +288,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const {
     project, addItemToShelf, updateShelfItem,
     updateMatrixLayout, setMatrixAssignment,
-    activeVariantId, showGhosted,
+    activeVariantId, showGhosted, setShowGhosted,
+    showDiscontinued, setShowDiscontinued,
     slideBaseScale,
   } = useProjectStore();
 
@@ -567,6 +568,18 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const assignedItemIds = new Set(layout.assignments.map((a) => a.itemId));
   const unassigned = shelf.items.filter((i) => !assignedItemIds.has(i.id));
 
+  // Discontinued: products in the current shelf whose productId is absent
+  // from the future shelf. Only surfaced when the user is looking at the
+  // future matrix AND the Show discontinued toggle is on.
+  const discontinuedItems = useMemo(() => {
+    if (!activePlan || shelfId !== 'future' || !showDiscontinued) return [];
+    const futureProductIds = new Set(activePlan.futureShelf.items.map((i) => i.productId));
+    return activePlan.currentShelf.items.filter((item) => {
+      if (item.isPlaceholder || !item.productId) return false;
+      return !futureProductIds.has(item.productId);
+    });
+  }, [activePlan, shelfId, showDiscontinued]);
+
   return (
     <div className="range-design">
       <DndContext sensors={sensors} collisionDetection={closestCenter}
@@ -575,6 +588,16 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
           <div className="range-design-title-bar">
             <PillToggle value={shelfId} onChange={onShelfChange} />
             <div className="range-design-canvas-controls">
+              {activeVariant && (
+                <label className="ghost-toggle" title="Show products excluded from this variant as ghost cards">
+                  <input type="checkbox" checked={showGhosted} onChange={(e) => setShowGhosted(e.target.checked)} />
+                  <span>Show excluded</span>
+                </label>
+              )}
+              <label className="ghost-toggle" title="Show discontinued products (in current range but not future)">
+                <input type="checkbox" checked={showDiscontinued} onChange={(e) => setShowDiscontinued(e.target.checked)} />
+                <span>Show discontinued</span>
+              </label>
               <SlideCanvasControls scrollAreaSelector=".range-view-scroll" />
             </div>
           </div>
@@ -650,6 +673,22 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                   return (
                     <UnassignedDraggable key={item.id} itemId={item.id}
                       name={item.isPlaceholder ? (item.placeholderName || 'New SKU') : (product?.name || item.productId)} />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {discontinuedItems.length > 0 && (
+            <div className="unassigned-tray discontinued-tray">
+              <span className="unassigned-label">Discontinued from current range ({discontinuedItems.length}):</span>
+              <div className="unassigned-items">
+                {discontinuedItems.map((item) => {
+                  const product = catalogue.find((p) => p.id === item.productId);
+                  return (
+                    <span key={item.id} className="unassigned-item discontinued">
+                      {product?.name || item.productId}
+                    </span>
                   );
                 })}
               </div>

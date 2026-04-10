@@ -30,6 +30,7 @@ import { getActivePlan } from './types';
 import type { Product, ShelfItem, PlaceholderData } from './types';
 import { SlideCanvasControls, fitSlideToWidth } from './components/SlideCanvasControls';
 import { resolvePlanSlideSize } from './utils/slideSize';
+import { resolveEffectiveCardFormat } from './utils/cardFormat';
 import './App.css';
 
 function App() {
@@ -52,6 +53,8 @@ function App() {
     activeVariantId,
     showGhosted,
     setShowGhosted,
+    showDiscontinued,
+    setShowDiscontinued,
     renamePlan,
     activeView,
     setActiveView,
@@ -76,7 +79,6 @@ function App() {
   const [overShelfId, setOverShelfId] = useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [shelfRailWidth, setShelfRailWidth] = useState(0);
-  const [showDiscontinued, setShowDiscontinued] = useState(true);
 
   // Resolve the effective slide size for the currently-visible plan+view.
   // Each plan persists its own transform-view and range-view sizes via
@@ -106,6 +108,23 @@ function App() {
       useProjectStore.getState().setSlideBaseScaleMode(effectiveSlideSize.mode);
     }
   }, [effectiveSlideSize, slideBaseScale, slideBaseScaleMode, setSlideBaseScale]);
+
+  // Keep store.cardFormat in sync with the effective plan+variant format
+  // so the Toolbar dropdown and every card reading the mirror reflect
+  // the current context. Writing happens inside the store's setCardFormat
+  // action; this effect covers the read side when the user switches
+  // plans or variants.
+  useEffect(() => {
+    if (!activePlan) return;
+    const effective = resolveEffectiveCardFormat(activePlan, activeVariantId);
+    const current = useProjectStore.getState().cardFormat;
+    const effectiveRec = effective as unknown as Record<string, boolean>;
+    const currentRec = current as unknown as Record<string, boolean>;
+    const changed = Object.keys(effectiveRec).some((k) => effectiveRec[k] !== currentRec[k]);
+    if (changed) {
+      useProjectStore.setState({ cardFormat: effective });
+    }
+  }, [activePlan, activeVariantId]);
 
   // Apply the computed canvas scale + zoom as CSS custom properties on the
   // root <html> element so both .transform-16-9 and .matrix-16-9 read them.
