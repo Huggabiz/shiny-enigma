@@ -416,6 +416,30 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       }
     }
 
+    // When the user is designing the future shelf and Show discontinued
+    // is on, the view ALSO renders current-shelf products that dropped
+    // out of the future range as ghost cards at their original cell
+    // position. Add them to the cell counts so the layout algorithm
+    // reserves the right amount of space per cell instead of shrinking
+    // them on top of the existing future items.
+    if (shelfId === 'future' && showDiscontinued && activePlan) {
+      const futureProductIds = new Set(activePlan.futureShelf.items.map((i) => i.productId));
+      const currentLayout = activePlan.currentShelf.matrixLayout;
+      if (currentLayout) {
+        const discIds = new Set(
+          activePlan.currentShelf.items
+            .filter((i) => !i.isPlaceholder && i.productId && !futureProductIds.has(i.productId))
+            .map((i) => i.id),
+        );
+        for (const a of currentLayout.assignments) {
+          if (!discIds.has(a.itemId)) continue;
+          if (a.row >= 0 && a.row < numRows && a.col >= 0 && a.col < numCols) {
+            cellCounts[a.row][a.col] += 1;
+          }
+        }
+      }
+    }
+
     const totalProducts = cellCounts.flat().reduce((s, n) => s + n, 0);
     if (totalProducts === 0) {
       return {
@@ -454,7 +478,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
     return { columnWidths: bestColW, rowHeights: bestRowH, cardWidth: bestCW };
   }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize, variantIncludedIds, showGhosted,
-      scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH]);
+      scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH,
+      shelfId, showDiscontinued, activePlan]);
 
   const gridCols = `${scaledRowHeaderW}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${scaledAddBtnW}px`;
 
