@@ -18,8 +18,8 @@
 /* Title */
 .range-design-title-bar {
   width: 100%;
-  max-width: 1100px;
   margin-bottom: 10px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;

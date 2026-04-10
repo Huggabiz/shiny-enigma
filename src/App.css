@@ -78,9 +78,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0 4px;
-  width: 1100px;
-  margin: 0 auto;
+  padding: 0 16px;
+  width: 100%;
   flex-shrink: 0;
 }
 
