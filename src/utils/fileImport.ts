@@ -34,13 +34,18 @@ export function parseSpreadsheet(
   const products: Product[] = json.map((row, index) => {
     const sourceRaw = row[mapping.source];
     const source: 'live' | 'dev' = sourceRaw && String(sourceRaw).toLowerCase().startsWith('dev') ? 'dev' : 'live';
+    // Text fields from spreadsheets often come with leading / trailing
+    // whitespace or stray newlines, which otherwise end up as
+    // "duplicate" entries in the catalogue category / sub-category
+    // dropdowns because Set treats "Foo" and "Foo " as distinct.
+    const str = (v: unknown): string => String(v ?? '').trim();
     return {
       id: `product-${index}-${String(row[mapping.sku] ?? index)}`,
-      sku: String(row[mapping.sku] ?? ''),
-      name: String(row[mapping.name] ?? ''),
-      category: String(row[mapping.category] ?? ''),
-      subCategory: String(row[mapping.subCategory] ?? ''),
-      productFamily: String(row[mapping.productFamily] ?? ''),
+      sku: str(row[mapping.sku]),
+      name: str(row[mapping.name]),
+      category: str(row[mapping.category]),
+      subCategory: str(row[mapping.subCategory]),
+      productFamily: str(row[mapping.productFamily]),
       sapCollection: normaliseSapCollection(row[mapping.sapCollection]),
       volume: Number(row[mapping.volume]) || 0,
       forecastVolume: numOrUndef(row[mapping.forecastVolume]),
@@ -50,7 +55,7 @@ export function parseSpreadsheet(
       ausRrp: numOrUndef(row[mapping.ausRrp]),
       revenue: Number(row[mapping.revenue]) || 0,
       forecastRevenue: numOrUndef(row[mapping.forecastRevenue]),
-      imageUrl: row[mapping.imageUrl] ? String(row[mapping.imageUrl]) : undefined,
+      imageUrl: row[mapping.imageUrl] ? String(row[mapping.imageUrl]).trim() : undefined,
       source,
     };
   });

@@ -162,20 +162,20 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   const [collapsedSubCats, setCollapsedSubCats] = useState<Set<string>>(new Set());
 
   const categories = useMemo(
-    () => [...new Set(products.map((p) => p.category).filter(Boolean))].sort(),
+    () => [...new Set(products.map((p) => (p.category || '').trim()).filter(Boolean))].sort(),
     [products]
   );
 
   // Sub-categories filtered by selected category
   const subCategories = useMemo(() => {
     const source = categoryFilter
-      ? products.filter((p) => p.category === categoryFilter)
+      ? products.filter((p) => (p.category || '').trim() === categoryFilter)
       : products;
-    return [...new Set(source.map((p) => p.subCategory).filter(Boolean))].sort();
+    return [...new Set(source.map((p) => (p.subCategory || '').trim()).filter(Boolean))].sort();
   }, [products, categoryFilter]);
 
   const families = useMemo(
-    () => [...new Set(products.map((p) => p.productFamily).filter(Boolean))].sort(),
+    () => [...new Set(products.map((p) => (p.productFamily || '').trim()).filter(Boolean))].sort(),
     [products]
   );
 
@@ -185,9 +185,12 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
         !search ||
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.sku.toLowerCase().includes(search.toLowerCase());
-      const matchesCategory = !categoryFilter || p.category === categoryFilter;
-      const matchesSubCategory = !subCategoryFilter || p.subCategory === subCategoryFilter;
-      const matchesFamily = !familyFilter || p.productFamily === familyFilter;
+      // Trim both sides of the equality so old projects with untrimmed
+      // imports still behave as if they were loaded through the cleaned
+      // importer — no mysterious "no match" after picking a dropdown value.
+      const matchesCategory = !categoryFilter || (p.category || '').trim() === categoryFilter;
+      const matchesSubCategory = !subCategoryFilter || (p.subCategory || '').trim() === subCategoryFilter;
+      const matchesFamily = !familyFilter || (p.productFamily || '').trim() === familyFilter;
       // Live/Dev filter: anything without an explicit 'dev' source counts as live.
       const isDev = p.source === 'dev';
       const matchesSource = isDev ? showDev : showLive;
