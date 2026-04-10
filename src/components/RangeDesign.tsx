@@ -41,6 +41,71 @@ const ADD_ROW_HEIGHT = 28;
 const EMPTY_SIZE = 30;
 const MIN_ROW_H = 40;
 
+// Sort-by keys for the matrix cell sort dropdown. 'manual' keeps the
+// existing matrix order (the order the user dragged items into the cell).
+type SortKey = 'manual' | 'name' | 'sku' | 'rrp' | 'usRrp' | 'euRrp' | 'ausRrp' | 'volume' | 'forecastVolume' | 'revenue' | 'forecastRevenue';
+
+function itemSortValue(
+  item: ShelfItem,
+  catalogue: Product[],
+  key: SortKey,
+  isFutureShelf: boolean,
+): number | string {
+  if (key === 'manual') return 0;
+  // Real product cards prefer future-pricing overrides on the future shelf
+  // so a sort by UK RRP reflects the user's edited price, not the stale one.
+  if (!item.isPlaceholder) {
+    const p = catalogue.find((pp) => pp.id === item.productId);
+    if (!p) return key === 'name' || key === 'sku' ? '' : 0;
+    const future = isFutureShelf ? p.futurePricing?.default : undefined;
+    switch (key) {
+      case 'name': return p.name || '';
+      case 'sku': return p.sku || '';
+      case 'rrp': return future?.ukRrp ?? p.rrp ?? 0;
+      case 'usRrp': return future?.usRrp ?? p.usRrp ?? 0;
+      case 'euRrp': return future?.euRrp ?? p.euRrp ?? 0;
+      case 'ausRrp': return future?.ausRrp ?? p.ausRrp ?? 0;
+      case 'volume': return p.volume ?? 0;
+      case 'forecastVolume': return p.forecastVolume ?? 0;
+      case 'revenue': return p.revenue ?? 0;
+      case 'forecastRevenue': return p.forecastRevenue ?? 0;
+    }
+  }
+  // Placeholder fallback — use placeholderData if populated.
+  const d = item.placeholderData;
+  if (!d) return key === 'name' || key === 'sku' ? (item.placeholderName || '') : 0;
+  switch (key) {
+    case 'name': return d.name || item.placeholderName || '';
+    case 'sku': return d.sku || '';
+    case 'rrp': return d.rrp ?? 0;
+    case 'usRrp': return d.usRrp ?? 0;
+    case 'euRrp': return d.euRrp ?? 0;
+    case 'ausRrp': return d.ausRrp ?? 0;
+    case 'volume': return d.volume ?? 0;
+    case 'forecastVolume': return d.forecastVolume ?? 0;
+    case 'revenue': return d.revenue ?? 0;
+    case 'forecastRevenue': return d.forecastRevenue ?? 0;
+  }
+  return 0;
+}
+
+function sortShelfItems<T extends ShelfItem>(
+  items: T[],
+  catalogue: Product[],
+  key: SortKey,
+  dir: 'asc' | 'desc',
+  isFutureShelf: boolean,
+): T[] {
+  if (key === 'manual') return items;
+  const factor = dir === 'asc' ? 1 : -1;
+  return [...items].sort((a, b) => {
+    const va = itemSortValue(a, catalogue, key, isFutureShelf);
+    const vb = itemSortValue(b, catalogue, key, isFutureShelf);
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * factor;
+    return String(va).localeCompare(String(vb)) * factor;
+  });
+}
+
 // For n products in a cell of given width at given card width,
 // how many columns fit horizontally, and how many rows result?
 function cellGrid(n: number, cardW: number, cellW: number): { cols: number; rows: number } {
@@ -147,7 +212,7 @@ function computeLayout(
   return { fits: true, colWidths, rowHeights };
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf }: {
+function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir }: {
   row: number; col: number; itemIds: string[];
   shelf: Shelf; catalogue: Product[];
   cardWidth: number;
@@ -159,6 +224,8 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
    * rendered when this cell is in the future matrix. */
   discontinuedItems?: ShelfItem[];
   isFutureShelf: boolean;
+  sortBy: SortKey;
+  sortDir: 'asc' | 'desc';
 }) {
   const cellId = `matrix-cell-${row}-${col}`;
   const { setNodeRef, isOver } = useDroppable({ id: cellId });
@@ -166,10 +233,16 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
   const { removeItemFromShelf, removeMatrixAssignment, activeVariantId: storeVariantId, toggleVariantItem } = useProjectStore();
 
   // Filter items by variant
-  const items = allItems.filter((item) => {
-    if (!item || !variantIncludedIds) return true;
+  const filtered = allItems.filter((item): item is ShelfItem => {
+    if (!item) return false;
+    if (!variantIncludedIds) return true;
     return variantIncludedIds.has(item.id) || showGhostedProp;
   });
+  // Sort by the chosen key — 'manual' preserves the original matrix order.
+  const items = sortShelfItems(filtered, catalogue, sortBy, sortDir, isFutureShelf);
+  const sortedDiscontinued = discontinuedItems
+    ? sortShelfItems(discontinuedItems, catalogue, sortBy, sortDir, isFutureShelf)
+    : undefined;
 
   return (
     <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''}`}
@@ -197,7 +270,7 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
       })}
       {/* Discontinued ghost cards — rendered at the current-shelf position
           but styled red so the user can see what dropped out of the range. */}
-      {discontinuedItems?.map((item) => {
+      {sortedDiscontinued?.map((item) => {
         const product = catalogue.find((p) => p.id === item.productId);
         return (
           <MatrixProductCard key={`disc-${item.id}`} itemId={item.id} product={product}
@@ -250,6 +323,21 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   const displayFcstRev = isPlaceholder ? placeholderData?.forecastRevenue : product?.forecastRevenue;
   const displayCategory = isPlaceholder ? placeholderData?.category : product?.category;
   const isDev = !isPlaceholder && product?.source === 'dev';
+
+  // Compute RRP deltas vs the catalogue (live) price when a future
+  // override is in play, so the future matrix card highlights price
+  // moves the same way the transform view card does.
+  const rrpDelta = (current: number | undefined, original: number | undefined): number | null => {
+    if (current === undefined || original === undefined) return null;
+    if (current === 0 || original === 0) return null;
+    if (current === original) return null;
+    return current - original;
+  };
+  const ukDelta = isFutureShelf && !isPlaceholder ? rrpDelta(displayRrp, product?.rrp) : null;
+  const usDelta = isFutureShelf && !isPlaceholder ? rrpDelta(displayUsRrp, product?.usRrp) : null;
+  const euDelta = isFutureShelf && !isPlaceholder ? rrpDelta(displayEuRrp, product?.euRrp) : null;
+  const ausDelta = isFutureShelf && !isPlaceholder ? rrpDelta(displayAusRrp, product?.ausRrp) : null;
+
   const cardClasses = [
     'matrix-card',
     isDragging ? 'dragging' : '',
@@ -258,6 +346,18 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
     isGhosted ? 'ghosted' : '',
     isDiscontinued ? 'ghosted-discontinued' : '',
   ].filter(Boolean).join(' ');
+
+  // Reusable delta chip renderer — matches the transform view's
+  // RrpRow styling (small up/down arrow + absolute delta in green/red).
+  const renderDelta = (delta: number | null, symbol: string) => {
+    if (delta === null) return null;
+    const up = delta > 0;
+    return (
+      <span className={`matrix-card-rrp-delta ${up ? 'up' : 'down'}`}>
+        {' '}{up ? '\u2191' : '\u2193'}{symbol}{Math.abs(delta).toFixed(2)}
+      </span>
+    );
+  };
 
   return (
     <div ref={setNodeRef} className={cardClasses}
@@ -277,15 +377,15 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
       )}
       {cardFormat.showName && <div className="matrix-card-name" title={displayName}>{displayName}</div>}
       {cardFormat.showSku && <div className="matrix-card-sku">{displaySku || '—'}</div>}
-      {cardFormat.showRrp && <div className="matrix-card-rrp">{displayRrp ? `\u00A3${displayRrp}` : '—'}</div>}
+      {cardFormat.showRrp && <div className="matrix-card-rrp">{displayRrp ? `\u00A3${displayRrp}` : '\u2014'}{renderDelta(ukDelta, '\u00A3')}</div>}
       {cardFormat.showUsRrp && displayUsRrp !== undefined && (
-        <div className="matrix-card-rrp matrix-card-us">${displayUsRrp}</div>
+        <div className="matrix-card-rrp matrix-card-us">${displayUsRrp}{renderDelta(usDelta, '$')}</div>
       )}
       {cardFormat.showEuRrp && displayEuRrp !== undefined && (
-        <div className="matrix-card-rrp matrix-card-eu">{'\u20AC'}{displayEuRrp}</div>
+        <div className="matrix-card-rrp matrix-card-eu">{'\u20AC'}{displayEuRrp}{renderDelta(euDelta, '\u20AC')}</div>
       )}
       {cardFormat.showAusRrp && displayAusRrp !== undefined && (
-        <div className="matrix-card-rrp matrix-card-aus">A${displayAusRrp}</div>
+        <div className="matrix-card-rrp matrix-card-aus">A${displayAusRrp}{renderDelta(ausDelta, 'A$')}</div>
       )}
       {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {displayVolume ? displayVolume.toLocaleString() : '—'}</div>}
       {cardFormat.showForecastVolume && displayForecast !== undefined && (
@@ -334,6 +434,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const scaledHeaderRowH = Math.round(HEADER_ROW_HEIGHT * uiScale);
   const scaledAddRowH = Math.round(ADD_ROW_HEIGHT * uiScale);
 
+  const [sortBy, setSortBy] = useState<SortKey>('manual');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [placeholderDialog, setPlaceholderDialog] = useState<
     | { mode: 'create'; row: number; col: number }
     | { mode: 'edit'; itemId: string; data: PlaceholderData }
@@ -449,12 +551,19 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       };
     }
 
-    // Binary search for largest uniform card width
-    let lo = MIN_CARD_WIDTH;
+    // Binary search for largest uniform card width that fits everything.
+    // When the user has Show discontinued on, cells can be carrying a lot
+    // of extra ghost cards, so the regular floor (MIN_CARD_WIDTH = 40) is
+    // sometimes too large to fit. Fall back to an absolute floor of 22px
+    // for the dense case so the sizer always has room to find a fit
+    // before spilling over the canvas.
+    const absoluteFloor = shelfId === 'future' && showDiscontinued ? 22 : MIN_CARD_WIDTH;
+    let lo = absoluteFloor;
     let hi = MAX_CARD_WIDTH;
-    let bestCW = MIN_CARD_WIDTH;
+    let bestCW = absoluteFloor;
     let bestColW: number[] = [];
     let bestRowH: number[] = [];
+    let foundFit = false;
 
     while (lo <= hi) {
       const mid = Math.floor((lo + hi) / 2);
@@ -463,9 +572,28 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         bestCW = mid;
         bestColW = result.colWidths;
         bestRowH = result.rowHeights;
+        foundFit = true;
         lo = mid + 1;
       } else {
         hi = mid - 1;
+      }
+    }
+
+    // Absolute fallback: if even the floor didn't fit (dense plan with
+    // lots of discontinued overlays) accept the layout at the floor so
+    // the render stays inside the canvas bounds instead of spilling.
+    if (!foundFit) {
+      const fallback = computeLayout(absoluteFloor, cellCounts, numCols, numRows, availW, availH);
+      bestCW = absoluteFloor;
+      bestColW = fallback.colWidths.length ? fallback.colWidths : Array(numCols).fill((availW - (numCols - 1) * GAP) / numCols);
+      bestRowH = fallback.rowHeights.length ? fallback.rowHeights : Array(numRows).fill((availH - (numRows - 1) * GAP) / numRows);
+      // Clamp row heights so their total doesn't exceed available space
+      // — individual cells will clip via overflow: hidden, which is
+      // preferable to pushing the whole matrix off the canvas.
+      const rowSum = bestRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * GAP;
+      if (rowSum > availH) {
+        const scale = (availH - (numRows - 1) * GAP) / bestRowH.reduce((s, h) => s + h, 0);
+        bestRowH = bestRowH.map((h) => Math.max(MIN_ROW_H, h * scale));
       }
     }
 
@@ -675,6 +803,33 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                 <input type="checkbox" checked={showDiscontinued} onChange={(e) => setShowDiscontinued(e.target.checked)} />
                 <span>Show discontinued</span>
               </label>
+              <div className="slide-size-control" title="Sort cards within each matrix cell">
+                <span>Sort</span>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}>
+                  <option value="manual">Manual</option>
+                  <option value="name">Name</option>
+                  <option value="sku">SKU</option>
+                  <option value="rrp">UK RRP</option>
+                  <option value="usRrp">US RRP</option>
+                  <option value="euRrp">EU RRP</option>
+                  <option value="ausRrp">AUS RRP</option>
+                  <option value="volume">Volume</option>
+                  <option value="forecastVolume">Forecast Volume</option>
+                  <option value="revenue">Revenue</option>
+                  <option value="forecastRevenue">Forecast Revenue</option>
+                </select>
+                {sortBy !== 'manual' && (
+                  <button
+                    type="button"
+                    className="sort-dir-btn"
+                    onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+                    title={sortDir === 'asc' ? 'Ascending — click to flip' : 'Descending — click to flip'}
+                    aria-label="Toggle sort direction"
+                  >
+                    {sortDir === 'asc' ? '\u2191' : '\u2193'}
+                  </button>
+                )}
+              </div>
               <SlideCanvasControls scrollAreaSelector=".range-view-scroll" />
             </div>
           </div>
@@ -728,7 +883,9 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                       variantIncludedIds={variantIncludedIds}
                       showGhostedProp={showGhosted}
                       discontinuedItems={discontinuedByCell.get(`${row}-${col}`)}
-                      isFutureShelf={shelfId === 'future'} />
+                      isFutureShelf={shelfId === 'future'}
+                      sortBy={sortBy}
+                      sortDir={sortDir} />
                   ))}
                   <div />
                 </div>
