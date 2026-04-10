@@ -445,43 +445,78 @@ function waitForNextPaint(): Promise<void> {
   });
 }
 
+/**
+ * Temporarily neutralise every CSS transform on the slide canvases and
+ * their wrappers so html2canvas can rasterise the cards without the
+ * parent scale corrupting the output. html2canvas has well-known trouble
+ * capturing elements inside a transformed ancestor — the fix is to
+ * remove the transform during capture and restore it immediately after.
+ */
+function suspendCanvasTransforms(): () => void {
+  const selectors = ['.transform-16-9', '.matrix-16-9', '.slide-canvas-wrapper'];
+  const restore: Array<() => void> = [];
+  for (const selector of selectors) {
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>(selector))) {
+      const prevTransform = el.style.transform;
+      const prevTransformOrigin = el.style.transformOrigin;
+      el.style.transform = 'none';
+      el.style.transformOrigin = '';
+      restore.push(() => {
+        el.style.transform = prevTransform;
+        el.style.transformOrigin = prevTransformOrigin;
+      });
+    }
+  }
+  return () => {
+    for (const fn of restore) fn();
+  };
+}
+
 async function captureCardsInShelf(selector: string): Promise<Map<string, CapturedCard>> {
   const out = new Map<string, CapturedCard>();
-  const cards = document.querySelectorAll<HTMLElement>(selector);
-  // 8px margin around each card so the full border + any overflowing
-  // New / DEV badges (which live at top/left: -6px) are included in the
-  // rasterised image. The aspect ratio is computed from the canvas's
-  // actual pixel dimensions so the PPT side places the image at the
-  // correct proportions.
-  const PAD_CSS_PX = 8;
-  for (const card of Array.from(cards)) {
-    const id = card.getAttribute('data-item-id');
-    if (!id) continue;
-    try {
-      const widthPx = card.offsetWidth;
-      const heightPx = card.offsetHeight;
-      if (widthPx <= 0 || heightPx <= 0) continue;
-      const canvas = await html2canvas(card, {
-        backgroundColor: null,
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        width: widthPx + PAD_CSS_PX * 2,
-        height: heightPx + PAD_CSS_PX * 2,
-        x: -PAD_CSS_PX,
-        y: -PAD_CSS_PX,
-      });
-      out.set(id, {
-        dataUrl: canvas.toDataURL('image/png'),
-        // Use the actual canvas dimensions so PPT placement uses the
-        // same aspect as the rasterised image, not the card's inner box.
-        aspect: canvas.height / canvas.width,
-      });
-    } catch (err) {
-      // Swallow CORS / tainted canvas errors — the caller will fall back to
-      // the shape-based drawCard() renderer for any card we couldn't capture.
-      console.warn('[exportPptx] failed to capture card', id, err);
+  // Remove the zoom transform on the canvas ancestors while html2canvas
+  // runs. Without this the rasterised cards come out stretched /
+  // cropped when slideZoom != 1 (e.g. after Auto fit-to-width).
+  const restoreTransforms = suspendCanvasTransforms();
+  try {
+    const cards = document.querySelectorAll<HTMLElement>(selector);
+    // 8px margin around each card so the full border + any overflowing
+    // New / DEV badges (which live at top/left: -6px) are included in the
+    // rasterised image. The aspect ratio is computed from the canvas's
+    // actual pixel dimensions so the PPT side places the image at the
+    // correct proportions.
+    const PAD_CSS_PX = 8;
+    for (const card of Array.from(cards)) {
+      const id = card.getAttribute('data-item-id');
+      if (!id) continue;
+      try {
+        const widthPx = card.offsetWidth;
+        const heightPx = card.offsetHeight;
+        if (widthPx <= 0 || heightPx <= 0) continue;
+        const canvas = await html2canvas(card, {
+          backgroundColor: null,
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          width: widthPx + PAD_CSS_PX * 2,
+          height: heightPx + PAD_CSS_PX * 2,
+          x: -PAD_CSS_PX,
+          y: -PAD_CSS_PX,
+        });
+        out.set(id, {
+          dataUrl: canvas.toDataURL('image/png'),
+          // Use the actual canvas dimensions so PPT placement uses the
+          // same aspect as the rasterised image, not the card's inner box.
+          aspect: canvas.height / canvas.width,
+        });
+      } catch (err) {
+        // Swallow CORS / tainted canvas errors — the caller will fall back to
+        // the shape-based drawCard() renderer for any card we couldn't capture.
+        console.warn('[exportPptx] failed to capture card', id, err);
+      }
     }
+  } finally {
+    restoreTransforms();
   }
   return out;
 }
