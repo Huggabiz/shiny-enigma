@@ -109,6 +109,19 @@ export interface RangeVariant {
   includedFutureItemIds: string[];  // references ShelfItem.id in futureShelf
 }
 
+// Per-view slide canvas size settings. 'auto' picks a tier from the
+// number of items on the relevant shelf(s); 'manual' uses the explicit
+// scale the user selected.
+export interface SlideViewSize {
+  scale: number;              // 1, 1.25, 1.5, 1.75, 2, 2.5, 3
+  mode: 'auto' | 'manual';
+}
+
+export interface PlanSlideSettings {
+  transform?: SlideViewSize;  // used by the transform view
+  range?: SlideViewSize;      // shared by current + future range matrix views
+}
+
 // A single range plan (current + future + sankey links + variants)
 export interface RangePlan {
   id: string;
@@ -117,6 +130,7 @@ export interface RangePlan {
   futureShelf: Shelf;
   sankeyLinks: SankeyLink[];
   variants: RangeVariant[];
+  slideSettings?: PlanSlideSettings;
 }
 
 // The full project state — now holds multiple range plans

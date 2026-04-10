@@ -28,7 +28,8 @@ import { EditableTitle } from './components/EditableTitle';
 import { useProjectStore } from './store/useProjectStore';
 import { getActivePlan } from './types';
 import type { Product, ShelfItem, PlaceholderData } from './types';
-import { SlideCanvasControls } from './components/SlideCanvasControls';
+import { SlideCanvasControls, fitSlideToWidth } from './components/SlideCanvasControls';
+import { resolvePlanSlideSize } from './utils/slideSize';
 import './App.css';
 
 function App() {
@@ -77,25 +78,34 @@ function App() {
   const [shelfRailWidth, setShelfRailWidth] = useState(0);
   const [showDiscontinued, setShowDiscontinued] = useState(true);
 
-  // Auto-compute the required slide base scale from the busiest shelf so
-  // dense plans grow their canvas instead of shrinking cards. The tiers
-  // step 1x / 1.25x / 1.5x / 1.75x / 2x at 18 / 28 / 40 / 55 items. Users
-  // can override via the toolbar dropdown (slideBaseScaleMode = 'manual').
-  const maxShelfItems = useMemo(() => {
-    if (!activePlan) return 0;
-    return Math.max(activePlan.currentShelf.items.length, activePlan.futureShelf.items.length);
-  }, [activePlan]);
+  // Resolve the effective slide size for the currently-visible plan+view.
+  // Each plan persists its own transform-view and range-view sizes via
+  // plan.slideSettings; if the plan doesn't have an explicit override the
+  // auto-tier picks a scale from the busiest shelf relevant to the view.
+  // The derived value is mirrored into the store's slideBaseScale /
+  // slideBaseScaleMode so descendant components (Shelf, RangeDesign,
+  // SlideCanvasControls) can keep reading it without prop-drilling.
+  const effectiveSlideSize = useMemo(() => {
+    if (!activePlan) return { scale: 1, mode: 'auto' as const };
+    if (activeView === 'transform') {
+      const autoCount = Math.max(
+        activePlan.currentShelf.items.length,
+        activePlan.futureShelf.items.length,
+      );
+      return resolvePlanSlideSize(activePlan, 'transform', autoCount);
+    }
+    const shelf = designShelfId === 'current' ? activePlan.currentShelf : activePlan.futureShelf;
+    return resolvePlanSlideSize(activePlan, 'range', shelf.items.length);
+  }, [activePlan, activeView, designShelfId]);
 
   useEffect(() => {
-    if (slideBaseScaleMode !== 'auto') return;
-    const n = maxShelfItems;
-    let scale = 1;
-    if (n > 55) scale = 2;
-    else if (n > 40) scale = 1.75;
-    else if (n > 28) scale = 1.5;
-    else if (n > 18) scale = 1.25;
-    if (scale !== slideBaseScale) setSlideBaseScale(scale);
-  }, [maxShelfItems, slideBaseScaleMode, slideBaseScale, setSlideBaseScale]);
+    if (effectiveSlideSize.scale !== slideBaseScale) {
+      setSlideBaseScale(effectiveSlideSize.scale);
+    }
+    if (effectiveSlideSize.mode !== slideBaseScaleMode) {
+      useProjectStore.getState().setSlideBaseScaleMode(effectiveSlideSize.mode);
+    }
+  }, [effectiveSlideSize, slideBaseScale, slideBaseScaleMode, setSlideBaseScale]);
 
   // Apply the computed canvas scale + zoom as CSS custom properties on the
   // root <html> element so both .transform-16-9 and .matrix-16-9 read them.
@@ -108,6 +118,19 @@ function App() {
       root.style.removeProperty('--slide-zoom');
     };
   }, [slideBaseScale, slideZoom]);
+
+  // Auto-fit the slide to the viewport width whenever the user switches
+  // views or changes the resolution tier — matches the desktop slide
+  // tool convention where the canvas snaps to fit when something big
+  // happens to the layout.
+  useEffect(() => {
+    const selector = activeView === 'transform' ? '.transform-view-scroll' : '.range-view-scroll';
+    // Wait for the new view's DOM to mount and CSS vars to commit.
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => fitSlideToWidth(selector));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activeView, slideBaseScale]);
 
   // Ctrl + scroll zooms the slide, anchored to the cursor position so the
   // point under the mouse stays put (PowerPoint-style). Attached at the

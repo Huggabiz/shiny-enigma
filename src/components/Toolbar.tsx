@@ -18,6 +18,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
     clearCatalogue, clearRanges,
     cardFormat, setCardFormat,
   } = useProjectStore();
+  const [exportProgress, setExportProgress] = useState<string | null>(null);
   const loadRef = useRef<HTMLInputElement>(null);
   const [openMenu, setOpenMenu] = useState<'save' | 'manage' | 'format' | null>(null);
 
@@ -113,11 +114,14 @@ export function Toolbar({ activeView }: ToolbarProps) {
                     onClick={async () => {
                       if (!project) return;
                       closeMenus();
+                      setExportProgress('Preparing export\u2026');
                       try {
-                        await exportToPptx(project);
+                        await exportToPptx(project, setExportProgress);
                       } catch (err) {
                         console.error(err);
                         alert('PowerPoint export failed. See browser console for details.');
+                      } finally {
+                        setExportProgress(null);
                       }
                     }}
                   >
@@ -152,6 +156,16 @@ export function Toolbar({ activeView }: ToolbarProps) {
         <input ref={loadRef} type="file" accept=".json" onChange={handleLoad} hidden />
         <button className="toolbar-btn" onClick={() => loadRef.current?.click()}>Load</button>
       </div>
+      {exportProgress && (
+        <div className="export-progress-overlay" role="status" aria-live="polite">
+          <div className="export-progress-card">
+            <div className="export-progress-spinner" aria-hidden="true" />
+            <div className="export-progress-title">Exporting PowerPoint</div>
+            <div className="export-progress-message">{exportProgress}</div>
+            <div className="export-progress-hint">Leave this tab visible while the capture runs.</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

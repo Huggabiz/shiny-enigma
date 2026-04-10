@@ -1,4 +1,5 @@
 import { useProjectStore } from '../store/useProjectStore';
+import { getActivePlan } from '../types';
 
 interface SlideCanvasControlsProps {
   /** CSS selector for the scroll area whose size drives fit-to-width. */
@@ -8,22 +9,52 @@ interface SlideCanvasControlsProps {
 const SLIDE_LOGICAL_WIDTH = 1100;
 
 /**
+ * Fit the slide to the scroll area's current width by computing the right
+ * zoom level and centring scroll. Called by the toolbar button AND by
+ * App.tsx effects whenever the active view or resolution tier changes.
+ */
+export function fitSlideToWidth(scrollAreaSelector: string): void {
+  const el = document.querySelector(scrollAreaSelector) as HTMLElement | null;
+  if (!el) return;
+  const padding = 40;
+  const avail = el.clientWidth - padding;
+  const scale = useProjectStore.getState().slideBaseScale;
+  const canvasWidth = SLIDE_LOGICAL_WIDTH * scale;
+  if (canvasWidth <= 0 || avail <= 0) return;
+  const zoom = Math.max(0.3, Math.min(3, avail / canvasWidth));
+  useProjectStore.getState().setSlideZoom(zoom);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+      el.scrollTop = (el.scrollHeight - el.clientHeight) / 2;
+    });
+  });
+}
+
+/**
  * Toolbar controls for the slide canvas — lets the user override the
  * auto-computed resolution tier, nudge the zoom up / down, fit the slide
  * to the viewport width, and reset zoom.
  */
 export function SlideCanvasControls({ scrollAreaSelector }: SlideCanvasControlsProps) {
   const {
-    slideBaseScale, slideBaseScaleMode, setSlideBaseScale, setSlideBaseScaleMode,
+    slideBaseScale, slideBaseScaleMode,
     slideZoom, setSlideZoom,
+    project, activeView, setPlanSlideSize,
   } = useProjectStore();
 
+  // Settings are persisted per plan + view. Transform view writes to
+  // plan.slideSettings.transform; current/future range share
+  // plan.slideSettings.range.
+  const activePlan = project ? getActivePlan(project) : undefined;
+  const viewKey: 'transform' | 'range' = activeView === 'transform' ? 'transform' : 'range';
+
   const onResolutionChange = (value: string) => {
+    if (!activePlan) return;
     if (value === 'auto') {
-      setSlideBaseScaleMode('auto');
+      setPlanSlideSize(activePlan.id, viewKey, { mode: 'auto' });
     } else {
-      setSlideBaseScaleMode('manual');
-      setSlideBaseScale(Number(value));
+      setPlanSlideSize(activePlan.id, viewKey, { mode: 'manual', scale: Number(value) });
     }
   };
 
@@ -31,21 +62,7 @@ export function SlideCanvasControls({ scrollAreaSelector }: SlideCanvasControlsP
 
   const fitToWidth = () => {
     if (!scrollAreaSelector) return;
-    const el = document.querySelector(scrollAreaSelector) as HTMLElement | null;
-    if (!el) return;
-    const padding = 40; // breathing room inside the scroll area
-    const avail = el.clientWidth - padding;
-    const canvasWidth = SLIDE_LOGICAL_WIDTH * slideBaseScale;
-    if (canvasWidth <= 0) return;
-    const zoom = avail / canvasWidth;
-    setSlideZoom(zoom);
-    // Centre horizontally after the zoom reflows
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
-        el.scrollTop = (el.scrollHeight - el.clientHeight) / 2;
-      });
-    });
+    fitSlideToWidth(scrollAreaSelector);
   };
 
   return (

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat } from '../types';
+import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat, SlideViewSize } from '../types';
 import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan } from '../types';
 
 // Helper: update a specific plan in the plans array
@@ -41,12 +41,22 @@ interface ProjectStore {
 
   // Slide canvas size — baseScale grows the logical canvas so more content
   // fits without shrinking; zoom is a visual multiplier for navigation.
+  // Effective slide base scale for the active plan+view (derived from the
+  // plan's slideSettings by App.tsx). Kept in the store so descendant
+  // components can read it without prop-drilling, but the source of
+  // truth lives on the RangePlan via `slideSettings`.
   slideBaseScale: number;        // 1, 1.25, 1.5, ...
   slideBaseScaleMode: 'auto' | 'manual';
   slideZoom: number;             // 0.5 - 2.0, default 1
   setSlideBaseScale: (scale: number) => void;
   setSlideBaseScaleMode: (mode: 'auto' | 'manual') => void;
   setSlideZoom: (zoom: number) => void;
+  /** Persist a slide size override against a specific plan / view. */
+  setPlanSlideSize: (
+    planId: string,
+    view: 'transform' | 'range',
+    patch: Partial<SlideViewSize>,
+  ) => void;
 
   // Card format
   setCardFormat: (format: Partial<CardFormat>) => void;
@@ -138,6 +148,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setSlideBaseScale: (scale) => set({ slideBaseScale: scale }),
   setSlideBaseScaleMode: (mode) => set({ slideBaseScaleMode: mode }),
   setSlideZoom: (zoom) => set({ slideZoom: Math.max(0.3, Math.min(3, zoom)) }),
+
+  setPlanSlideSize: (planId, view, patch) => {
+    const { project } = get();
+    if (!project) return;
+    set({
+      project: updatePlan(project, planId, (p) => {
+        const current: SlideViewSize = p.slideSettings?.[view] ?? { scale: 1, mode: 'auto' };
+        return {
+          ...p,
+          slideSettings: {
+            ...(p.slideSettings || {}),
+            [view]: { ...current, ...patch },
+          },
+        };
+      }),
+    });
+  },
 
   setCardFormat: (updates) => set((state) => ({ cardFormat: { ...state.cardFormat, ...updates } })),
   setShowPlanTree: (show) => set({ showPlanTree: show }),

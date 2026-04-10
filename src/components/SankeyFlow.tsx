@@ -422,7 +422,7 @@ export function SankeyFlow({
   }
 
   return (
-    <div ref={containerRef} className="sankey-container" style={{ width: railWidth, marginLeft: 16 }}>
+    <div ref={containerRef} className="sankey-container" style={{ width: railWidth }}>
       <svg ref={svgRef} className="sankey-svg" />
     </div>
   );

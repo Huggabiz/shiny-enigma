@@ -144,6 +144,10 @@
   min-height: 0;
   display: flex;
   align-items: stretch;
+  /* Match the shelf-container horizontal padding so flows align with
+     cards regardless of the current --ui-scale. */
+  margin-left: calc(16px * var(--ui-scale, 1));
+  margin-right: calc(16px * var(--ui-scale, 1));
 }
 
 .transform-16-9 .sankey-svg {

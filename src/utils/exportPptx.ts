@@ -241,6 +241,38 @@ function computeShelfLayout(itemCount: number, railLeft: number, railWidth: numb
   };
 }
 
+/**
+ * Fit a captured card into a slot of given inches-dimensions while
+ * preserving the card's DOM aspect ratio (heightPx / widthPx). Returns
+ * the (x, y, w, h) placement centred within the slot.
+ */
+function fitCardToSlot(
+  slotX: number,
+  slotY: number,
+  slotW: number,
+  slotH: number,
+  aspect: number,
+): { x: number; y: number; w: number; h: number } {
+  const slotAspect = slotH / slotW;
+  let w: number;
+  let h: number;
+  if (aspect > slotAspect) {
+    // The card is proportionally taller than the slot — clamp to slotH
+    h = slotH;
+    w = h / aspect;
+  } else {
+    // Card is proportionally wider — clamp to slotW
+    w = slotW;
+    h = w * aspect;
+  }
+  return {
+    x: slotX + (slotW - w) / 2,
+    y: slotY + (slotH - h) / 2,
+    w,
+    h,
+  };
+}
+
 function drawShelfRow(
   slide: PptxGenJS.Slide,
   shelf: Shelf,
@@ -249,7 +281,7 @@ function drawShelfRow(
   labelY: number,
   labelBelow: boolean,
   shelfName: string,
-  cardImages: Map<string, string> | null,
+  cardImages: Map<string, CapturedCard> | null,
   trailingItems?: ShelfItem[],
 ) {
   // Shelf name — sub-heading, lower authority than the main slide title
@@ -297,12 +329,12 @@ function drawShelfRow(
   const placeCard = (item: ShelfItem, slotIndex: number, tagExtra: string) => {
     const cardX = layout.offsetLeft + slotIndex * layout.slotWidth;
     const cardId = `${shelf.id}-${tagExtra}-${(item.id || '').slice(0, 8).replace(/[^a-zA-Z0-9]/g, '_')}`;
-    const dataUrl = cardImages?.get(item.id);
-    if (dataUrl) {
+    const capture = cardImages?.get(item.id);
+    if (capture) {
+      const rect = fitCardToSlot(cardX, layout.topY, layout.cardWidth, layout.cardHeight, capture.aspect);
       slide.addImage({
-        data: dataUrl,
-        x: cardX, y: layout.topY, w: layout.cardWidth, h: layout.cardHeight,
-        sizing: { type: 'contain', w: layout.cardWidth, h: layout.cardHeight },
+        data: capture.dataUrl,
+        x: rect.x, y: rect.y, w: rect.w, h: rect.h,
         objectName: `${cardId}-img`,
       });
     } else {
@@ -383,12 +415,19 @@ function addFlowRibbon(
 // the title and shelf sub-labels remain editable pptxgen text objects.
 // ───────────────────────────────────────────────────────────────
 
+interface CapturedCard {
+  dataUrl: string;
+  /** Aspect ratio = DOM pixel height / DOM pixel width. Used on the PPT
+   * side to fit the image into its slot without stretching. */
+  aspect: number;
+}
+
 interface PlanCapture {
-  // Map<itemId, dataUrl> for both shelves combined (transform slide)
-  cardImages: Map<string, string>;
-  // Map<itemId, dataUrl> for matrix cards in each shelf (design slides)
-  matrixCurrentCards: Map<string, string>;
-  matrixFutureCards: Map<string, string>;
+  // Map<itemId, CapturedCard> for both shelves combined (transform slide)
+  cardImages: Map<string, CapturedCard>;
+  // Map<itemId, CapturedCard> for matrix cards in each shelf (design slides)
+  matrixCurrentCards: Map<string, CapturedCard>;
+  matrixFutureCards: Map<string, CapturedCard>;
   // PNG data URL for the whole sankey band, or null if nothing to draw
   sankeyImage: string | null;
 }
@@ -401,20 +440,36 @@ function waitForNextPaint(): Promise<void> {
   });
 }
 
-async function captureCardsInShelf(selector: string): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
+async function captureCardsInShelf(selector: string): Promise<Map<string, CapturedCard>> {
+  const out = new Map<string, CapturedCard>();
   const cards = document.querySelectorAll<HTMLElement>(selector);
   for (const card of Array.from(cards)) {
     const id = card.getAttribute('data-item-id');
     if (!id) continue;
     try {
+      // Grab the card's DOM pixel box BEFORE rasterising so we have the
+      // exact aspect ratio to use on the PPT side. offsetWidth/offsetHeight
+      // exclude CSS transform: scale() — we're in layout pixel space.
+      const widthPx = card.offsetWidth;
+      const heightPx = card.offsetHeight;
+      if (widthPx <= 0 || heightPx <= 0) continue;
       const canvas = await html2canvas(card, {
         backgroundColor: null,
         scale: 2,
         useCORS: true,
         logging: false,
+        // Clip html2canvas to the card's bounding box so overflowing
+        // badges (New / DEV circles that extend past the corner) don't
+        // inflate the canvas and skew the aspect ratio.
+        width: widthPx,
+        height: heightPx,
+        x: 0,
+        y: 0,
       });
-      out.set(id, canvas.toDataURL('image/png'));
+      out.set(id, {
+        dataUrl: canvas.toDataURL('image/png'),
+        aspect: heightPx / widthPx,
+      });
     } catch (err) {
       // Swallow CORS / tainted canvas errors — the caller will fall back to
       // the shape-based drawCard() renderer for any card we couldn't capture.
@@ -464,20 +519,20 @@ async function captureSankey(): Promise<string | null> {
   });
 }
 
-async function captureTransformSlide(): Promise<{ cardImages: Map<string, string>; sankeyImage: string | null }> {
-  const cardImages = new Map<string, string>();
+async function captureTransformSlide(): Promise<{ cardImages: Map<string, CapturedCard>; sankeyImage: string | null }> {
+  const cardImages = new Map<string, CapturedCard>();
   // Current shelf cards
   const currentCards = await captureCardsInShelf('.shelf-container:not(.flipped) .product-card[data-item-id]');
-  for (const [id, url] of currentCards) cardImages.set(id, url);
+  for (const [id, cap] of currentCards) cardImages.set(id, cap);
   // Future shelf cards (includes discontinued ghost cards)
   const futureCards = await captureCardsInShelf('.shelf-container.flipped .product-card[data-item-id]');
-  for (const [id, url] of futureCards) cardImages.set(id, url);
+  for (const [id, cap] of futureCards) cardImages.set(id, cap);
 
   const sankeyImage = await captureSankey();
   return { cardImages, sankeyImage };
 }
 
-async function captureMatrixCards(): Promise<Map<string, string>> {
+async function captureMatrixCards(): Promise<Map<string, CapturedCard>> {
   // Matrix cards live inside .matrix-16-9 and carry their own data-item-id.
   return captureCardsInShelf('.matrix-16-9 .matrix-card[data-item-id]');
 }
@@ -666,7 +721,7 @@ function addDesignSlide(
   catalogue: Product[],
   planName: string,
   label: string,
-  matrixCardImages: Map<string, string> | null,
+  matrixCardImages: Map<string, CapturedCard> | null,
 ) {
   const layout = shelf.matrixLayout;
   if (!layout || layout.xLabels.length === 0 || layout.yLabels.length === 0) return;
@@ -813,12 +868,12 @@ function addDesignSlide(
         const py = startY + gr * (bestCH + D_CARD_GAP);
         const cardId = `d-${r}-${c}-${idx}`;
 
-        const dataUrl = matrixCardImages?.get(item.id);
-        if (dataUrl) {
+        const capture = matrixCardImages?.get(item.id);
+        if (capture) {
+          const rect = fitCardToSlot(px, py, bestCW, bestCH, capture.aspect);
           slide.addImage({
-            data: dataUrl,
-            x: px, y: py, w: bestCW, h: bestCH,
-            sizing: { type: 'contain', w: bestCW, h: bestCH },
+            data: capture.dataUrl,
+            x: rect.x, y: rect.y, w: rect.w, h: rect.h,
             objectName: `${cardId}-img`,
           });
         } else {
@@ -833,11 +888,17 @@ function addDesignSlide(
 // Public entry point
 // ───────────────────────────────────────────────────────────────
 
-export async function exportToPptx(project: Project): Promise<void> {
+export async function exportToPptx(
+  project: Project,
+  onProgress?: (message: string) => void,
+): Promise<void> {
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE';
   pptx.author = 'Range Planner';
   pptx.title = project.name;
+
+  const report = (msg: string) => onProgress?.(msg);
+  const total = project.plans.length;
 
   // Multi-view capture loop: for every plan we visit the transform view
   // (cards + sankey), then the range-design matrix view for current and
@@ -855,14 +916,20 @@ export async function exportToPptx(project: Project): Promise<void> {
     await waitForNextPaint();
   };
 
-  for (const plan of project.plans) {
+  report('Preparing export\u2026');
+
+  for (let i = 0; i < project.plans.length; i++) {
+    const plan = project.plans[i];
+    const step = `Plan ${i + 1} of ${total}: ${plan.name}`;
+
     store.setActivePlan(plan.id);
     store.setActiveVariant(null);
 
     // ── Transform slide ──
+    report(`${step} — transform slide\u2026`);
     store.setActiveView('transform');
     await settle();
-    let transform: { cardImages: Map<string, string>; sankeyImage: string | null } | null = null;
+    let transform: { cardImages: Map<string, CapturedCard>; sankeyImage: string | null } | null = null;
     try {
       transform = await captureTransformSlide();
     } catch (err) {
@@ -870,10 +937,11 @@ export async function exportToPptx(project: Project): Promise<void> {
     }
 
     // ── Matrix current shelf ──
+    report(`${step} — current range matrix\u2026`);
     store.setActiveView('range-design');
     store.setDesignShelfId('current');
     await settle();
-    let matrixCurrentCards = new Map<string, string>();
+    let matrixCurrentCards = new Map<string, CapturedCard>();
     try {
       matrixCurrentCards = await captureMatrixCards();
     } catch (err) {
@@ -881,9 +949,10 @@ export async function exportToPptx(project: Project): Promise<void> {
     }
 
     // ── Matrix future shelf ──
+    report(`${step} — future range matrix\u2026`);
     store.setDesignShelfId('future');
     await settle();
-    let matrixFutureCards = new Map<string, string>();
+    let matrixFutureCards = new Map<string, CapturedCard>();
     try {
       matrixFutureCards = await captureMatrixCards();
     } catch (err) {
@@ -900,12 +969,14 @@ export async function exportToPptx(project: Project): Promise<void> {
 
   // Restore the original view / plan / variant so the user ends up back
   // wherever they started.
+  report('Restoring view\u2026');
   if (originalActivePlanId) store.setActivePlan(originalActivePlanId);
   if (originalVariantId) store.setActiveVariant(originalVariantId);
   store.setDesignShelfId(originalDesignShelfId);
   store.setActiveView(originalActiveView);
   await settle();
 
+  report('Building slides\u2026');
   for (const plan of project.plans) {
     const capture = captures.get(plan.id) || null;
     addTransformSlide(pptx, plan, project.catalogue, capture);
@@ -913,6 +984,7 @@ export async function exportToPptx(project: Project): Promise<void> {
     addDesignSlide(pptx, plan.futureShelf, project.catalogue, plan.name, 'Future Range', capture?.matrixFutureCards || null);
   }
 
+  report('Writing file\u2026');
   await pptx.writeFile({ fileName: `${project.name.replace(/\s+/g, '_')}_range_plan.pptx` });
 }
 
