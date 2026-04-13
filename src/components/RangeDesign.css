@@ -284,9 +284,14 @@
   opacity: 1;
 }
 
-/* Product card — uses CSS variable for responsive sizing */
+/* Product card — uses CSS variable for responsive sizing.
+   min-height enforces a playing-card aspect ratio (1 : 1.4) so cards
+   keep a pleasing tall shape when they only carry a few fields. The
+   JS layout maths in estimateCardHeight() uses the same floor so the
+   algorithm's row-height picks match what actually renders. */
 .matrix-card {
   width: var(--matrix-card-width, 80px);
+  min-height: calc(var(--matrix-card-width, 80px) * 1.4);
   background: #fff;
   border: 1.5px solid #e0e0e0;
   border-radius: 6px;

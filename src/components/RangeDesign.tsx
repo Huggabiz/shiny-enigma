@@ -36,8 +36,15 @@ const ADD_BTN_WIDTH = 28;
 // computeLayout / cellGrid keeps the algorithm's "how many cards fit
 // per row" decision in lockstep with what flex-wrap actually does.
 const BASE_GAP = 3;
-const MAX_CARD_WIDTH = 90;
+const MAX_CARD_WIDTH = 150;
 const MIN_CARD_WIDTH = 40;
+// Playing-card minimum aspect ratio. Cards never get shorter than
+// cardW * this factor, so the default-toggles card shape stays
+// pleasingly tall even as the binary search grows cardW to fill
+// available space. Content-heavy formats (US/EU/AUS RRP, revenue,
+// forecast revenue, category) grow the card past this floor via
+// estimateCardHeight — see below.
+const CARD_MIN_ASPECT = 1.4;
 const HEADER_ROW_HEIGHT = 28;
 const ADD_ROW_HEIGHT = 28;
 const EMPTY_SIZE = 30;
@@ -84,7 +91,10 @@ function estimateCardHeight(cf: CardFormat, cardW: number): number {
   if (cf.showRevenue) h += CARD_LINE_H;
   if (cf.showForecastRevenue) h += CARD_LINE_H;
   if (cf.showCategory) h += CARD_LINE_H;
-  return h;
+  // Clamp to the playing-card minimum. At the default toggle set the
+  // minimum usually wins so cards keep a ~1:1.4 shape; with extra
+  // fields on, content height takes over and cards grow past it.
+  return Math.max(h, cardW * CARD_MIN_ASPECT);
 }
 
 // Sort-by keys for the matrix cell sort dropdown. 'manual' keeps the
