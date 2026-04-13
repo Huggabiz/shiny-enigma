@@ -244,10 +244,22 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
         <h3>Catalogue</h3>
         <div className="catalogue-header-actions">
           <button className="catalogue-collapse-all-btn" onClick={() => {
+            // Collapse-all: collapse every category AND every sub-cat so a
+            // fresh expand starts from a fully closed tree. Expand-all
+            // (when already collapsed) clears both sets so all
+            // categories + sub-categories open at once.
             const allCats = grouped.map((g) => g.category);
             const allCollapsed = allCats.every((c) => collapsedCategories.has(c));
-            setCollapsedCategories(allCollapsed ? new Set() : new Set(allCats));
-            if (allCollapsed) setCollapsedSubCats(new Set());
+            if (allCollapsed) {
+              setCollapsedCategories(new Set());
+              setCollapsedSubCats(new Set());
+            } else {
+              setCollapsedCategories(new Set(allCats));
+              const allSubKeys = grouped.flatMap((g) =>
+                g.subCategories.map((sc) => `${g.category}::${sc.subCategory}`),
+              );
+              setCollapsedSubCats(new Set(allSubKeys));
+            }
           }} title={collapsedCategories.size > 0 ? "Expand all" : "Collapse all"}>↕</button>
           <button
             className={`catalogue-expand-btn ${expanded ? 'active' : ''}`}

@@ -139,17 +139,26 @@ function App() {
   }, [slideBaseScale, slideZoom]);
 
   // Auto-fit the slide to the viewport width whenever the user switches
-  // views or changes the resolution tier — matches the desktop slide
-  // tool convention where the canvas snaps to fit when something big
-  // happens to the layout.
+  // views, changes the resolution tier, or opens/loads/creates a project
+  // (project?.activePlanId flips from undefined → a real id on first
+  // open). Matches the desktop slide tool convention where the canvas
+  // snaps to fit when something big happens to the layout.
   useEffect(() => {
+    if (!project) return;
     const selector = activeView === 'transform' ? '.transform-view-scroll' : '.range-view-scroll';
-    // Wait for the new view's DOM to mount and CSS vars to commit.
+    // Wait for the new view's DOM to mount and CSS vars to commit. Two
+    // RAFs is enough for the initial render; on a fresh project we add a
+    // small fallback timeout so RangeDesign's own measure-and-layout has
+    // a chance to finish before we read clientWidth.
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => fitSlideToWidth(selector));
     });
-    return () => cancelAnimationFrame(id);
-  }, [activeView, slideBaseScale]);
+    const t = window.setTimeout(() => fitSlideToWidth(selector), 80);
+    return () => {
+      cancelAnimationFrame(id);
+      window.clearTimeout(t);
+    };
+  }, [activeView, slideBaseScale, project?.activePlanId]);
 
   // Ctrl + scroll zooms the slide, anchored to the cursor position so the
   // point under the mouse stays put (PowerPoint-style). Attached at the
