@@ -284,17 +284,17 @@
   opacity: 1;
 }
 
-/* Product card — uses CSS variable for responsive sizing.
-   min-height enforces a playing-card aspect ratio (1 : 1.4) so cards
-   keep a pleasing tall shape when they only carry a few fields. The
-   JS layout maths in estimateCardHeight() uses the same floor so the
-   algorithm's row-height picks match what actually renders.
-   justify-content: center distributes any whitespace evenly above
-   and below the content block when the min-aspect is bigger than
-   the content needs, so cards look balanced rather than top-heavy. */
+/* Product card — uses CSS variables for responsive sizing.
+   Both width and height are set from the JS layout algorithm via
+   --matrix-card-width and --matrix-card-height, so the rendered card
+   is EXACTLY the size the algorithm reserved space for. overflow: hidden
+   clips any content the card can't fit (usually only happens when the
+   user enables a lot of Card Format toggles on dense layouts).
+   justify-content: center keeps the content block visually centred
+   when it is shorter than the card's reserved height. */
 .matrix-card {
   width: var(--matrix-card-width, 80px);
-  min-height: calc(var(--matrix-card-width, 80px) * 1.4);
+  height: var(--matrix-card-height, 112px);
   background: #fff;
   border: 1.5px solid #e0e0e0;
   border-radius: 6px;
@@ -308,6 +308,7 @@
   position: relative;
   transition: border-color 0.15s, box-shadow 0.15s;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .matrix-card:hover {
@@ -435,25 +436,31 @@
   width: 100%;
 }
 
-.matrix-card-sku {
+/* Every single-line field forces nowrap + ellipsis so the field
+   always measures exactly one line tall. Without this, long values
+   like "Vol: 109,300" would wrap to two lines on narrower cards and
+   the JS layout estimator would under-count row heights — which is
+   what was causing the bottom of matrix cards to clip. */
+.matrix-card-sku,
+.matrix-card-rrp,
+.matrix-card-vol,
+.matrix-card-forecast,
+.matrix-card-rev,
+.matrix-card-category {
   font-size: 7px;
-  color: #999;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
 }
 
-.matrix-card-rrp {
-  font-size: 7px;
-  color: #2e7d32;
-}
-
-.matrix-card-vol {
-  font-size: 7px;
-  color: #666;
-}
-
-.matrix-card-forecast {
-  font-size: 7px;
-  color: #1976d2;
-}
+.matrix-card-sku { color: #999; }
+.matrix-card-rrp { color: #2e7d32; }
+.matrix-card-vol { color: #666; }
+.matrix-card-forecast { color: #1976d2; }
+.matrix-card-rev { color: #555; }
+.matrix-card-category { color: #999; font-style: italic; }
 
 .matrix-card-rrp.matrix-card-us { color: #1976d2; }
 .matrix-card-rrp.matrix-card-eu { color: #6a1b9a; }
@@ -468,17 +475,6 @@
 }
 .matrix-card-rrp-delta.up { color: #2e7d32; }
 .matrix-card-rrp-delta.down { color: #c62828; }
-
-.matrix-card-rev {
-  font-size: 7px;
-  color: #555;
-}
-
-.matrix-card-category {
-  font-size: 7px;
-  color: #999;
-  font-style: italic;
-}
 
 /* Add buttons */
 .matrix-add-btn {

@@ -246,10 +246,17 @@ function computeLayout(
   return { fits: true, colWidths, rowHeights };
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cellHeight, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir }: {
+function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cardHeight, cellHeight, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir }: {
   row: number; col: number; itemIds: string[];
   shelf: Shelf; catalogue: Product[];
   cardWidth: number;
+  /** Hard pixel cap on each card box. Applied as an inline CSS
+   * variable that the .matrix-card rule reads for its `height`. This
+   * makes the JS layout estimate authoritative rather than a guess:
+   * the card is exactly what the algorithm reserved space for, and
+   * overflow: hidden on .matrix-card clips any excess content inside
+   * the card instead of letting it leak past the cell border. */
+  cardHeight: number;
   /** Hard pixel cap on the cell box. Combined with overflow: hidden
    * and box-sizing: border-box this prevents the cell from auto-sizing
    * past its row height — without this, CSS grid's auto track ignores
@@ -288,6 +295,7 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cellHeight
     <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''}`}
       style={{
         '--matrix-card-width': `${Math.floor(cardWidth)}px`,
+        '--matrix-card-height': `${Math.floor(cardHeight)}px`,
         height: `${cellHeight}px`,
       } as React.CSSProperties}>
       {items.map((item) => {
@@ -538,11 +546,11 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   }, []);
 
   // Build cell counts and compute layout
-  const { columnWidths, rowHeights, cardWidth } = useMemo(() => {
+  const { columnWidths, rowHeights, cardWidth, cardHeight } = useMemo(() => {
     const numCols = layout.xLabels.length;
     const numRows = layout.yLabels.length;
     if (numCols === 0 || numRows === 0 || wrapperSize.w === 0 || wrapperSize.h === 0) {
-      return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH };
+      return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH, cardHeight: MAX_CARD_WIDTH * 1.4 };
     }
 
     // Scaled gap / padding values that match what the CSS actually
@@ -601,6 +609,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         columnWidths: Array(numCols).fill((availW - (numCols - 1) * scaledGap) / numCols),
         rowHeights: Array(numRows).fill((availH - (numRows - 1) * scaledGap) / numRows),
         cardWidth: MAX_CARD_WIDTH,
+        cardHeight: estimateCardHeight(cardFormat, MAX_CARD_WIDTH),
       };
     }
 
@@ -717,7 +726,11 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       }
     }
 
-    return { columnWidths: bestColW, rowHeights: bestRowH, cardWidth: bestCW };
+    // Use the SAME cardH the algorithm reserved space for. The card is
+    // given this exact height via the --matrix-card-height CSS variable,
+    // so JS and CSS can never drift.
+    const finalCardH = estimateCardHeight(cardFormat, bestCW);
+    return { columnWidths: bestColW, rowHeights: bestRowH, cardWidth: bestCW, cardHeight: finalCardH };
   }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize, variantIncludedIds, showGhosted,
       scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH, uiScale,
       shelfId, showDiscontinued, activePlan, cardFormat]);
@@ -991,6 +1004,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                       itemIds={cellMap.get(`${row}-${col}`) || []}
                       shelf={shelf} catalogue={catalogue}
                       cardWidth={cardWidth}
+                      cardHeight={cardHeight}
                       cellHeight={rowHeights[row] || 80}
                       onAddPlaceholder={handleAddPlaceholder}
                       onEditPlaceholder={handleEditPlaceholder}
