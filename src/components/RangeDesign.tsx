@@ -18,7 +18,7 @@ import { PillToggle } from './PillToggle';
 import { PlaceholderDialog } from './PlaceholderDialog';
 import { EditableTitle } from './EditableTitle';
 import { SlideCanvasControls } from './SlideCanvasControls';
-import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem } from '../types';
+import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem, CardFormat } from '../types';
 import { getActivePlan } from '../types';
 import './RangeDesign.css';
 
@@ -38,11 +38,54 @@ const ADD_BTN_WIDTH = 28;
 const BASE_GAP = 3;
 const MAX_CARD_WIDTH = 90;
 const MIN_CARD_WIDTH = 40;
-const CARD_ASPECT = 1.4;
 const HEADER_ROW_HEIGHT = 28;
 const ADD_ROW_HEIGHT = 28;
 const EMPTY_SIZE = 30;
 const MIN_ROW_H = 40;
+
+// ---------------------------------------------------------------
+// Card-height estimator
+//
+// Every Card Format toggle adds a visible line to the matrix card,
+// and the JS layout maths has to know how tall the card actually is
+// to decide how many rows of cards a cell needs. Using a fixed
+// aspect-ratio constant (the pre-1.9.12 CARD_ASPECT = 1.4) worked
+// when only image + name + sku + vol + uk-rrp were on, but turning
+// on US/EU/AUS RRP, Revenue, Forecast Revenue, Category etc. grows
+// the card by ~10px per extra line and the algorithm under-allocated
+// row height, letting the bottom card clip at the cell border.
+//
+// Values here mirror the px / line-height in RangeDesign.css:
+//   .matrix-card-image { width: 70%; aspect-ratio: 1; max-height: 40px; margin-bottom: 2px }
+//   .matrix-card-name  { font-size: 8px; line-height: 1.15; max-height: 2.3em }  → ≈ 21px
+//   all other fields    font-size: 7px                                          → ≈ 10px each line
+//   .matrix-card        padding: 4px  (top + bottom = 8)
+// ---------------------------------------------------------------
+const CARD_PADDING_V = 8;
+const CARD_LINE_H = 10;    // one line of 7px-font field content
+const CARD_NAME_H = 21;    // name can wrap to 2 lines
+const CARD_IMG_MAX = 40;
+const CARD_IMG_MARGIN = 2;
+
+function estimateCardHeight(cf: CardFormat, cardW: number): number {
+  let h = CARD_PADDING_V;
+  if (cf.showImage) {
+    // Image is 70% of card width with aspect-ratio 1, capped at 40px.
+    h += Math.min(CARD_IMG_MAX, cardW * 0.7) + CARD_IMG_MARGIN;
+  }
+  if (cf.showName) h += CARD_NAME_H;
+  if (cf.showSku) h += CARD_LINE_H;
+  if (cf.showRrp) h += CARD_LINE_H;
+  if (cf.showUsRrp) h += CARD_LINE_H;
+  if (cf.showEuRrp) h += CARD_LINE_H;
+  if (cf.showAusRrp) h += CARD_LINE_H;
+  if (cf.showVolume) h += CARD_LINE_H;
+  if (cf.showForecastVolume) h += CARD_LINE_H;
+  if (cf.showRevenue) h += CARD_LINE_H;
+  if (cf.showForecastRevenue) h += CARD_LINE_H;
+  if (cf.showCategory) h += CARD_LINE_H;
+  return h;
+}
 
 // Sort-by keys for the matrix cell sort dropdown. 'manual' keeps the
 // existing matrix order (the order the user dragged items into the cell).
@@ -133,6 +176,7 @@ function cellGrid(
 //   3. Row heights proportional to the max row-count in each row
 function computeLayout(
   cardW: number,
+  cardH: number,
   cellCounts: number[][], // [row][col]
   numCols: number,
   numRows: number,
@@ -142,7 +186,6 @@ function computeLayout(
   cardGap: number,
   cellPadding: number,
 ): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
-  const cardH = cardW * CARD_ASPECT;
 
   // Step 1: For each column, find the max products in any cell
   const maxPerCol = Array.from({ length: numCols }, (_, col) => {
@@ -446,6 +489,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     activeVariantId, showGhosted, setShowGhosted,
     showDiscontinued, setShowDiscontinued,
     slideBaseScale,
+    cardFormat,
   } = useProjectStore();
 
   // Scale the chrome dimensions (row/column headers, gaps) with the
@@ -599,7 +643,10 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
     while (lo <= hi) {
       const mid = Math.floor((lo + hi) / 2);
-      const result = computeLayout(mid, cellCounts, numCols, numRows, availW, availH, scaledGap, scaledCardGap, scaledCellPadding);
+      // Recompute card height at each candidate width because the
+      // image portion of the card scales with width up to the 40px cap.
+      const cardH = estimateCardHeight(cardFormat, mid);
+      const result = computeLayout(mid, cardH, cellCounts, numCols, numRows, availW, availH, scaledGap, scaledCardGap, scaledCellPadding);
       if (result.fits) {
         bestCW = mid;
         bestColW = result.colWidths;
@@ -615,7 +662,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     // lots of discontinued overlays) accept the layout at the floor so
     // the render stays inside the canvas bounds instead of spilling.
     if (!foundFit) {
-      const fallback = computeLayout(absoluteFloor, cellCounts, numCols, numRows, availW, availH, scaledGap, scaledCardGap, scaledCellPadding);
+      const fallbackCardH = estimateCardHeight(cardFormat, absoluteFloor);
+      const fallback = computeLayout(absoluteFloor, fallbackCardH, cellCounts, numCols, numRows, availW, availH, scaledGap, scaledCardGap, scaledCellPadding);
       bestCW = absoluteFloor;
       bestColW = fallback.colWidths.length ? fallback.colWidths : Array(numCols).fill((availW - (numCols - 1) * scaledGap) / numCols);
       bestRowH = fallback.rowHeights.length ? fallback.rowHeights : Array(numRows).fill((availH - (numRows - 1) * scaledGap) / numRows);
@@ -640,7 +688,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     return { columnWidths: bestColW, rowHeights: bestRowH, cardWidth: bestCW };
   }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize, variantIncludedIds, showGhosted,
       scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH, uiScale,
-      shelfId, showDiscontinued, activePlan]);
+      shelfId, showDiscontinued, activePlan, cardFormat]);
 
   const gridCols = `${scaledRowHeaderW}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${scaledAddBtnW}px`;
 
