@@ -30,9 +30,12 @@ interface RangeDesignProps {
 
 const ROW_HEADER_WIDTH = 60;
 const ADD_BTN_WIDTH = 28;
-const GAP = 3;
-const CARD_GAP = 4;
-const CELL_PADDING = 4;
+// All inter-cell gaps + cell paddings are this many CSS pixels at
+// --ui-scale = 1. The CSS multiplies by var(--ui-scale, 1), so the JS
+// layout maths must do the same — passing the scaled values through to
+// computeLayout / cellGrid keeps the algorithm's "how many cards fit
+// per row" decision in lockstep with what flex-wrap actually does.
+const BASE_GAP = 3;
 const MAX_CARD_WIDTH = 90;
 const MIN_CARD_WIDTH = 40;
 const CARD_ASPECT = 1.4;
@@ -108,9 +111,17 @@ function sortShelfItems<T extends ShelfItem>(
 
 // For n products in a cell of given width at given card width,
 // how many columns fit horizontally, and how many rows result?
-function cellGrid(n: number, cardW: number, cellW: number): { cols: number; rows: number } {
+// cellPadding / cardGap are passed in (already scaled by --ui-scale)
+// so the maths matches the rendered CSS at any slide resolution tier.
+function cellGrid(
+  n: number,
+  cardW: number,
+  cellW: number,
+  cellPadding: number,
+  cardGap: number,
+): { cols: number; rows: number } {
   if (n === 0) return { cols: 0, rows: 0 };
-  const maxCols = Math.max(1, Math.floor((cellW - CELL_PADDING * 2 + CARD_GAP) / (cardW + CARD_GAP)));
+  const maxCols = Math.max(1, Math.floor((cellW - cellPadding * 2 + cardGap) / (cardW + cardGap)));
   const cols = Math.min(n, maxCols);
   return { cols, rows: Math.ceil(n / cols) };
 }
@@ -127,6 +138,9 @@ function computeLayout(
   numRows: number,
   availW: number,
   availH: number,
+  gap: number,
+  cardGap: number,
+  cellPadding: number,
 ): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
   const cardH = cardW * CARD_ASPECT;
 
@@ -149,22 +163,22 @@ function computeLayout(
   });
 
   let colWidths = idealColSlots.map((slots) =>
-    slots === 0 ? EMPTY_SIZE : slots * (cardW + CARD_GAP) - CARD_GAP + CELL_PADDING * 2
+    slots === 0 ? EMPTY_SIZE : slots * (cardW + cardGap) - cardGap + cellPadding * 2
   );
-  let totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * GAP;
+  let totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * gap;
 
   // If too wide, increase cols per cell (pack more horizontally, fewer rows)
   if (totalW > availW) {
     // Redistribute: compute how many horizontal slots each column gets
     // proportionally to its max product count
     const totalProducts = maxPerCol.reduce((s, n) => s + n, 0) || 1;
-    const usableW = availW - (numCols - 1) * GAP - maxPerCol.filter((n) => n === 0).length * EMPTY_SIZE;
+    const usableW = availW - (numCols - 1) * gap - maxPerCol.filter((n) => n === 0).length * EMPTY_SIZE;
     colWidths = maxPerCol.map((n) => {
       if (n === 0) return EMPTY_SIZE;
       const proportionalW = (n / totalProducts) * usableW;
-      return Math.max(cardW + CELL_PADDING * 2, proportionalW);
+      return Math.max(cardW + cellPadding * 2, proportionalW);
     });
-    totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * GAP;
+    totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * gap;
     if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
   }
 
@@ -175,7 +189,7 @@ function computeLayout(
     for (let col = 0; col < numCols; col++) {
       const n = cellCounts[row][col];
       if (n === 0) { cellRows[row].push(0); continue; }
-      const { rows } = cellGrid(n, cardW, colWidths[col]);
+      const { rows } = cellGrid(n, cardW, colWidths[col], cellPadding, cardGap);
       cellRows[row].push(rows);
     }
   }
@@ -190,15 +204,15 @@ function computeLayout(
 
   if (totalCardRows === 0) {
     // All empty
-    const rowH = (availH - (numRows - 1) * GAP) / numRows;
+    const rowH = (availH - (numRows - 1) * gap) / numRows;
     return { fits: true, colWidths, rowHeights: Array(numRows).fill(rowH) };
   }
 
   // Compute natural row heights (minimum needed)
   const naturalRowH = maxCardRowsPerRow.map((r) =>
-    r === 0 ? MIN_ROW_H : r * (cardH + CARD_GAP) - CARD_GAP + CELL_PADDING * 2
+    r === 0 ? MIN_ROW_H : r * (cardH + cardGap) - cardGap + cellPadding * 2
   );
-  const totalNaturalH = naturalRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * GAP;
+  const totalNaturalH = naturalRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * gap;
 
   if (totalNaturalH > availH) return { fits: false, colWidths, rowHeights: naturalRowH };
 
@@ -212,10 +226,16 @@ function computeLayout(
   return { fits: true, colWidths, rowHeights };
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir }: {
+function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cellHeight, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir }: {
   row: number; col: number; itemIds: string[];
   shelf: Shelf; catalogue: Product[];
   cardWidth: number;
+  /** Hard pixel cap on the cell box. Combined with overflow: hidden
+   * and box-sizing: border-box this prevents the cell from auto-sizing
+   * past its row height — without this, CSS grid's auto track ignores
+   * the row container's explicit style.height and lets cells extend
+   * past the row's bottom edge (the v1.9.x discontinued-spillover). */
+  cellHeight: number;
   onAddPlaceholder: (row: number, col: number) => void;
   onEditPlaceholder?: (itemId: string) => void;
   variantIncludedIds: Set<string> | null;
@@ -246,7 +266,10 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, onAddPlace
 
   return (
     <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''}`}
-      style={{ '--matrix-card-width': `${Math.floor(cardWidth)}px` } as React.CSSProperties}>
+      style={{
+        '--matrix-card-width': `${Math.floor(cardWidth)}px`,
+        height: `${cellHeight}px`,
+      } as React.CSSProperties}>
       {items.map((item) => {
         if (!item) return null;
         const product = catalogue.find((p) => p.id === item.productId);
@@ -501,9 +524,18 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH };
     }
 
+    // Scaled gap / padding values that match what the CSS actually
+    // renders at the current --ui-scale. JS used to use literal 3/4
+    // constants which drifted from the stylesheet at scale > 1, causing
+    // cellGrid to think more cards fit per row than reality and
+    // under-allocating row height (cells then spilled vertically).
+    const scaledGap = BASE_GAP * uiScale;
+    const scaledCardGap = BASE_GAP * uiScale;
+    const scaledCellPadding = BASE_GAP * uiScale;
+
     const wPad = 24;
-    const availW = wrapperSize.w - wPad - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * GAP;
-    const availH = wrapperSize.h - wPad - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * GAP;
+    const availW = wrapperSize.w - wPad - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * scaledGap;
+    const availH = wrapperSize.h - wPad - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * scaledGap;
 
     const cellCounts: number[][] = [];
     for (let row = 0; row < numRows; row++) {
@@ -545,8 +577,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     const totalProducts = cellCounts.flat().reduce((s, n) => s + n, 0);
     if (totalProducts === 0) {
       return {
-        columnWidths: Array(numCols).fill((availW - (numCols - 1) * GAP) / numCols),
-        rowHeights: Array(numRows).fill((availH - (numRows - 1) * GAP) / numRows),
+        columnWidths: Array(numCols).fill((availW - (numCols - 1) * scaledGap) / numCols),
+        rowHeights: Array(numRows).fill((availH - (numRows - 1) * scaledGap) / numRows),
         cardWidth: MAX_CARD_WIDTH,
       };
     }
@@ -567,7 +599,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
     while (lo <= hi) {
       const mid = Math.floor((lo + hi) / 2);
-      const result = computeLayout(mid, cellCounts, numCols, numRows, availW, availH);
+      const result = computeLayout(mid, cellCounts, numCols, numRows, availW, availH, scaledGap, scaledCardGap, scaledCellPadding);
       if (result.fits) {
         bestCW = mid;
         bestColW = result.colWidths;
@@ -583,22 +615,23 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     // lots of discontinued overlays) accept the layout at the floor so
     // the render stays inside the canvas bounds instead of spilling.
     if (!foundFit) {
-      const fallback = computeLayout(absoluteFloor, cellCounts, numCols, numRows, availW, availH);
+      const fallback = computeLayout(absoluteFloor, cellCounts, numCols, numRows, availW, availH, scaledGap, scaledCardGap, scaledCellPadding);
       bestCW = absoluteFloor;
-      bestColW = fallback.colWidths.length ? fallback.colWidths : Array(numCols).fill((availW - (numCols - 1) * GAP) / numCols);
-      bestRowH = fallback.rowHeights.length ? fallback.rowHeights : Array(numRows).fill((availH - (numRows - 1) * GAP) / numRows);
+      bestColW = fallback.colWidths.length ? fallback.colWidths : Array(numCols).fill((availW - (numCols - 1) * scaledGap) / numCols);
+      bestRowH = fallback.rowHeights.length ? fallback.rowHeights : Array(numRows).fill((availH - (numRows - 1) * scaledGap) / numRows);
       // Clamp row heights so their total doesn't exceed available space
-      // — individual cells will clip via overflow: hidden, which is
-      // preferable to pushing the whole matrix off the canvas.
-      const rowSum = bestRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * GAP;
+      // — combined with the explicit cell-height fix below, individual
+      // cells get hard-clipped via overflow: hidden so the matrix stays
+      // inside the canvas even in dense-overflow scenarios.
+      const rowSum = bestRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * scaledGap;
       if (rowSum > availH) {
-        const scale = (availH - (numRows - 1) * GAP) / bestRowH.reduce((s, h) => s + h, 0);
+        const scale = (availH - (numRows - 1) * scaledGap) / bestRowH.reduce((s, h) => s + h, 0);
         bestRowH = bestRowH.map((h) => Math.max(MIN_ROW_H, h * scale));
       }
     }
 
     // Distribute remaining width evenly
-    const totalColW = bestColW.reduce((s, w) => s + w, 0) + (numCols - 1) * GAP;
+    const totalColW = bestColW.reduce((s, w) => s + w, 0) + (numCols - 1) * scaledGap;
     if (totalColW < availW) {
       const extra = availW - totalColW;
       bestColW = bestColW.map((w) => w + extra / numCols);
@@ -606,7 +639,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
     return { columnWidths: bestColW, rowHeights: bestRowH, cardWidth: bestCW };
   }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize, variantIncludedIds, showGhosted,
-      scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH,
+      scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH, uiScale,
       shelfId, showDiscontinued, activePlan]);
 
   const gridCols = `${scaledRowHeaderW}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${scaledAddBtnW}px`;
@@ -878,6 +911,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                       itemIds={cellMap.get(`${row}-${col}`) || []}
                       shelf={shelf} catalogue={catalogue}
                       cardWidth={cardWidth}
+                      cellHeight={rowHeights[row] || 80}
                       onAddPlaceholder={handleAddPlaceholder}
                       onEditPlaceholder={handleEditPlaceholder}
                       variantIncludedIds={variantIncludedIds}

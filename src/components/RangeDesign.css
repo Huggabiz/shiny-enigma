@@ -175,12 +175,17 @@
   opacity: 1;
 }
 
-/* Grid rows — explicit height from JS */
+/* Grid rows — explicit height from JS. overflow: hidden is a safety
+   net: cells now also carry an explicit pixel height, but if any
+   future change ever lets a cell's intrinsic height exceed the row,
+   we clip at the row boundary instead of letting content leak past
+   the bottom of the matrix canvas. */
 .matrix-row {
   display: grid;
   gap: calc(3px * var(--ui-scale, 1));
   margin-bottom: calc(3px * var(--ui-scale, 1));
   min-height: 0;
+  overflow: hidden;
 }
 
 .matrix-row-header {
