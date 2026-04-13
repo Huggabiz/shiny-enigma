@@ -32,9 +32,9 @@ const ROW_HEADER_WIDTH = 60;
 const ADD_BTN_WIDTH = 28;
 // All inter-cell gaps + cell paddings are this many CSS pixels at
 // --ui-scale = 1. The CSS multiplies by var(--ui-scale, 1), so the JS
-// layout maths must do the same — passing the scaled values through to
-// computeLayout / cellGrid keeps the algorithm's "how many cards fit
-// per row" decision in lockstep with what flex-wrap actually does.
+// layout maths must do the same — the scaled values are passed through
+// to computeLayout so the algorithm's "how many card-slots fit per
+// column" decision matches what the browser renders.
 const BASE_GAP = 3;
 const MAX_CARD_WIDTH = 150;
 const MIN_CARD_WIDTH = 40;
@@ -162,32 +162,21 @@ function sortShelfItems<T extends ShelfItem>(
   });
 }
 
-// For n products in a cell of given width at given card width,
-// how many columns fit horizontally, and how many rows result?
-// cellPadding / cardGap are passed in (already scaled by --ui-scale)
-// so the maths matches the rendered CSS at any slide resolution tier.
-function cellGrid(
-  n: number,
-  cardW: number,
-  cellW: number,
-  cellPadding: number,
-  cardGap: number,
-): { cols: number; rows: number } {
-  if (n === 0) return { cols: 0, rows: 0 };
-  const maxCols = Math.max(1, Math.floor((cellW - cellPadding * 2 + cardGap) / (cardW + cardGap)));
-  const cols = Math.min(n, maxCols);
-  return { cols, rows: Math.ceil(n / cols) };
-}
-
-// Core layout algorithm: for a given card width, compute column widths and row heights
-// Strategy:
-//   1. Compute column widths from the max product count per column (assume single-row packing initially)
-//   2. Refine: given column widths, compute actual row counts per cell
-//   3. Row heights proportional to the max row-count in each row
+// Core layout algorithm. Given an explicit cellColsPerCol (how many
+// cards per row each matrix column will fit), compute concrete column
+// widths + row heights and report whether the layout fits.
+//
+// The caller drives this with different cellColsPerCol values derived
+// from a "target max rows per cell" loop, and picks the configuration
+// that yields the largest cardW. That's how we escape the old
+// sqrt-based heuristic which would pack e.g. a 10-card cell into 4
+// slots (3 rows) when 5 slots (2 rows) would free up enough vertical
+// budget to grow every card.
 function computeLayout(
   cardW: number,
   cardH: number,
   cellCounts: number[][], // [row][col]
+  cellColsPerCol: number[], // [col]  — explicit horizontal slots per col
   numCols: number,
   numRows: number,
   availW: number,
@@ -197,57 +186,29 @@ function computeLayout(
   cellPadding: number,
 ): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
 
-  // Step 1: For each column, find the max products in any cell
-  const maxPerCol = Array.from({ length: numCols }, (_, col) => {
-    let max = 0;
-    for (let row = 0; row < numRows; row++) {
-      if (cellCounts[row][col] > max) max = cellCounts[row][col];
-    }
-    return max;
-  });
-
-  // Step 2: Compute column widths iteratively
-  // Start by assuming we can stack as many rows as needed (use sqrt-based cols estimate)
-  // Then refine based on available height
-  const idealColSlots = maxPerCol.map((n) => {
-    if (n === 0) return 0;
-    // Ideal: use enough cols so rows are roughly square-ish
-    return Math.max(1, Math.ceil(Math.sqrt(n)));
-  });
-
-  let colWidths = idealColSlots.map((slots) =>
-    slots === 0 ? EMPTY_SIZE : slots * (cardW + cardGap) - cardGap + cellPadding * 2
+  // Column widths from the explicit cellCols. Empty columns shrink to
+  // EMPTY_SIZE so they don't eat horizontal budget.
+  const colWidths = cellColsPerCol.map((cols) =>
+    cols === 0 ? EMPTY_SIZE : cols * (cardW + cardGap) - cardGap + cellPadding * 2
   );
-  let totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * gap;
+  const totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * gap;
+  if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
 
-  // If too wide, increase cols per cell (pack more horizontally, fewer rows)
-  if (totalW > availW) {
-    // Redistribute: compute how many horizontal slots each column gets
-    // proportionally to its max product count
-    const totalProducts = maxPerCol.reduce((s, n) => s + n, 0) || 1;
-    const usableW = availW - (numCols - 1) * gap - maxPerCol.filter((n) => n === 0).length * EMPTY_SIZE;
-    colWidths = maxPerCol.map((n) => {
-      if (n === 0) return EMPTY_SIZE;
-      const proportionalW = (n / totalProducts) * usableW;
-      return Math.max(cardW + cellPadding * 2, proportionalW);
-    });
-    totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * gap;
-    if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
-  }
-
-  // Step 3: Given column widths, compute how many card-rows each cell needs
+  // Cell row count = ceil(cellCount / cellCols) for each cell. Using
+  // cellColsPerCol directly (instead of deriving from cellGrid on the
+  // already-sized column) guarantees the actual render matches what
+  // this function planned for.
   const cellRows: number[][] = [];
   for (let row = 0; row < numRows; row++) {
     cellRows.push([]);
     for (let col = 0; col < numCols; col++) {
       const n = cellCounts[row][col];
-      if (n === 0) { cellRows[row].push(0); continue; }
-      const { rows } = cellGrid(n, cardW, colWidths[col], cellPadding, cardGap);
-      cellRows[row].push(rows);
+      const cols = cellColsPerCol[col];
+      if (n === 0 || cols === 0) { cellRows[row].push(0); continue; }
+      cellRows[row].push(Math.ceil(n / cols));
     }
   }
 
-  // Step 4: Row heights proportional to max card-rows in each row
   const maxCardRowsPerRow = Array.from({ length: numRows }, (_, row) => {
     const max = Math.max(...cellRows[row]);
     return max > 0 ? max : 0;
@@ -637,50 +598,95 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       };
     }
 
-    // Binary search for largest uniform card width that fits everything.
+    // Max product count in any single column, used to bound the target
+    // "max card rows per cell" loop below.
+    const maxPerCol = Array.from({ length: numCols }, (_, col) => {
+      let max = 0;
+      for (let row = 0; row < numRows; row++) {
+        if (cellCounts[row][col] > max) max = cellCounts[row][col];
+      }
+      return max;
+    });
+    const absoluteMaxCount = Math.max(1, ...maxPerCol);
+
     // When the user has Show discontinued on, cells can be carrying a lot
     // of extra ghost cards, so the regular floor (MIN_CARD_WIDTH = 40) is
     // sometimes too large to fit. Fall back to an absolute floor of 22px
     // for the dense case so the sizer always has room to find a fit
     // before spilling over the canvas.
     const absoluteFloor = shelfId === 'future' && showDiscontinued ? 22 : MIN_CARD_WIDTH;
-    let lo = absoluteFloor;
-    let hi = MAX_CARD_WIDTH;
-    let bestCW = absoluteFloor;
+
+    // Outer loop: iterate over "target max card rows per cell".
+    // For each target we derive cellCols[col] = ceil(maxPerCol[col] / target)
+    // — i.e. how many horizontal slots each column needs so every cell in
+    // that column fits its contents in `target` rows or less. Then we
+    // binary search the biggest cardW that still fits this configuration,
+    // and keep whichever (target, cardW) pair yields the largest cardW.
+    //
+    // This is how the algorithm "maximises the space": the old sqrt-based
+    // heuristic would lock a dense column into 3 card-rows when 2 would
+    // have freed enough vertical budget to grow every card by 30-40%. By
+    // trying multiple targets we find the one whose horizontal vs vertical
+    // balance lets cards get biggest.
+    let bestCW = 0;
     let bestColW: number[] = [];
     let bestRowH: number[] = [];
     let foundFit = false;
 
-    while (lo <= hi) {
-      const mid = Math.floor((lo + hi) / 2);
-      // Recompute card height at each candidate width because the
-      // image portion of the card scales with width up to the 40px cap.
-      const cardH = estimateCardHeight(cardFormat, mid);
-      const result = computeLayout(mid, cardH, cellCounts, numCols, numRows, availW, availH, scaledGap, scaledCardGap, scaledCellPadding);
-      if (result.fits) {
-        bestCW = mid;
-        bestColW = result.colWidths;
-        bestRowH = result.rowHeights;
+    for (let target = 1; target <= absoluteMaxCount; target++) {
+      const cellColsPerCol = maxPerCol.map((n) =>
+        n === 0 ? 0 : Math.ceil(n / target),
+      );
+
+      let lo = absoluteFloor;
+      let hi = MAX_CARD_WIDTH;
+      let targetBestCW = 0;
+      let targetBestColW: number[] = [];
+      let targetBestRowH: number[] = [];
+
+      while (lo <= hi) {
+        const mid = Math.floor((lo + hi) / 2);
+        const cardH = estimateCardHeight(cardFormat, mid);
+        const result = computeLayout(
+          mid, cardH, cellCounts, cellColsPerCol,
+          numCols, numRows, availW, availH,
+          scaledGap, scaledCardGap, scaledCellPadding,
+        );
+        if (result.fits) {
+          targetBestCW = mid;
+          targetBestColW = result.colWidths;
+          targetBestRowH = result.rowHeights;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+
+      if (targetBestCW > bestCW) {
+        bestCW = targetBestCW;
+        bestColW = targetBestColW;
+        bestRowH = targetBestRowH;
         foundFit = true;
-        lo = mid + 1;
-      } else {
-        hi = mid - 1;
       }
     }
 
-    // Absolute fallback: if even the floor didn't fit (dense plan with
-    // lots of discontinued overlays) accept the layout at the floor so
-    // the render stays inside the canvas bounds instead of spilling.
+    // Absolute fallback: if no target produced a fit (pathological dense
+    // case) accept the layout at the floor with the loosest target so the
+    // render stays inside the canvas bounds instead of spilling.
     if (!foundFit) {
+      const fallbackTarget = absoluteMaxCount;
+      const cellColsPerCol = maxPerCol.map((n) =>
+        n === 0 ? 0 : Math.ceil(n / fallbackTarget),
+      );
       const fallbackCardH = estimateCardHeight(cardFormat, absoluteFloor);
-      const fallback = computeLayout(absoluteFloor, fallbackCardH, cellCounts, numCols, numRows, availW, availH, scaledGap, scaledCardGap, scaledCellPadding);
+      const fallback = computeLayout(
+        absoluteFloor, fallbackCardH, cellCounts, cellColsPerCol,
+        numCols, numRows, availW, availH,
+        scaledGap, scaledCardGap, scaledCellPadding,
+      );
       bestCW = absoluteFloor;
       bestColW = fallback.colWidths.length ? fallback.colWidths : Array(numCols).fill((availW - (numCols - 1) * scaledGap) / numCols);
       bestRowH = fallback.rowHeights.length ? fallback.rowHeights : Array(numRows).fill((availH - (numRows - 1) * scaledGap) / numRows);
-      // Clamp row heights so their total doesn't exceed available space
-      // — combined with the explicit cell-height fix below, individual
-      // cells get hard-clipped via overflow: hidden so the matrix stays
-      // inside the canvas even in dense-overflow scenarios.
       const rowSum = bestRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * scaledGap;
       if (rowSum > availH) {
         const scale = (availH - (numRows - 1) * scaledGap) / bestRowH.reduce((s, h) => s + h, 0);
@@ -688,11 +694,21 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       }
     }
 
-    // Distribute remaining width evenly
+    // Distribute remaining horizontal width proportionally to each
+    // column's product count so dense columns (e.g. Mid with 10 items)
+    // get more of the slack than sparse ones, rather than the old
+    // uniform split which left denser cells looking pinched.
     const totalColW = bestColW.reduce((s, w) => s + w, 0) + (numCols - 1) * scaledGap;
     if (totalColW < availW) {
       const extra = availW - totalColW;
-      bestColW = bestColW.map((w) => w + extra / numCols);
+      const productSum = maxPerCol.reduce((s, n) => s + n, 0);
+      if (productSum > 0) {
+        bestColW = bestColW.map((w, i) =>
+          maxPerCol[i] === 0 ? w : w + extra * (maxPerCol[i] / productSum),
+        );
+      } else {
+        bestColW = bestColW.map((w) => w + extra / numCols);
+      }
     }
 
     return { columnWidths: bestColW, rowHeights: bestRowH, cardWidth: bestCW };
