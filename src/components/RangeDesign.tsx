@@ -37,7 +37,8 @@ const ADD_BTN_WIDTH = 28;
 // column" decision matches what the browser renders.
 const BASE_GAP = 3;
 const MAX_CARD_WIDTH = 150;
-const MIN_CARD_WIDTH = 40;
+// No MIN_CARD_WIDTH anymore — the binary search uses an absoluteFloor
+// of 22px directly so dense plans can always find a fit.
 // Playing-card minimum aspect ratio. Cards never get shorter than
 // cardW * this factor, so the default-toggles card shape stays
 // pleasingly tall even as the binary search grows cardW to fill
@@ -63,19 +64,24 @@ const MIN_ROW_H = 40;
 // row height, letting the bottom card clip at the cell border.
 //
 // Values here mirror the px / line-height in RangeDesign.css:
-//   .matrix-card-image { width: 70%; aspect-ratio: 1; max-height: 40px; margin-bottom: 2px }
-//   .matrix-card-name  { font-size: 8px; line-height: 1.15; max-height: 2.3em }  → ≈ 21px
-//   all other fields    font-size: 7px                                          → ≈ 10px each line
-//   .matrix-card        padding: 4px  (top + bottom = 8)
+//   .matrix-card         padding: 4px   border: 1.5px  (chrome = 8 + 3)
+//   .matrix-card-image   width: 70%; aspect-ratio: 1; max-height: 40px; margin-bottom: 2px  → ≈ 42
+//   .matrix-card-name    font-size: 8px; line-height: 1.15; max-height: 2.3em              → ≈ 21
+//   all other fields     font-size: 7px                                                    → ≈ 10 each
 // ---------------------------------------------------------------
-const CARD_PADDING_V = 8;
+const CARD_PADDING_V = 8;    // .matrix-card padding: top + bottom
+const CARD_BORDER_V = 3;     // .matrix-card border: 1.5 top + 1.5 bottom
+const CARD_CHROME_V = CARD_PADDING_V + CARD_BORDER_V;
 const CARD_LINE_H = 10;    // one line of 7px-font field content
 const CARD_NAME_H = 21;    // name can wrap to 2 lines
 const CARD_IMG_MAX = 40;
 const CARD_IMG_MARGIN = 2;
 
 function estimateCardHeight(cf: CardFormat, cardW: number): number {
-  let h = CARD_PADDING_V;
+  // Chrome (padding + border) is part of the card's outer box. Leaving
+  // the border out was a 3px drift that let borderline layouts squeak
+  // past the fit check and then clip at render time.
+  let h = CARD_CHROME_V;
   if (cf.showImage) {
     // Image is 70% of card width with aspect-ratio 1, capped at 40px.
     h += Math.min(CARD_IMG_MAX, cardW * 0.7) + CARD_IMG_MARGIN;
@@ -609,12 +615,12 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     });
     const absoluteMaxCount = Math.max(1, ...maxPerCol);
 
-    // When the user has Show discontinued on, cells can be carrying a lot
-    // of extra ghost cards, so the regular floor (MIN_CARD_WIDTH = 40) is
-    // sometimes too large to fit. Fall back to an absolute floor of 22px
-    // for the dense case so the sizer always has room to find a fit
-    // before spilling over the canvas.
-    const absoluteFloor = shelfId === 'future' && showDiscontinued ? 22 : MIN_CARD_WIDTH;
+    // Universal absolute floor. The binary search below maximises
+    // cardW anyway, so dropping the floor to 22 costs nothing in easy
+    // cases and rescues tight ones — including the "current view
+    // crops, future+discon view fits" asymmetry that came from the
+    // previous dual-floor (40 for current, 22 only for future+discon).
+    const absoluteFloor = 22;
 
     // Outer loop: iterate over "target max card rows per cell".
     // For each target we derive cellCols[col] = ceil(maxPerCol[col] / target)

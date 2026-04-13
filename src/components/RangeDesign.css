@@ -288,7 +288,10 @@
    min-height enforces a playing-card aspect ratio (1 : 1.4) so cards
    keep a pleasing tall shape when they only carry a few fields. The
    JS layout maths in estimateCardHeight() uses the same floor so the
-   algorithm's row-height picks match what actually renders. */
+   algorithm's row-height picks match what actually renders.
+   justify-content: center distributes any whitespace evenly above
+   and below the content block when the min-aspect is bigger than
+   the content needs, so cards look balanced rather than top-heavy. */
 .matrix-card {
   width: var(--matrix-card-width, 80px);
   min-height: calc(var(--matrix-card-width, 80px) * 1.4);
@@ -299,6 +302,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   cursor: grab;
   user-select: none;
   position: relative;
