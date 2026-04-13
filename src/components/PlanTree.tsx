@@ -2,71 +2,75 @@ import { useMemo, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { CloseIcon } from './Icons';
 import { NameDialog } from './NameDialog';
-import type { Product, RangePlan } from '../types';
+import type { PlanFolder, RangePlan } from '../types';
 import './PlanTree.css';
 
-function getPlanCategory(plan: RangePlan, catalogue: Product[]): string {
-  const categoryCounts = new Map<string, number>();
-  const allItems = [...plan.currentShelf.items, ...plan.futureShelf.items];
-  for (const item of allItems) {
-    if (item.isPlaceholder || !item.productId) continue;
-    const product = catalogue.find((p) => p.id === item.productId);
-    if (!product?.category) continue;
-    categoryCounts.set(product.category, (categoryCounts.get(product.category) || 0) + 1);
-  }
-  if (categoryCounts.size === 0) return 'Uncategorised';
-  let maxCat = '';
-  let maxCount = 0;
-  for (const [cat, count] of categoryCounts) {
-    if (count > maxCount) { maxCat = cat; maxCount = count; }
-  }
-  return maxCat;
-}
+const UNFILED_KEY = '__unfiled__';
+
+/** Key used when dragging a plan via HTML5 DnD — kept minimal so we can
+ * drop onto a folder header and just call setPlanFolder. */
+const DND_MIME = 'application/x-range-plan-id';
 
 export function PlanTree() {
   const {
     project, addPlan, removePlan, setActivePlan, setShowPlanTree,
     activeVariantId, setActiveVariant, addVariant, removeVariant,
+    addFolder, removeFolder, renameFolder, setPlanFolder,
   } = useProjectStore();
-  // Track collapsed plans (not expanded) so new plans default to
-  // expanded — the user expects to see variants straight away.
+  // Track collapsed plans (not expanded) so new plans default to expanded.
   const [collapsedPlans, setCollapsedPlans] = useState<Set<string>>(new Set());
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [nameDialog, setNameDialog] = useState<
-    | { kind: 'plan' }
+    | { kind: 'plan'; folderId?: string }
+    | { kind: 'folder' }
     | { kind: 'variant'; planId: string }
     | null
   >(null);
+  const [dragOverFolderKey, setDragOverFolderKey] = useState<string | null>(null);
 
-  const grouped = useMemo(() => {
-    if (!project) return [];
-    const groups = new Map<string, RangePlan[]>();
-    for (const plan of project.plans) {
-      const cat = getPlanCategory(plan, project.catalogue);
-      const arr = groups.get(cat) || [];
-      arr.push(plan);
-      groups.set(cat, arr);
-    }
-    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const folders = useMemo<PlanFolder[]>(() => {
+    if (!project?.folders) return [];
+    return [...project.folders].sort((a, b) => a.order - b.order);
   }, [project]);
+
+  // Bucket plans by folder. Unknown / missing folder IDs fall through to
+  // the Unfiled bucket so deleting a folder never orphans a plan visually.
+  const plansByFolder = useMemo(() => {
+    const map = new Map<string, RangePlan[]>();
+    map.set(UNFILED_KEY, []);
+    for (const f of folders) map.set(f.id, []);
+    if (!project) return map;
+    for (const plan of project.plans) {
+      const key = plan.folderId && map.has(plan.folderId) ? plan.folderId : UNFILED_KEY;
+      map.get(key)!.push(plan);
+    }
+    return map;
+  }, [project, folders]);
 
   if (!project) return null;
 
   const handleNew = () => setNameDialog({ kind: 'plan' });
+  const handleNewInFolder = (folderId: string) => setNameDialog({ kind: 'plan', folderId });
+  const handleNewFolder = () => setNameDialog({ kind: 'folder' });
   const handleNewVariant = (planId: string) => setNameDialog({ kind: 'variant', planId });
 
   const handleNameSave = (name: string) => {
     if (!nameDialog) return;
     if (nameDialog.kind === 'plan') {
-      addPlan(name);
+      addPlan(name, nameDialog.folderId);
+    } else if (nameDialog.kind === 'folder') {
+      addFolder(name);
     } else {
       addVariant(nameDialog.planId, name);
     }
     setNameDialog(null);
   };
 
-  const existingPlanNames = useMemo(() => project?.plans.map((p) => p.name) ?? [], [project]);
+  const existingPlanNames = project.plans.map((p) => p.name);
+  const existingFolderNames = folders.map((f) => f.name);
   const variantPlan = nameDialog?.kind === 'variant'
-    ? project?.plans.find((p) => p.id === nameDialog.planId)
+    ? project.plans.find((p) => p.id === nameDialog.planId)
     : undefined;
   const existingVariantNames = variantPlan?.variants.map((v) => v.name) ?? [];
 
@@ -78,89 +82,212 @@ export function PlanTree() {
     });
   };
 
+  const toggleFolder = (folderKey: string) => {
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderKey)) next.delete(folderKey); else next.add(folderKey);
+      return next;
+    });
+  };
+
+  const handlePlanDragStart = (e: React.DragEvent<HTMLDivElement>, planId: string) => {
+    e.dataTransfer.setData(DND_MIME, planId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleFolderDragOver = (e: React.DragEvent<HTMLDivElement>, folderKey: string) => {
+    if (!e.dataTransfer.types.includes(DND_MIME)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverFolderKey !== folderKey) setDragOverFolderKey(folderKey);
+  };
+
+  const handleFolderDragLeave = (folderKey: string) => {
+    if (dragOverFolderKey === folderKey) setDragOverFolderKey(null);
+  };
+
+  const handleFolderDrop = (e: React.DragEvent<HTMLDivElement>, folderKey: string) => {
+    const planId = e.dataTransfer.getData(DND_MIME);
+    setDragOverFolderKey(null);
+    if (!planId) return;
+    e.preventDefault();
+    setPlanFolder(planId, folderKey === UNFILED_KEY ? undefined : folderKey);
+  };
+
+  const renderPlan = (plan: RangePlan) => {
+    const isActive = plan.id === project.activePlanId;
+    const isExpanded = !collapsedPlans.has(plan.id);
+    const itemCount = plan.currentShelf.items.length + plan.futureShelf.items.length;
+
+    return (
+      <div key={plan.id}>
+        <div
+          className={`plan-tree-item plan-parent ${isActive ? 'active-parent' : ''}`}
+          draggable
+          onDragStart={(e) => handlePlanDragStart(e, plan.id)}
+        >
+          <button className="plan-tree-expand" onClick={() => toggleExpand(plan.id)}>
+            {isExpanded ? '▾' : '▸'}
+          </button>
+          <div className="plan-tree-item-body"
+            onClick={() => { setActivePlan(plan.id); setActiveVariant(null); if (!isExpanded) toggleExpand(plan.id); }}>
+            <div className="plan-tree-item-icon">▦</div>
+            <div className="plan-tree-item-info">
+              <div className="plan-tree-item-name">{plan.name}</div>
+              <div className="plan-tree-item-meta">{itemCount} products</div>
+            </div>
+          </div>
+          <button className="plan-tree-add-variant" onClick={(e) => { e.stopPropagation(); handleNewVariant(plan.id); }} title="Add variant">+ Add Variant</button>
+          <div className="plan-tree-item-actions">
+            {!isActive && project.plans.length > 1 && (
+              <button className="plan-tree-item-delete" onClick={(e) => {
+                e.stopPropagation();
+                if (confirm(`Delete "${plan.name}"?`)) removePlan(plan.id);
+              }}><CloseIcon size={8} color="#fff" /></button>
+            )}
+          </div>
+        </div>
+
+        {isExpanded && (
+          <div
+            className={`plan-tree-item variant ${isActive && !activeVariantId ? 'active' : ''}`}
+            onClick={() => { setActivePlan(plan.id); setActiveVariant(null); }}>
+            <div className="plan-tree-variant-indent" />
+            <div className="plan-tree-item-icon variant-icon">●</div>
+            <div className="plan-tree-item-info">
+              <div className="plan-tree-item-name">Master</div>
+              <div className="plan-tree-item-meta">{itemCount} products</div>
+            </div>
+          </div>
+        )}
+        {isExpanded && plan.variants.map((variant) => {
+          const isVarActive = isActive && activeVariantId === variant.id;
+          const varCount = variant.includedCurrentItemIds.length + variant.includedFutureItemIds.length;
+          return (
+            <div key={variant.id}
+              className={`plan-tree-item variant ${isVarActive ? 'active' : ''}`}
+              onClick={() => { setActivePlan(plan.id); setActiveVariant(variant.id); }}>
+              <div className="plan-tree-variant-indent" />
+              <div className="plan-tree-item-icon variant-icon">○</div>
+              <div className="plan-tree-item-info">
+                <div className="plan-tree-item-name">{variant.name}</div>
+                <div className="plan-tree-item-meta">{varCount} included</div>
+              </div>
+              <button className="plan-tree-item-delete" onClick={(e) => {
+                e.stopPropagation();
+                if (confirm(`Delete variant "${variant.name}"?`)) removeVariant(plan.id, variant.id);
+              }}><CloseIcon size={7} color="#fff" /></button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderFolder = (
+    folderKey: string,
+    label: string,
+    plans: RangePlan[],
+    deletable: boolean,
+    renamable: boolean,
+  ) => {
+    const isCollapsed = collapsedFolders.has(folderKey);
+    const isDropTarget = dragOverFolderKey === folderKey;
+    const isEditing = editingFolderId === folderKey;
+
+    return (
+      <div
+        key={folderKey}
+        className={`plan-tree-folder ${isDropTarget ? 'drop-target' : ''}`}
+        onDragOver={(e) => handleFolderDragOver(e, folderKey)}
+        onDragLeave={() => handleFolderDragLeave(folderKey)}
+        onDrop={(e) => handleFolderDrop(e, folderKey)}
+      >
+        <div className="plan-tree-folder-header">
+          <button
+            className="plan-tree-expand folder-expand"
+            onClick={() => toggleFolder(folderKey)}
+            title={isCollapsed ? 'Expand' : 'Collapse'}
+          >
+            {isCollapsed ? '▸' : '▾'}
+          </button>
+          <span className="plan-tree-folder-icon">{isCollapsed ? '📁' : '📂'}</span>
+          {isEditing && renamable ? (
+            <input
+              className="plan-tree-folder-name-input"
+              defaultValue={label}
+              autoFocus
+              onBlur={(e) => {
+                const trimmed = e.target.value.trim();
+                if (trimmed && trimmed !== label) renameFolder(folderKey, trimmed);
+                setEditingFolderId(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                if (e.key === 'Escape') setEditingFolderId(null);
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span
+              className="plan-tree-folder-name"
+              onClick={() => { if (renamable) setEditingFolderId(folderKey); }}
+              title={renamable ? 'Click to rename' : undefined}
+            >
+              {label}
+            </span>
+          )}
+          <span className="plan-tree-folder-count">{plans.length}</span>
+          <button
+            className="plan-tree-folder-add"
+            onClick={() => handleNewInFolder(folderKey === UNFILED_KEY ? '' : folderKey)}
+            title="New plan in this folder"
+          >+</button>
+          {deletable && (
+            <button
+              className="plan-tree-folder-delete"
+              onClick={() => {
+                if (confirm(`Delete folder "${label}"? Plans inside it move to Unfiled.`)) {
+                  removeFolder(folderKey);
+                }
+              }}
+              title="Delete folder"
+            ><CloseIcon size={8} color="#fff" /></button>
+          )}
+        </div>
+        {!isCollapsed && (
+          <div className="plan-tree-folder-body">
+            {plans.length === 0 ? (
+              <div className="plan-tree-folder-empty">Drop plans here</div>
+            ) : (
+              plans.map(renderPlan)
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const unfiledPlans = plansByFolder.get(UNFILED_KEY) || [];
+
   return (
     <div className="plan-tree-panel">
       <div className="plan-tree-header">
         <h3>Range Plans</h3>
         <div className="plan-tree-header-actions">
+          <button className="plan-tree-new-folder" onClick={handleNewFolder} title="New folder">+ Folder</button>
           <button className="plan-tree-new" onClick={handleNew}>+ New</button>
           <button className="plan-tree-close" onClick={() => setShowPlanTree(false)}><CloseIcon size={10} color="#999" /></button>
         </div>
       </div>
 
       <div className="plan-tree-list">
-        {grouped.map(([category, plans]) => (
-          <div key={category} className="plan-tree-group">
-            <div className="plan-tree-category">{category}</div>
-            {plans.map((plan) => {
-              const isActive = plan.id === project.activePlanId;
-              const isExpanded = !collapsedPlans.has(plan.id);
-              const itemCount = plan.currentShelf.items.length + plan.futureShelf.items.length;
-
-              return (
-                <div key={plan.id}>
-                  {/* Plan row — always expandable */}
-                  <div className={`plan-tree-item plan-parent ${isActive ? 'active-parent' : ''}`}>
-                    <button className="plan-tree-expand" onClick={() => toggleExpand(plan.id)}>
-                      {isExpanded ? '▾' : '▸'}
-                    </button>
-                    <div className="plan-tree-item-body"
-                      onClick={() => { setActivePlan(plan.id); setActiveVariant(null); if (!isExpanded) toggleExpand(plan.id); }}>
-                      <div className="plan-tree-item-icon">▦</div>
-                      <div className="plan-tree-item-info">
-                        <div className="plan-tree-item-name">{plan.name}</div>
-                        <div className="plan-tree-item-meta">{itemCount} products</div>
-                      </div>
-                    </div>
-                    <button className="plan-tree-add-variant" onClick={(e) => { e.stopPropagation(); handleNewVariant(plan.id); }} title="Add variant">+ Add Variant</button>
-                    <div className="plan-tree-item-actions">
-                      {!isActive && project.plans.length > 1 && (
-                        <button className="plan-tree-item-delete" onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm(`Delete "${plan.name}"?`)) removePlan(plan.id);
-                        }}><CloseIcon size={8} color="#fff" /></button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Master + Variants */}
-                  {isExpanded && (
-                    <div
-                      className={`plan-tree-item variant ${isActive && !activeVariantId ? 'active' : ''}`}
-                      onClick={() => { setActivePlan(plan.id); setActiveVariant(null); }}>
-                      <div className="plan-tree-variant-indent" />
-                      <div className="plan-tree-item-icon variant-icon">●</div>
-                      <div className="plan-tree-item-info">
-                        <div className="plan-tree-item-name">Master</div>
-                        <div className="plan-tree-item-meta">{itemCount} products</div>
-                      </div>
-                    </div>
-                  )}
-                  {isExpanded && plan.variants.map((variant) => {
-                    const isVarActive = isActive && activeVariantId === variant.id;
-                    const varCount = variant.includedCurrentItemIds.length + variant.includedFutureItemIds.length;
-                    return (
-                      <div key={variant.id}
-                        className={`plan-tree-item variant ${isVarActive ? 'active' : ''}`}
-                        onClick={() => { setActivePlan(plan.id); setActiveVariant(variant.id); }}>
-                        <div className="plan-tree-variant-indent" />
-                        <div className="plan-tree-item-icon variant-icon">○</div>
-                        <div className="plan-tree-item-info">
-                          <div className="plan-tree-item-name">{variant.name}</div>
-                          <div className="plan-tree-item-meta">{varCount} included</div>
-                        </div>
-                        <button className="plan-tree-item-delete" onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm(`Delete variant "${variant.name}"?`)) removeVariant(plan.id, variant.id);
-                        }}><CloseIcon size={7} color="#fff" /></button>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+        {folders.map((f) =>
+          renderFolder(f.id, f.name, plansByFolder.get(f.id) || [], true, true),
+        )}
+        {/* Always-visible Unfiled bucket so there's a drop target when no
+            user folders exist and for plans that never got filed. */}
+        {renderFolder(UNFILED_KEY, 'Unfiled', unfiledPlans, false, false)}
       </div>
 
       {nameDialog && nameDialog.kind === 'plan' && (
@@ -170,6 +297,17 @@ export function PlanTree() {
           placeholder="e.g. AW26 Storage"
           submitLabel="Create Plan"
           existingNames={existingPlanNames}
+          onSave={handleNameSave}
+          onClose={() => setNameDialog(null)}
+        />
+      )}
+      {nameDialog && nameDialog.kind === 'folder' && (
+        <NameDialog
+          title="New Folder"
+          label="Folder name"
+          placeholder="e.g. Storage, Kitchenware"
+          submitLabel="Create Folder"
+          existingNames={existingFolderNames}
           onSave={handleNameSave}
           onClose={() => setNameDialog(null)}
         />

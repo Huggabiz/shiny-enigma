@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat, SlideViewSize } from '../types';
+import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat, SlideViewSize, PlanFolder } from '../types';
 import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan } from '../types';
 
 // Helper: update a specific plan in the plans array
@@ -70,10 +70,17 @@ interface ProjectStore {
   updateProjectName: (name: string) => void;
 
   // Plan management
-  addPlan: (name: string) => void;
+  addPlan: (name: string, folderId?: string) => void;
   removePlan: (planId: string) => void;
   setActivePlan: (planId: string) => void;
   renamePlan: (planId: string, name: string) => void;
+  setPlanFolder: (planId: string, folderId: string | undefined) => void;
+
+  // Folder management
+  addFolder: (name: string) => void;
+  removeFolder: (folderId: string) => void;
+  renameFolder: (folderId: string, name: string) => void;
+  reorderFolders: (orderedFolderIds: string[]) => void;
 
   // Variant management
   activeVariantId: string | null;
@@ -235,10 +242,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   // Plan management
-  addPlan: (name) => {
+  addPlan: (name, folderId) => {
     const { project } = get();
     if (!project) return;
     const newPlan = createEmptyPlan(name);
+    if (folderId) newPlan.folderId = folderId;
     set({
       project: {
         ...project,
@@ -248,6 +256,75 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       },
       linkMode: false,
       linkSource: null,
+    });
+  },
+
+  setPlanFolder: (planId, folderId) => {
+    const { project } = get();
+    if (!project) return;
+    set({
+      project: updatePlan(project, planId, (p) => {
+        const { folderId: _drop, ...rest } = p;
+        void _drop;
+        return folderId ? { ...rest, folderId } : rest;
+      }),
+    });
+  },
+
+  // Folder management — pure organisational constructs, never referenced
+  // by plan internals so changes are localised to Project.folders.
+  addFolder: (name) => {
+    const { project } = get();
+    if (!project) return;
+    const folders = project.folders || [];
+    const nextOrder = folders.length > 0 ? Math.max(...folders.map((f) => f.order)) + 1 : 0;
+    const folder: PlanFolder = {
+      id: `folder-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      order: nextOrder,
+    };
+    set({
+      project: { ...project, folders: [...folders, folder], updatedAt: new Date().toISOString() },
+    });
+  },
+
+  removeFolder: (folderId) => {
+    const { project } = get();
+    if (!project) return;
+    const folders = (project.folders || []).filter((f) => f.id !== folderId);
+    // Plans in the removed folder fall back to the "Unfiled" bucket.
+    const plans = project.plans.map((p) =>
+      p.folderId === folderId ? (({ folderId: _drop, ...rest }) => { void _drop; return rest; })(p) : p,
+    );
+    set({ project: { ...project, folders, plans, updatedAt: new Date().toISOString() } });
+  },
+
+  renameFolder: (folderId, name) => {
+    const { project } = get();
+    if (!project) return;
+    const folders = (project.folders || []).map((f) => f.id === folderId ? { ...f, name } : f);
+    set({ project: { ...project, folders, updatedAt: new Date().toISOString() } });
+  },
+
+  reorderFolders: (orderedFolderIds) => {
+    const { project } = get();
+    if (!project) return;
+    const folders = project.folders || [];
+    const byId = new Map(folders.map((f) => [f.id, f]));
+    const reordered = orderedFolderIds
+      .map((id, idx) => {
+        const f = byId.get(id);
+        return f ? { ...f, order: idx } : null;
+      })
+      .filter((f): f is PlanFolder => f !== null);
+    // Append any folders that weren't in the ordered list (defensive).
+    const leftover = folders.filter((f) => !orderedFolderIds.includes(f.id));
+    set({
+      project: {
+        ...project,
+        folders: [...reordered, ...leftover.map((f, i) => ({ ...f, order: reordered.length + i }))],
+        updatedAt: new Date().toISOString(),
+      },
     });
   },
 
@@ -711,7 +788,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 }));
 
-// Migration: convert old single-plan projects to multi-plan format
+// Migration: convert old single-plan projects to multi-plan format.
+//
+// Backwards-compat contract: projects saved by v1.9.0+ already use the
+// multi-plan shape below, so they pass straight through. Any *additive*
+// fields introduced since (e.g. `folders`, `folderId`, `slideSettings`,
+// per-plan/per-variant `cardFormat`) are optional in the Project/RangePlan
+// types, so an older file that omits them still type-checks and every
+// reader guards against `undefined`. Newer readers therefore continue to
+// load older files without needing explicit version coercion.
 function migrateProject(data: Record<string, unknown>): Project {
   // Already new format
   if (Array.isArray(data.plans)) return data as unknown as Project;

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { saveProject, saveRangeStructure, loadProjectFile } from '../utils/projectFile';
 import { exportToPptx } from '../utils/exportPptx';
@@ -18,7 +18,21 @@ export function Toolbar({ activeView }: ToolbarProps) {
     clearCatalogue, clearRanges,
     cardFormat, setCardFormat,
     activeVariantId,
+    updateProjectName,
   } = useProjectStore();
+  const [editingName, setEditingName] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (editingName) {
+      nameInputRef.current?.focus();
+      nameInputRef.current?.select();
+    }
+  }, [editingName]);
+  const commitProjectName = (next: string) => {
+    const trimmed = next.trim();
+    if (trimmed && project && trimmed !== project.name) updateProjectName(trimmed);
+    setEditingName(false);
+  };
   const [exportProgress, setExportProgress] = useState<string | null>(null);
 
   // Resolve the scope the current format edits apply to — helps the user
@@ -54,7 +68,28 @@ export function Toolbar({ activeView }: ToolbarProps) {
       <div className="toolbar-brand">
         <span className="toolbar-logo">Range Planner</span>
         <span className="toolbar-version">v{APP_VERSION}</span>
-        {project && <span className="toolbar-project-name">{project.name}</span>}
+        {project && (
+          editingName ? (
+            <input
+              ref={nameInputRef}
+              className="toolbar-project-name-input"
+              defaultValue={project.name}
+              onBlur={(e) => commitProjectName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitProjectName((e.target as HTMLInputElement).value);
+                if (e.key === 'Escape') setEditingName(false);
+              }}
+            />
+          ) : (
+            <span
+              className="toolbar-project-name"
+              onClick={() => setEditingName(true)}
+              title="Click to rename project"
+            >
+              {project.name}
+            </span>
+          )
+        )}
       </div>
 
       <div className="toolbar-actions">
@@ -121,8 +156,18 @@ export function Toolbar({ activeView }: ToolbarProps) {
               </button>
               {openMenu === 'save' && (
                 <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
-                  <button onClick={() => { if (project) saveProject(project); closeMenus(); }}>Save Full Project</button>
-                  <button onClick={() => { if (project) saveRangeStructure(project); closeMenus(); }}>Save Range Structure</button>
+                  <button onClick={async () => {
+                    closeMenus();
+                    if (!project) return;
+                    try { await saveProject(project); }
+                    catch (err) { console.error(err); alert('Failed to save project.'); }
+                  }}>Save Full Project</button>
+                  <button onClick={async () => {
+                    closeMenus();
+                    if (!project) return;
+                    try { await saveRangeStructure(project); }
+                    catch (err) { console.error(err); alert('Failed to save range structure.'); }
+                  }}>Save Range Structure</button>
                   <hr />
                   <button
                     onClick={async () => {

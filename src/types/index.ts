@@ -142,6 +142,19 @@ export interface RangePlan {
   /** Optional card-format override for this plan. Variants within the
    * plan can further override by setting their own cardFormat. */
   cardFormat?: Partial<CardFormat>;
+  /** Optional folder membership — plans without a folderId live in the
+   * top-level "Unfiled" bucket. Folders are user-defined via PlanTree. */
+  folderId?: string;
+}
+
+/** A user-defined folder in the plans tree. Pure organisational
+ * construct — has no effect on plan data or behaviour beyond grouping
+ * in the PlanTree UI. */
+export interface PlanFolder {
+  id: string;
+  name: string;
+  /** Order within the folder list. Lower numbers render first. */
+  order: number;
 }
 
 // The full project state — now holds multiple range plans
@@ -150,6 +163,9 @@ export interface Project {
   plans: RangePlan[];
   activePlanId: string;
   catalogue: Product[];
+  /** User-defined folders for organising plans. Optional so older
+   * projects saved without this field still load cleanly. */
+  folders?: PlanFolder[];
   createdAt: string;
   updatedAt: string;
 }

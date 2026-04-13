@@ -154,8 +154,10 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   const familyFilter = catalogueFilters.family;
   const { showLive, showDev, showCore, showDuo, hideUsed } = catalogueFilters;
   const setSearch = (v: string) => setCatalogueFilters({ search: v });
-  const setCategoryFilter = (v: string) => setCatalogueFilters({ category: v, subCategory: '' });
-  const setSubCategoryFilter = (v: string) => setCatalogueFilters({ subCategory: v });
+  // Changing category clears sub-category + family. Changing sub-category
+  // clears family. Keeps downstream filters consistent with the cascade.
+  const setCategoryFilter = (v: string) => setCatalogueFilters({ category: v, subCategory: '', family: '' });
+  const setSubCategoryFilter = (v: string) => setCatalogueFilters({ subCategory: v, family: '' });
   const setFamilyFilter = (v: string) => setCatalogueFilters({ family: v });
   const [expanded, setExpanded] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
@@ -174,10 +176,17 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
     return [...new Set(source.map((p) => (p.subCategory || '').trim()).filter(Boolean))].sort();
   }, [products, categoryFilter]);
 
-  const families = useMemo(
-    () => [...new Set(products.map((p) => (p.productFamily || '').trim()).filter(Boolean))].sort(),
-    [products]
-  );
+  // Families cascade off the currently-selected category + sub-category so
+  // users don't see Product Family options that would yield zero results
+  // under the other filters they already picked.
+  const families = useMemo(() => {
+    const source = products.filter((p) => {
+      if (categoryFilter && (p.category || '').trim() !== categoryFilter) return false;
+      if (subCategoryFilter && (p.subCategory || '').trim() !== subCategoryFilter) return false;
+      return true;
+    });
+    return [...new Set(source.map((p) => (p.productFamily || '').trim()).filter(Boolean))].sort();
+  }, [products, categoryFilter, subCategoryFilter]);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -264,7 +273,7 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
         <select
           className="catalogue-select"
           value={categoryFilter}
-          onChange={(e) => { setCategoryFilter(e.target.value); setSubCategoryFilter(''); }}
+          onChange={(e) => setCategoryFilter(e.target.value)}
         >
           <option value="">All Categories</option>
           {categories.map((c) => (

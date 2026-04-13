@@ -50,6 +50,23 @@
   background: #1565c0;
 }
 
+.plan-tree-new-folder {
+  padding: 3px 8px;
+  font-size: 10px;
+  background: #f5f5f5;
+  color: #555;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.plan-tree-new-folder:hover {
+  background: #e8e8e8;
+  border-color: #bbb;
+  color: #333;
+}
+
 .plan-tree-close {
   width: 24px;
   height: 24px;
@@ -84,6 +101,130 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 4px 8px;
+}
+
+/* User-defined folder group. The header stays visible at the top, body
+   is the plans list that reveals when not collapsed. */
+.plan-tree-folder {
+  margin-bottom: 10px;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+
+.plan-tree-folder.drop-target {
+  background: #e3f2fd;
+  outline: 2px dashed #1976d2;
+  outline-offset: -2px;
+}
+
+.plan-tree-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px 6px 2px;
+  border-bottom: 1px solid #eee;
+  user-select: none;
+}
+
+.plan-tree-folder-header .folder-expand {
+  width: 14px;
+}
+
+.plan-tree-folder-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.plan-tree-folder-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+
+.plan-tree-folder-name-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #333;
+  padding: 2px 4px;
+  border: 1px solid #1976d2;
+  border-radius: 3px;
+  outline: none;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.plan-tree-folder-count {
+  font-size: 10px;
+  color: #999;
+  padding: 0 4px;
+}
+
+.plan-tree-folder-add {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #666;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.plan-tree-folder-add:hover {
+  background: #f0f0f0;
+  border-color: #bbb;
+  color: #333;
+}
+
+.plan-tree-folder-delete {
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: #ef5350;
+  color: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  opacity: 0;
+}
+
+.plan-tree-folder-header:hover .plan-tree-folder-delete {
+  opacity: 1;
+}
+
+.plan-tree-folder-body {
+  padding: 4px 0 0;
+}
+
+.plan-tree-folder-empty {
+  font-size: 10px;
+  color: #bbb;
+  font-style: italic;
+  padding: 8px 12px;
+  text-align: center;
+  border: 1px dashed #e0e0e0;
+  border-radius: 4px;
+  margin: 4px 6px;
 }
 
 .plan-tree-item {
