@@ -34,6 +34,17 @@ const ADD_BTN_WIDTH = 28;
 const HEADER_ROW_HEIGHT = 28;
 const ADD_ROW_HEIGHT = 28;
 
+// Convert a #rrggbb hex colour to an `rgba(r, g, b, a)` string. Used
+// by MatrixProductCard to derive a translucent lens tint from the
+// lens's solid colour without needing a separate "tintColor" field.
+function hexToRgba(hex: string, alpha: number): string {
+  const m = hex.replace('#', '');
+  const r = parseInt(m.slice(0, 2), 16);
+  const g = parseInt(m.slice(2, 4), 16);
+  const b = parseInt(m.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // Sort-by keys for the matrix cell sort dropdown. 'manual' keeps the
 // existing matrix order (the order the user dragged items into the cell).
 type SortKey = 'manual' | 'name' | 'sku' | 'rrp' | 'usRrp' | 'euRrp' | 'ausRrp' | 'volume' | 'forecastVolume' | 'revenue' | 'forecastRevenue';
@@ -198,6 +209,28 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   onRemove: () => void; onEdit?: () => void;
 }) {
   const cardFormat = useProjectStore((s) => s.cardFormat);
+  // Lens state — used to apply the active lens's tint and to handle
+  // edit-mode click-to-toggle membership.
+  const project = useProjectStore((s) => s.project);
+  const toggleLensProduct = useProjectStore((s) => s.toggleLensProduct);
+  const activeLens = useMemo(() => {
+    if (!project?.activeLensId) return null;
+    return project.lenses?.find((l) => l.id === project.activeLensId) ?? null;
+  }, [project?.activeLensId, project?.lenses]);
+  const editingLens = useMemo(() => {
+    if (!project?.editingLensId) return null;
+    return project.lenses?.find((l) => l.id === project.editingLensId) ?? null;
+  }, [project?.editingLensId, project?.lenses]);
+  const productInActiveLens = useMemo(() => {
+    if (!activeLens || !product) return false;
+    if (activeLens.builtInKind === 'dev') return product.source === 'dev';
+    return activeLens.productIds.includes(product.id);
+  }, [activeLens, product]);
+  const productInEditingLens = useMemo(() => {
+    if (!editingLens || !product) return false;
+    return editingLens.productIds.includes(product.id);
+  }, [editingLens, product]);
+
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `matrix-item-${itemId}`, data: { itemId },
   });
@@ -249,7 +282,26 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
     isDev ? 'dev-product' : '',
     isGhosted ? 'ghosted' : '',
     isDiscontinued ? 'ghosted-discontinued' : '',
+    productInActiveLens ? 'lens-tinted' : '',
+    editingLens ? 'lens-edit-mode' : '',
+    editingLens && productInEditingLens ? 'lens-edit-member' : '',
   ].filter(Boolean).join(' ');
+
+  // When the active lens has the product, paint the card background
+  // with a translucent version of the lens colour (alpha ~22%) so the
+  // tint reads clearly without obscuring the card content.
+  const lensTintStyle = productInActiveLens && activeLens
+    ? { backgroundColor: hexToRgba(activeLens.color, 0.22), borderColor: activeLens.color }
+    : undefined;
+
+  // Click handler used when a custom lens is in edit mode — clicking
+  // the card toggles the product's membership in that lens.
+  const handleLensEditClick = (e: React.MouseEvent) => {
+    if (!editingLens || !product || isPlaceholder) return;
+    e.stopPropagation();
+    e.preventDefault();
+    toggleLensProduct(editingLens.id, product.id);
+  };
 
   // Reusable delta chip renderer — matches the transform view's
   // RrpRow styling (small up/down arrow + absolute delta in green/red).
@@ -265,9 +317,15 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
 
   return (
     <div ref={setNodeRef} className={cardClasses}
+      style={lensTintStyle}
       data-item-id={itemId}
+      // In lens edit mode a click toggles membership instead of doing
+      // any normal interaction; outside edit mode the double-click
+      // still opens the placeholder editor.
+      onClick={editingLens ? handleLensEditClick : undefined}
       onDoubleClick={(e) => { if (isPlaceholder && onEdit) { e.stopPropagation(); onEdit(); } }}
-      {...attributes} {...listeners}>
+      {...(editingLens ? {} : attributes)}
+      {...(editingLens ? {} : listeners)}>
       {/* Badges sit OUTSIDE the .matrix-card-content overflow clip so
           their negative top/left/right offsets stick out past the card
           border instead of being masked. They're absolutely positioned

@@ -157,6 +157,58 @@ export interface PlanFolder {
   order: number;
 }
 
+/** A "Lens" is a tag-like view filter over the catalogue. When a lens
+ * is active, every product card in that lens gets a tint of the lens's
+ * colour. Built-in 'dev' lens has implicit membership (any product
+ * with `source === 'dev'`); custom lenses store explicit `productIds`.
+ * The user toggles membership by enabling Edit mode on a lens and
+ * clicking SKU cards. */
+export interface Lens {
+  id: string;
+  name: string;
+  /** Hex colour used for both the swatch and the card-background tint. */
+  color: string;
+  /** Catalogue product IDs in this lens. Ignored for the built-in 'dev'
+   * lens — its membership is implicit (any catalogue product whose
+   * `source === 'dev'`). */
+  productIds: string[];
+  /** Identifies a built-in lens. Built-ins can't be deleted or renamed
+   * and may have implicit membership rules. */
+  builtInKind?: 'dev';
+}
+
+/** Default Dev lens — auto-added on project load if missing. The blue
+ * matches the existing `.matrix-card.dev-product` background. */
+export const DEFAULT_DEV_LENS: Lens = {
+  id: 'lens-dev',
+  name: 'Dev',
+  color: '#1565c0',
+  productIds: [],
+  builtInKind: 'dev',
+};
+
+/** Auto-assigned colour palette for new lenses. Rotates through these
+ * by `lenses.length % palette.length`, skipping the dev blue. */
+export const LENS_PALETTE: string[] = [
+  '#7b1fa2', // purple
+  '#388e3c', // green
+  '#f57c00', // orange
+  '#c62828', // red
+  '#0097a7', // teal
+  '#6a1b9a', // deep purple
+  '#5d4037', // brown
+  '#455a64', // blue grey
+  '#827717', // dark olive
+  '#bf360c', // deep orange
+];
+
+/** True if a product is "in" a lens. Built-in 'dev' uses implicit
+ * membership; custom lenses use explicit productIds. */
+export function isProductInLens(lens: Lens, product: Pick<Product, 'id' | 'source'>): boolean {
+  if (lens.builtInKind === 'dev') return product.source === 'dev';
+  return lens.productIds.includes(product.id);
+}
+
 // The full project state — now holds multiple range plans
 export interface Project {
   name: string;
@@ -166,6 +218,19 @@ export interface Project {
   /** User-defined folders for organising plans. Optional so older
    * projects saved without this field still load cleanly. */
   folders?: PlanFolder[];
+  /** Catalogue lenses — see Lens type. Optional for backwards-compat;
+   * the loader migration ensures the built-in Dev lens is always
+   * present at index 0 after load. */
+  lenses?: Lens[];
+  /** Currently active lens ID (null = no lens applied → cards render
+   * with no tint). Project-level so the active lens persists across
+   * plan switches. */
+  activeLensId?: string | null;
+  /** Lens currently in "edit mode" — clicking a SKU card toggles its
+   * membership in this lens. Null = no edit mode. Only one lens can be
+   * editable at a time. Built-in 'dev' lens can never be in edit mode
+   * (implicit membership). */
+  editingLensId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

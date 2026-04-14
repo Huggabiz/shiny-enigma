@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { CloseIcon } from './Icons';
 import { NameDialog } from './NameDialog';
+import { LensSidebar } from './LensSidebar';
 import type { PlanFolder, RangePlan } from '../types';
 import './PlanTree.css';
 
@@ -287,6 +288,10 @@ export function PlanTree() {
             user folders exist and for plans that never got filed. */}
         {renderFolder(UNFILED_KEY, 'Unfiled', unfiledPlans, false, false)}
       </div>
+
+      {/* Lens selection bar — splits the vertical height with the
+          plan list above it. See LensSidebar.tsx. */}
+      <LensSidebar />
 
       {nameDialog && nameDialog.kind === 'plan' && (
         <NameDialog

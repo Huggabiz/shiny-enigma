@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat, SlideViewSize, PlanFolder } from '../types';
-import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan } from '../types';
+import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat, SlideViewSize, PlanFolder, Lens } from '../types';
+import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan, DEFAULT_DEV_LENS, LENS_PALETTE } from '../types';
 
 // Helper: update a specific plan in the plans array
 function updatePlan(project: Project, planId: string, updater: (plan: RangePlan) => RangePlan): Project {
@@ -81,6 +81,14 @@ interface ProjectStore {
   removeFolder: (folderId: string) => void;
   renameFolder: (folderId: string, name: string) => void;
   reorderFolders: (orderedFolderIds: string[]) => void;
+
+  // Lens management — see types/Lens for the data model.
+  createLens: (name: string) => void;
+  removeLens: (lensId: string) => void;
+  renameLens: (lensId: string, name: string) => void;
+  setActiveLens: (lensId: string | null) => void;
+  setEditingLens: (lensId: string | null) => void;
+  toggleLensProduct: (lensId: string, productId: string) => void;
 
   // Variant management
   activeVariantId: string | null;
@@ -223,6 +231,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         plans: [firstPlan],
         activePlanId: firstPlan.id,
         catalogue,
+        lenses: [{ ...DEFAULT_DEV_LENS }],
+        activeLensId: null,
+        editingLensId: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -232,7 +243,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   loadProject: (project) => {
     // Migration: if old format (no plans array), convert
     const migrated = migrateProject(project as unknown as Record<string, unknown>);
-    set({ project: migrated, selectedItemId: null, linkMode: false, linkSource: null });
+    // Lens migration — older projects (pre-1.10) have no lenses field;
+    // ensure the built-in Dev lens always exists at index 0 so the UI
+    // never has to special-case its presence.
+    const ensured = ensureLenses(migrated);
+    set({ project: ensured, selectedItemId: null, linkMode: false, linkSource: null });
   },
 
   updateProjectName: (name) => {
@@ -326,6 +341,101 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         updatedAt: new Date().toISOString(),
       },
     });
+  },
+
+  // Lens management — Lens is project-level state. The built-in Dev
+  // lens is guaranteed by ensureLenses() at load time and can't be
+  // deleted or renamed.
+  createLens: (name) => {
+    const { project } = get();
+    if (!project) return;
+    const lenses = project.lenses ?? [];
+    // Skip the dev lens when picking a colour from the palette so the
+    // first custom lens doesn't accidentally clash with the dev blue.
+    const customCount = lenses.filter((l) => !l.builtInKind).length;
+    const color = LENS_PALETTE[customCount % LENS_PALETTE.length];
+    const newLens: Lens = {
+      id: `lens-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      color,
+      productIds: [],
+    };
+    set({
+      project: {
+        ...project,
+        lenses: [...lenses, newLens],
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  removeLens: (lensId) => {
+    const { project } = get();
+    if (!project) return;
+    const lens = (project.lenses ?? []).find((l) => l.id === lensId);
+    if (!lens || lens.builtInKind) return; // can't delete built-ins
+    const lenses = (project.lenses ?? []).filter((l) => l.id !== lensId);
+    set({
+      project: {
+        ...project,
+        lenses,
+        activeLensId: project.activeLensId === lensId ? null : project.activeLensId,
+        editingLensId: project.editingLensId === lensId ? null : project.editingLensId,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  renameLens: (lensId, name) => {
+    const { project } = get();
+    if (!project) return;
+    const lenses = (project.lenses ?? []).map((l) =>
+      l.id === lensId && !l.builtInKind ? { ...l, name } : l,
+    );
+    set({ project: { ...project, lenses, updatedAt: new Date().toISOString() } });
+  },
+
+  setActiveLens: (lensId) => {
+    const { project } = get();
+    if (!project) return;
+    set({ project: { ...project, activeLensId: lensId } });
+  },
+
+  setEditingLens: (lensId) => {
+    const { project } = get();
+    if (!project) return;
+    // Built-in lenses can't be in edit mode (implicit membership rules).
+    if (lensId) {
+      const lens = (project.lenses ?? []).find((l) => l.id === lensId);
+      if (!lens || lens.builtInKind) return;
+    }
+    // Edit mode also activates the lens so the user sees the tint
+    // while toggling membership — otherwise it's invisible feedback.
+    set({
+      project: {
+        ...project,
+        editingLensId: lensId,
+        activeLensId: lensId ?? project.activeLensId,
+      },
+    });
+  },
+
+  toggleLensProduct: (lensId, productId) => {
+    const { project } = get();
+    if (!project) return;
+    const lens = (project.lenses ?? []).find((l) => l.id === lensId);
+    if (!lens || lens.builtInKind) return; // can't toggle built-in membership
+    const lenses = (project.lenses ?? []).map((l) => {
+      if (l.id !== lensId) return l;
+      const has = l.productIds.includes(productId);
+      return {
+        ...l,
+        productIds: has
+          ? l.productIds.filter((id) => id !== productId)
+          : [...l.productIds, productId],
+      };
+    });
+    set({ project: { ...project, lenses, updatedAt: new Date().toISOString() } });
   },
 
   removePlan: (planId) => {
@@ -787,6 +897,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     });
   },
 }));
+
+// Lens migration: guarantees the project has a `lenses` array with the
+// built-in Dev lens at index 0. Called after migrateProject so older
+// files without the field load cleanly. Idempotent — running it on a
+// project that already has the Dev lens leaves it alone.
+function ensureLenses(project: Project): Project {
+  const lenses = project.lenses ?? [];
+  const hasDev = lenses.some((l) => l.builtInKind === 'dev');
+  if (hasDev) return project;
+  return {
+    ...project,
+    lenses: [{ ...DEFAULT_DEV_LENS }, ...lenses],
+    activeLensId: project.activeLensId ?? null,
+    editingLensId: project.editingLensId ?? null,
+  };
+}
 
 // Migration: convert old single-plan projects to multi-plan format.
 //

@@ -1,0 +1,133 @@
+import { useState } from 'react';
+import { useProjectStore } from '../store/useProjectStore';
+import './LensSidebar.css';
+
+/**
+ * LensSidebar — sits at the bottom of the .plan-tree-panel and lists
+ * the catalogue lenses for the current project. See types/Lens for the
+ * data model and the project README for the feature overview.
+ *
+ * Behaviour:
+ *   - Click a lens row to activate / deactivate it. The active lens
+ *     tints every product card whose product is "in" the lens.
+ *   - Click the pencil button on a custom lens to enter edit mode.
+ *     While edit mode is on, clicking matrix cards toggles their
+ *     product's membership in the lens. Edit also force-activates
+ *     the lens so the user sees the tint feedback.
+ *   - Built-in lenses (Dev) can't be deleted, renamed, or edited.
+ *     The Dev lens has implicit membership: any product with
+ *     `source === 'dev'`.
+ */
+export function LensSidebar() {
+  const { project, createLens, removeLens, renameLens, setActiveLens, setEditingLens } = useProjectStore();
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+
+  if (!project) return null;
+  const lenses = project.lenses ?? [];
+  const activeLensId = project.activeLensId ?? null;
+  const editingLensId = project.editingLensId ?? null;
+
+  const commitNew = () => {
+    const trimmed = newName.trim();
+    if (trimmed) createLens(trimmed);
+    setNewName('');
+    setAdding(false);
+  };
+
+  const commitRename = (lensId: string, name: string) => {
+    const trimmed = name.trim();
+    if (trimmed) renameLens(lensId, trimmed);
+    setRenamingId(null);
+  };
+
+  return (
+    <div className="lens-sidebar">
+      <div className="lens-sidebar-header">
+        <h3><span className="lens-icon" aria-hidden>⌕</span> Lenses</h3>
+        <button className="lens-add-btn" onClick={() => setAdding(true)} title="New lens">+ New</button>
+      </div>
+      <div className="lens-list">
+        {lenses.map((lens) => {
+          const isActive = activeLensId === lens.id;
+          const isEditing = editingLensId === lens.id;
+          const isBuiltIn = !!lens.builtInKind;
+          const memberCount = isBuiltIn ? null : lens.productIds.length;
+          return (
+            <div
+              key={lens.id}
+              className={`lens-item ${isActive ? 'active' : ''} ${isEditing ? 'editing' : ''}`}
+              onClick={() => setActiveLens(isActive ? null : lens.id)}
+              title={isActive ? 'Click to deactivate' : 'Click to activate'}
+            >
+              <span className="lens-swatch" style={{ background: lens.color }} />
+              {renamingId === lens.id ? (
+                <input
+                  className="lens-name-input"
+                  defaultValue={lens.name}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                  onBlur={(e) => commitRename(lens.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    if (e.key === 'Escape') setRenamingId(null);
+                  }}
+                />
+              ) : (
+                <span
+                  className="lens-name"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (!isBuiltIn) setRenamingId(lens.id);
+                  }}
+                  title={isBuiltIn ? 'Built-in lens' : 'Double-click to rename'}
+                >
+                  {lens.name}
+                  {memberCount !== null && <span className="lens-member-count"> · {memberCount}</span>}
+                </span>
+              )}
+              {!isBuiltIn && (
+                <>
+                  <button
+                    className={`lens-edit ${isEditing ? 'on' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingLens(isEditing ? null : lens.id);
+                    }}
+                    title={isEditing ? 'Stop editing membership' : 'Click cards to add/remove from this lens'}
+                  >✎</button>
+                  <button
+                    className="lens-delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Delete lens "${lens.name}"?`)) removeLens(lens.id);
+                    }}
+                    title="Delete lens"
+                  >×</button>
+                </>
+              )}
+            </div>
+          );
+        })}
+        {adding && (
+          <div className="lens-item adding">
+            <span className="lens-swatch placeholder" />
+            <input
+              className="lens-name-input"
+              placeholder="Lens name…"
+              value={newName}
+              autoFocus
+              onChange={(e) => setNewName(e.target.value)}
+              onBlur={commitNew}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                if (e.key === 'Escape') { setAdding(false); setNewName(''); }
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

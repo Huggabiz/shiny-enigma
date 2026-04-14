@@ -342,6 +342,27 @@
   border-color: #0097a7;
 }
 
+/* Lens edit mode — cursor swaps to a crosshair so the user knows
+   clicking will toggle membership in the lens currently in edit mode.
+   The .lens-edit-member modifier (set when the product is already in
+   the lens) gives the card a strong outline so the toggle state is
+   visible at a glance. */
+.matrix-card.lens-edit-mode {
+  cursor: crosshair;
+}
+
+.matrix-card.lens-edit-member {
+  outline: 2px solid #f57c00;
+  outline-offset: -2px;
+}
+
+/* Lens-tinted state — set inline `backgroundColor` from the lens's
+   colour at ~22% alpha and the border to the solid lens colour. The
+   inline style takes precedence over the default .matrix-card border. */
+.matrix-card.lens-tinted {
+  border-width: 2px;
+}
+
 .matrix-card-dev-badge {
   position: absolute;
   /* -3px (was -5px) keeps the badge inside the .matrix-cell padding
