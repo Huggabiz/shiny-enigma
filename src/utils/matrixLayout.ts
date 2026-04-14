@@ -54,6 +54,16 @@ export const MIN_ROW_H = 40;
 // cell, and the rightmost card wrapped to the next row at render time.
 const CELL_BORDER = 1;
 
+// Per-cell safety margin — a few pixels of slack baked into every
+// cell's planned outer width so the flex layout has breathing room
+// for sub-pixel rounding, half-pixel borders, and snap differences
+// between the JS plan and the browser's actual layout. Without this
+// the binary-search + slot-growth pair produces EXACT fits where
+// `content area === N*cardW + (N-1)*cardGap`, and any rounding in
+// any direction wraps a card to the next row. 4px (2 each side)
+// is invisible visually but eliminates the wrap class entirely.
+const CELL_SLACK = 4;
+
 // Auto-tier ladder used by computeMatrixAutoTier.
 export const TIER_LADDER = [1, 1.25, 1.5, 1.75, 2] as const;
 
@@ -132,10 +142,11 @@ export function computeLayout(
 
   // Column widths from the explicit cellCols. Empty columns shrink to
   // EMPTY_SIZE so they don't eat horizontal budget. The +CELL_BORDER*2
-  // accounts for the unscaled 1px cell border so the flex content area
-  // is wide enough for `cols` cards without wrapping.
+  // accounts for the unscaled 1px cell border. The +CELL_SLACK gives
+  // every cell a few pixels of horizontal breathing room so cards
+  // never wrap due to subpixel rounding (see CELL_SLACK comment).
   const colWidths = cellColsPerCol.map((cols) =>
-    cols === 0 ? EMPTY_SIZE : cols * (cardW + cardGap) - cardGap + cellPadding * 2 + CELL_BORDER * 2
+    cols === 0 ? EMPTY_SIZE : cols * (cardW + cardGap) - cardGap + cellPadding * 2 + CELL_BORDER * 2 + CELL_SLACK
   );
   const totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * gap;
   if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
@@ -171,8 +182,10 @@ export function computeLayout(
   // Compute natural row heights (minimum needed). +CELL_BORDER*2 mirrors
   // the column-width fix — the cell's vertical content area is also
   // shrunk by its 1px top + 1px bottom border under box-sizing: border-box.
+  // +CELL_SLACK gives vertical breathing room so a tall cell never clips
+  // its bottom row of cards.
   const naturalRowH = maxCardRowsPerRow.map((r) =>
-    r === 0 ? MIN_ROW_H : r * (cardH + cardGap) - cardGap + cellPadding * 2 + CELL_BORDER * 2
+    r === 0 ? MIN_ROW_H : r * (cardH + cardGap) - cardGap + cellPadding * 2 + CELL_BORDER * 2 + CELL_SLACK
   );
   const totalNaturalH = naturalRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * gap;
 
