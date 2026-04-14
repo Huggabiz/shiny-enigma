@@ -58,6 +58,13 @@
   cursor: grabbing;
 }
 
+/* Lens tinting — the tint background + border colour are set inline
+   from the lens's colour in JS. This rule just bumps the border to
+   2px so the lens colour reads clearly against the 2px default. */
+.product-card.lens-tinted {
+  border-width: 2px;
+}
+
 /* New / Dev badge — absolute, pointer-events: none so it cannot push
    the card's layout box or steal clicks from neighbours. */
 .card-new-badge {

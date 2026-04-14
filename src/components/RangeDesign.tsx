@@ -21,6 +21,7 @@ import { SlideCanvasControls } from './SlideCanvasControls';
 import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem } from '../types';
 import { getActivePlan } from '../types';
 import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH } from '../utils/matrixLayout';
+import { hexToRgba } from '../utils/color';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
@@ -33,17 +34,6 @@ const ROW_HEADER_WIDTH = 60;
 const ADD_BTN_WIDTH = 28;
 const HEADER_ROW_HEIGHT = 28;
 const ADD_ROW_HEIGHT = 28;
-
-// Convert a #rrggbb hex colour to an `rgba(r, g, b, a)` string. Used
-// by MatrixProductCard to derive a translucent lens tint from the
-// lens's solid colour without needing a separate "tintColor" field.
-function hexToRgba(hex: string, alpha: number): string {
-  const m = hex.replace('#', '');
-  const r = parseInt(m.slice(0, 2), 16);
-  const g = parseInt(m.slice(2, 4), 16);
-  const b = parseInt(m.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
 
 // Sort-by keys for the matrix cell sort dropdown. 'manual' keeps the
 // existing matrix order (the order the user dragged items into the cell).

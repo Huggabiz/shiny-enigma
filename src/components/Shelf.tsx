@@ -9,6 +9,7 @@ import { getActivePlan } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { computeShelfLayout } from '../utils/layout';
+import { deriveLabelsFromMatrix, packLabelsIntoRows } from '../utils/shelfLabels';
 import './Shelf.css';
 
 interface ShelfProps {
@@ -24,90 +25,6 @@ interface ShelfProps {
   discontinuedItems?: ShelfItem[];
   showDiscontinued?: boolean;
   flipped?: boolean;
-}
-
-interface DerivedLabel {
-  text: string;
-  startPosition: number;
-  endPosition: number;
-  color: string;
-  level: 'x' | 'y';
-}
-
-// Pack labels into rows, compacting non-overlapping onto same row
-function packLabelsIntoRows(labels: DerivedLabel[]): DerivedLabel[][] {
-  if (labels.length === 0) return [];
-  const sorted = [...labels].sort((a, b) => a.startPosition - b.startPosition);
-  const rows: DerivedLabel[][] = [];
-  for (const label of sorted) {
-    let placed = false;
-    for (const row of rows) {
-      const overlaps = row.some(
-        (existing) => label.startPosition <= existing.endPosition && label.endPosition >= existing.startPosition
-      );
-      if (!overlaps) {
-        row.push(label);
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      rows.push([label]);
-    }
-  }
-  return rows;
-}
-
-// Derive labels from matrix layout based on VISIBLE item order
-function deriveLabelsFromMatrix(
-  shelf: ShelfType,
-  visibleItemIds: string[],
-): { xLabels: DerivedLabel[]; yLabels: DerivedLabel[] } {
-  const layout = shelf.matrixLayout;
-  if (!layout || layout.assignments.length === 0) return { xLabels: [], yLabels: [] };
-
-  const xLabels: DerivedLabel[] = [];
-  const yLabels: DerivedLabel[] = [];
-
-  // Build a map of itemId -> position in the VISIBLE items list
-  const posMap = new Map(visibleItemIds.map((id, idx) => [id, idx]));
-
-  // Only consider assignments for visible items
-  const visibleAssignments = layout.assignments.filter((a) => posMap.has(a.itemId));
-
-  for (let col = 0; col < layout.xLabels.length; col++) {
-    const positions = visibleAssignments
-      .filter((a) => a.col === col)
-      .map((a) => posMap.get(a.itemId))
-      .filter((p): p is number => p !== undefined);
-    if (positions.length === 0) continue;
-    xLabels.push({
-      text: layout.xLabels[col],
-      startPosition: Math.min(...positions),
-      endPosition: Math.max(...positions),
-      color: '#dce6f0',
-      level: 'x',
-    });
-  }
-
-  for (let col = 0; col < layout.xLabels.length; col++) {
-    for (let row = 0; row < layout.yLabels.length; row++) {
-      const positions = visibleAssignments
-        .filter((a) => a.col === col && a.row === row)
-        .map((a) => posMap.get(a.itemId))
-        .filter((p): p is number => p !== undefined);
-      if (positions.length === 0) continue;
-      yLabels.push({
-        text: layout.yLabels[row],
-        startPosition: Math.min(...positions),
-        endPosition: Math.max(...positions),
-        color: '#f0e6d6',
-        level: 'y',
-      });
-    }
-  }
-
-  return { xLabels, yLabels };
 }
 
 export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp, editableFuturePricing, discontinuedItems, showDiscontinued, flipped }: ShelfProps) {

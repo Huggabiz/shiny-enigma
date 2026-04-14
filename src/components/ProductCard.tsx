@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Product, ShelfItem, FuturePricing } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
+import { hexToRgba } from '../utils/color';
 import { CloseIcon } from './Icons';
 import './ProductCard.css';
 
@@ -140,6 +141,23 @@ export function ProductCard({
   editableFuturePricing,
 }: ProductCardProps) {
   const cardFormat = useProjectStore((s) => s.cardFormat);
+  // Lens tinting — if there's an active custom lens that contains this
+  // product, paint the card background in the lens colour. Mirrors the
+  // wiring in MatrixProductCard so shelf cards (transform view) and
+  // multiplan rows pick up lens visuals the same way matrix cards do.
+  const project = useProjectStore((s) => s.project);
+  const activeLens = useMemo(() => {
+    if (!project?.activeLensId) return null;
+    return project.lenses?.find((l) => l.id === project.activeLensId) ?? null;
+  }, [project?.activeLensId, project?.lenses]);
+  const productInActiveLens = useMemo(() => {
+    if (!activeLens || !product) return false;
+    // Built-in lenses (Dev) own their styling via existing CSS classes
+    // and aren't part of the lens-tint selectable set.
+    if (activeLens.builtInKind) return false;
+    return activeLens.productIds.includes(product.id);
+  }, [activeLens, product]);
+
   const {
     attributes,
     listeners,
@@ -154,6 +172,9 @@ export function ProductCard({
     transition,
     opacity: isDragging ? 0.4 : 1,
     ...(cardWidth ? { width: `${cardWidth}px`, minWidth: `${cardWidth}px` } : {}),
+    ...(productInActiveLens && activeLens
+      ? { backgroundColor: hexToRgba(activeLens.color, 0.22), borderColor: activeLens.color }
+      : {}),
   };
 
   // Pull display data from placeholderData when present
@@ -183,6 +204,7 @@ export function ProductCard({
     isLinkHighlight ? 'link-highlight' : '',
     overlay ? 'overlay' : '',
     isCompact ? 'compact' : '',
+    productInActiveLens ? 'lens-tinted' : '',
   ]
     .filter(Boolean)
     .join(' ');

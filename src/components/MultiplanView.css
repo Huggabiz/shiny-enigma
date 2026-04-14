@@ -204,27 +204,50 @@
   color: #c62828;
 }
 
-/* Cards rail — flex-1 area to the right of the label. The inner
-   .multiplan-row-cards row uses computeShelfLayout-driven widths
-   (set inline from JS) to compress cards evenly. */
+/* Cards rail — flex-1 area to the right of the label. Rendered as a
+   vertical flex column so the matrix-derived label bands can sit
+   above the cards without overlapping them. The cards row uses
+   align-items: stretch so every card in the row shares the tallest
+   card's height (matches the Shelf rail pattern in the transform
+   view). */
 .multiplan-row-rail {
   flex: 1;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
   min-width: 0;
   padding: 10px 12px;
   overflow: hidden;
 }
 
+/* Derived-labels band above the cards. Reuses the shared
+   .shelf-derived-label classes from Shelf.css so label styling is
+   identical across Shelf and MultiplanView — only the surrounding
+   container spacing is adjusted here. */
+.multiplan-row-derived-labels {
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+
 .multiplan-row-cards {
   display: flex;
-  align-items: center;
-  flex: 1;
+  align-items: stretch;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
+/* Each slot stretches to the cards-row cross-axis (= the tallest
+   card's height) so every .product-card renders at the same height
+   within one row. Different rows can still have different heights
+   based on their own content. */
 .multiplan-card-slot {
   flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.multiplan-card-slot > .product-card {
+  flex: 1;
 }
 
 .multiplan-row-empty {

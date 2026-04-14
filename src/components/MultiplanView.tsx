@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { ProductCard } from './ProductCard';
 import { computeShelfLayout } from '../utils/layout';
+import { deriveLabelsFromMatrix, packLabelsIntoRows } from '../utils/shelfLabels';
 import type { Product, RangePlan, Shelf, ShelfItem } from '../types';
 import './MultiplanView.css';
+
+const DERIVED_LABEL_ROW_HEIGHT = 18;
 
 /**
  * MultiplanView — stacked horizontal strips, one per selected
@@ -186,6 +189,7 @@ interface MultiplanRowProps {
 function MultiplanRow({
   plan,
   variant,
+  shelf,
   visibleItems,
   catalogue,
   railWidth,
@@ -199,6 +203,18 @@ function MultiplanRow({
     [visibleItems.length, railWidth],
   );
   const { cardWidth, slotWidth, offsetLeft } = layout;
+
+  // Matrix-derived labels — same "matrix title format" the transform
+  // view shows above each shelf rail. Uses the shared shelfLabels
+  // util so the positioning maths match Shelf.tsx exactly.
+  const visibleItemIds = useMemo(() => visibleItems.map((i) => i.id), [visibleItems]);
+  const { xLabels, yLabels } = useMemo(
+    () => deriveLabelsFromMatrix(shelf, visibleItemIds),
+    [shelf, visibleItemIds],
+  );
+  const xLabelRows = useMemo(() => packLabelsIntoRows(xLabels), [xLabels]);
+  const yLabelRows = useMemo(() => packLabelsIntoRows(yLabels), [yLabels]);
+  const hasMatrixLabels = xLabelRows.length > 0 || yLabelRows.length > 0;
 
   return (
     <div className="multiplan-row" onDoubleClick={onDoubleClick} title="Double-click to open in Transform view">
@@ -221,27 +237,59 @@ function MultiplanRow({
         {visibleItems.length === 0 ? (
           <div className="multiplan-row-empty">No products on this shelf</div>
         ) : (
-          <div className="multiplan-row-cards" style={{ paddingLeft: offsetLeft }}>
-            {visibleItems.map((item, idx) => {
-              const product = item.isPlaceholder
-                ? undefined
-                : catalogue.find((p) => p.id === item.productId);
-              return (
-                <div
-                  key={item.id}
-                  className="multiplan-card-slot"
-                  style={{ width: cardWidth, marginRight: idx === visibleItems.length - 1 ? 0 : slotWidth - cardWidth }}
-                >
-                  <ProductCard
-                    item={item}
-                    product={product}
-                    overlay
-                    cardWidth={cardWidth}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <>
+            {hasMatrixLabels && (
+              <div className="multiplan-row-derived-labels shelf-derived-labels">
+                {xLabelRows.map((row, rowIndex) => (
+                  <div key={`x-${rowIndex}`} className="shelf-label-row" style={{ height: DERIVED_LABEL_ROW_HEIGHT }}>
+                    {row.map((label, i) => {
+                      const left = offsetLeft + label.startPosition * slotWidth;
+                      const width = (label.endPosition - label.startPosition) * slotWidth + cardWidth;
+                      return (
+                        <div key={i} className="shelf-derived-label x-label" style={{ left, width, backgroundColor: label.color }}>
+                          {label.text}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+                {yLabelRows.map((row, rowIndex) => (
+                  <div key={`y-${rowIndex}`} className="shelf-label-row" style={{ height: DERIVED_LABEL_ROW_HEIGHT }}>
+                    {row.map((label, i) => {
+                      const left = offsetLeft + label.startPosition * slotWidth;
+                      const width = (label.endPosition - label.startPosition) * slotWidth + cardWidth;
+                      return (
+                        <div key={i} className="shelf-derived-label y-label" style={{ left, width, backgroundColor: label.color }}>
+                          {label.text}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="multiplan-row-cards" style={{ paddingLeft: offsetLeft }}>
+              {visibleItems.map((item, idx) => {
+                const product = item.isPlaceholder
+                  ? undefined
+                  : catalogue.find((p) => p.id === item.productId);
+                return (
+                  <div
+                    key={item.id}
+                    className="multiplan-card-slot"
+                    style={{ width: cardWidth, marginRight: idx === visibleItems.length - 1 ? 0 : slotWidth - cardWidth }}
+                  >
+                    <ProductCard
+                      item={item}
+                      product={product}
+                      overlay
+                      cardWidth={cardWidth}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>
