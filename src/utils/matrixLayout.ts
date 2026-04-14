@@ -419,7 +419,18 @@ export function computeMatrixLayout(
 // scale s are (s / currentScale) × the currently-measured dimensions.
 // Caller passes the currently-measured availW / availH and the current
 // scale they were measured at; this helper takes care of the back-out.
+//
+// Hysteresis: when the *smallest* fitting scale is BELOW the current
+// scale (a downgrade), require the layout at that scale to clear
+// MIN_CARD_WIDTH by at least HYSTERESIS_MARGIN before committing.
+// Otherwise tiny sub-pixel measurement drift between calls (e.g. 1px
+// from Math.ceil-ed gap rounding at non-integer scales) can ping-pong
+// the scale 1↔2 forever. Hysteresis is one-directional: upgrades
+// happen the moment the current scale stops fitting, so dense plans
+// still bump up promptly.
 // ---------------------------------------------------------------
+const HYSTERESIS_MARGIN = 4;
+
 export function computeMatrixAutoTier(
   cellCounts: number[][],
   cardFormat: CardFormat,
@@ -437,7 +448,10 @@ export function computeMatrixAutoTier(
     const availW = baseAvailW * scale;
     const availH = baseAvailH * scale;
     const result = computeMatrixLayout(cellCounts, cardFormat, availW, availH, scale);
-    if (result.fits && result.cardW >= MIN_CARD_WIDTH) {
+    // Downgrades require comfortable cardW headroom; upgrades only
+    // require the bare minimum.
+    const minCardW = scale < currentScale ? MIN_CARD_WIDTH + HYSTERESIS_MARGIN : MIN_CARD_WIDTH;
+    if (result.fits && result.cardW >= minCardW) {
       return scale;
     }
   }

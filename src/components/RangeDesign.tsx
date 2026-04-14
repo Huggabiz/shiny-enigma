@@ -461,9 +461,15 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     // chrome here leaves the layout solver with more "available" space
     // than the browser actually has, and cards wrap.
     const scaledGap = Math.ceil(BASE_GAP * uiScale);
-    const wPad = 24;
-    const availW = wrapperSize.w - wPad - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * scaledGap;
-    const availH = wrapperSize.h - wPad - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * scaledGap;
+    // NOTE: do NOT subtract a wPad constant here. ResizeObserver's
+    // contentRect already excludes the .matrix-wrapper padding, so any
+    // unscaled fudge subtraction makes the chrome non-linear in
+    // uiScale — which made baseAvailW (currentAvailW / currentScale)
+    // give different values when measured at different scales, causing
+    // the v1.9.20 1↔2 auto-tier ping-pong oscillation. Linear chrome
+    // means baseAvailW is stable across re-measures.
+    const availW = wrapperSize.w - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * scaledGap;
+    const availH = wrapperSize.h - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * scaledGap;
     return { availW, availH, numCols, numRows };
   }, [layout.xLabels, layout.yLabels, wrapperSize, uiScale,
       scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH]);
