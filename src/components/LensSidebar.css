@@ -95,6 +95,19 @@
   background: #ddd;
 }
 
+/* In edit mode the swatch becomes a clickable target that cycles
+   through the unused palette colours. Subtle scale + ring on hover
+   so the user knows it's interactive without changing layout. */
+.lens-swatch.cyclable {
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.lens-swatch.cyclable:hover {
+  transform: scale(1.18);
+  box-shadow: 0 0 0 2px rgba(245, 124, 0, 0.25);
+}
+
 .lens-name {
   flex: 1;
   font-size: 12px;
@@ -167,4 +180,25 @@
 
 .lens-item.adding {
   padding: 4px 8px;
+}
+
+/* Built-in lens (Dev) — visible in the list as a label only.
+   Non-clickable, no hover, slightly muted; the "always on" tag on
+   the right tells the user why. */
+.lens-item.built-in {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.lens-item.built-in:hover {
+  background: transparent;
+}
+
+.lens-builtin-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  color: #999;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+  margin-left: auto;
 }

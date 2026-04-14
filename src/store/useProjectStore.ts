@@ -89,6 +89,9 @@ interface ProjectStore {
   setActiveLens: (lensId: string | null) => void;
   setEditingLens: (lensId: string | null) => void;
   toggleLensProduct: (lensId: string, productId: string) => void;
+  /** Cycle a custom lens's colour to the next palette entry that
+   * isn't already in use by another lens. No-op for built-in lenses. */
+  cycleLensColor: (lensId: string) => void;
 
   // Variant management
   activeVariantId: string | null;
@@ -398,6 +401,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setActiveLens: (lensId) => {
     const { project } = get();
     if (!project) return;
+    // The built-in Dev lens is always-on (its own existing CSS class
+    // owns the styling) and not a member of the activatable lens set —
+    // refuse to set it as the active lens so callers can blindly pass
+    // any lens id without leaking the Dev lens into the tint logic.
+    if (lensId) {
+      const lens = (project.lenses ?? []).find((l) => l.id === lensId);
+      if (!lens || lens.builtInKind) return;
+    }
     set({ project: { ...project, activeLensId: lensId } });
   },
 
@@ -436,6 +447,38 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       };
     });
     set({ project: { ...project, lenses, updatedAt: new Date().toISOString() } });
+  },
+
+  cycleLensColor: (lensId) => {
+    const { project } = get();
+    if (!project) return;
+    const lenses = project.lenses ?? [];
+    const lens = lenses.find((l) => l.id === lensId);
+    if (!lens || lens.builtInKind) return; // built-in lens colours are locked
+    // Skip colours used by any OTHER lens (excluding self) so cycling
+    // never lands on a duplicate. Falls back to the current colour if
+    // the palette is exhausted.
+    const usedByOthers = new Set(
+      lenses.filter((l) => l.id !== lensId).map((l) => l.color),
+    );
+    const palette = LENS_PALETTE;
+    const currentIdx = palette.indexOf(lens.color);
+    let nextColor = lens.color;
+    for (let i = 1; i <= palette.length; i++) {
+      const candidate = palette[(currentIdx + i + palette.length) % palette.length];
+      if (!usedByOthers.has(candidate)) {
+        nextColor = candidate;
+        break;
+      }
+    }
+    if (nextColor === lens.color) return;
+    set({
+      project: {
+        ...project,
+        lenses: lenses.map((l) => l.id === lensId ? { ...l, color: nextColor } : l),
+        updatedAt: new Date().toISOString(),
+      },
+    });
   },
 
   removePlan: (planId) => {

@@ -19,7 +19,15 @@ import './LensSidebar.css';
  *     `source === 'dev'`.
  */
 export function LensSidebar() {
-  const { project, createLens, removeLens, renameLens, setActiveLens, setEditingLens } = useProjectStore();
+  const {
+    project,
+    createLens,
+    removeLens,
+    renameLens,
+    setActiveLens,
+    setEditingLens,
+    cycleLensColor,
+  } = useProjectStore();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -54,14 +62,25 @@ export function LensSidebar() {
           const isEditing = editingLensId === lens.id;
           const isBuiltIn = !!lens.builtInKind;
           const memberCount = isBuiltIn ? null : lens.productIds.length;
+          // Built-in lenses (currently just Dev) are always-on and not
+          // selectable — clicking the row is a no-op so the lens entry
+          // is just a label in the list.
+          const handleRowClick = isBuiltIn
+            ? undefined
+            : () => setActiveLens(isActive ? null : lens.id);
           return (
             <div
               key={lens.id}
-              className={`lens-item ${isActive ? 'active' : ''} ${isEditing ? 'editing' : ''}`}
-              onClick={() => setActiveLens(isActive ? null : lens.id)}
-              title={isActive ? 'Click to deactivate' : 'Click to activate'}
+              className={`lens-item ${isBuiltIn ? 'built-in' : ''} ${isActive ? 'active' : ''} ${isEditing ? 'editing' : ''}`}
+              onClick={handleRowClick}
+              title={isBuiltIn ? 'Always on' : (isActive ? 'Click to deactivate' : 'Click to activate')}
             >
-              <span className="lens-swatch" style={{ background: lens.color }} />
+              <span
+                className={`lens-swatch ${isEditing ? 'cyclable' : ''}`}
+                style={{ background: lens.color }}
+                onClick={isEditing ? (e) => { e.stopPropagation(); cycleLensColor(lens.id); } : undefined}
+                title={isEditing ? 'Click to cycle colour' : undefined}
+              />
               {renamingId === lens.id ? (
                 <input
                   className="lens-name-input"
@@ -86,6 +105,9 @@ export function LensSidebar() {
                   {lens.name}
                   {memberCount !== null && <span className="lens-member-count"> · {memberCount}</span>}
                 </span>
+              )}
+              {isBuiltIn && (
+                <span className="lens-builtin-tag">always on</span>
               )}
               {!isBuiltIn && (
                 <>

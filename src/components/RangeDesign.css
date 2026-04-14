@@ -344,16 +344,10 @@
 
 /* Lens edit mode — cursor swaps to a crosshair so the user knows
    clicking will toggle membership in the lens currently in edit mode.
-   The .lens-edit-member modifier (set when the product is already in
-   the lens) gives the card a strong outline so the toggle state is
-   visible at a glance. */
+   No outline highlight on member cards: the lens tint already shows
+   membership clearly, so a separate outline was visually redundant. */
 .matrix-card.lens-edit-mode {
   cursor: crosshair;
-}
-
-.matrix-card.lens-edit-member {
-  outline: 2px solid #f57c00;
-  outline-offset: -2px;
 }
 
 /* Lens-tinted state — set inline `backgroundColor` from the lens's

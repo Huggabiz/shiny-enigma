@@ -223,13 +223,13 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   }, [project?.editingLensId, project?.lenses]);
   const productInActiveLens = useMemo(() => {
     if (!activeLens || !product) return false;
-    if (activeLens.builtInKind === 'dev') return product.source === 'dev';
+    // Built-in lenses (Dev) are owned by their existing always-on CSS
+    // (`.matrix-card.dev-product`) and aren't part of the lens-tint
+    // selectable set — ignore them here even if activeLensId somehow
+    // points at one.
+    if (activeLens.builtInKind) return false;
     return activeLens.productIds.includes(product.id);
   }, [activeLens, product]);
-  const productInEditingLens = useMemo(() => {
-    if (!editingLens || !product) return false;
-    return editingLens.productIds.includes(product.id);
-  }, [editingLens, product]);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `matrix-item-${itemId}`, data: { itemId },
@@ -284,7 +284,6 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
     isDiscontinued ? 'ghosted-discontinued' : '',
     productInActiveLens ? 'lens-tinted' : '',
     editingLens ? 'lens-edit-mode' : '',
-    editingLens && productInEditingLens ? 'lens-edit-member' : '',
   ].filter(Boolean).join(' ');
 
   // When the active lens has the product, paint the card background
