@@ -1,7 +1,7 @@
 import { useProjectStore } from '../store/useProjectStore';
 import './NavSidebar.css';
 
-export type ViewType = 'transform' | 'range-design';
+export type ViewType = 'transform' | 'range-design' | 'multiplan';
 
 interface NavSidebarProps {
   activeView: ViewType;
@@ -24,6 +24,14 @@ export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
 
       <div className="nav-separator" />
 
+      <button
+        className={`nav-item ${activeView === 'multiplan' ? 'active' : ''}`}
+        onClick={() => onViewChange('multiplan')}
+        title="Multiplan — compare shelves across plans/variants"
+      >
+        <span className="nav-icon">▤</span>
+        <span className="nav-label">Multiplan</span>
+      </button>
       <button
         className={`nav-item ${activeView === 'range-design' ? 'active' : ''}`}
         onClick={() => onViewChange('range-design')}

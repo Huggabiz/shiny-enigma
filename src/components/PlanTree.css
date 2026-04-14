@@ -371,3 +371,19 @@
 .plan-tree-item:hover .plan-tree-item-delete {
   opacity: 1;
 }
+
+/* Checkbox shown next to plan/variant rows ONLY when the Multiplan
+   view is active. Clicking it toggles whether that (plan, variant)
+   pair is included as a row in the multiplan stack. */
+.plan-tree-multiplan-check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: #1976d2;
+  margin: 0 2px 0 0;
+}
+
+.plan-tree-multiplan-check.variant {
+  margin-left: 2px;
+}

@@ -22,6 +22,7 @@ import { ImportDialog } from './components/ImportDialog';
 import { ProductCard } from './components/ProductCard';
 import { LinkPanel } from './components/LinkPanel';
 import { RangeDesign } from './components/RangeDesign';
+import { MultiplanView } from './components/MultiplanView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PlaceholderDialog } from './components/PlaceholderDialog';
 import { EditableTitle } from './components/EditableTitle';
@@ -152,6 +153,9 @@ function App() {
   // snaps to fit when something big happens to the layout.
   useEffect(() => {
     if (!project) return;
+    // Multiplan view has no fixed slide canvas, so there's nothing to
+    // auto-fit. Skip the snap-to-width entirely when it's active.
+    if (activeView === 'multiplan') return;
     const selector = activeView === 'transform' ? '.transform-view-scroll' : '.range-view-scroll';
     // Wait for the new view's DOM to mount and CSS vars to commit. Two
     // RAFs is enough for the initial render; on a fresh project we add a
@@ -602,6 +606,8 @@ function App() {
           )
         ) : activeView === 'range-design' ? (
           <RangeDesign shelfId={designShelfId} onShelfChange={setDesignShelfId} onImport={() => setShowImport(true)} />
+        ) : activeView === 'multiplan' ? (
+          <MultiplanView />
         ) : null}
       </div>
 

@@ -17,7 +17,18 @@ export function PlanTree() {
     project, addPlan, removePlan, setActivePlan, setShowPlanTree,
     activeVariantId, setActiveVariant, addVariant, removeVariant,
     addFolder, removeFolder, renameFolder, setPlanFolder,
+    activeView, toggleMultiplanEntry,
   } = useProjectStore();
+  const isMultiplan = activeView === 'multiplan';
+  // Fast lookup so each row can tell if its (planId, variantId|null)
+  // pair is already in the multiplan view entries list.
+  const multiplanKeySet = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of project?.multiplanView?.entries ?? []) {
+      set.add(`${e.planId}:${e.variantId ?? ''}`);
+    }
+    return set;
+  }, [project?.multiplanView?.entries]);
   // Track collapsed plans (not expanded) so new plans default to expanded.
   const [collapsedPlans, setCollapsedPlans] = useState<Set<string>>(new Set());
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
@@ -126,6 +137,9 @@ export function PlanTree() {
     //   - ''              — not selected
     const planRowState = isActive ? (activeVariantId ? 'active-parent' : 'active') : '';
 
+    const masterKey = `${plan.id}:`;
+    const masterInMultiplan = multiplanKeySet.has(masterKey);
+
     return (
       <div key={plan.id}>
         <div
@@ -133,6 +147,16 @@ export function PlanTree() {
           draggable
           onDragStart={(e) => handlePlanDragStart(e, plan.id)}
         >
+          {isMultiplan && (
+            <input
+              type="checkbox"
+              className="plan-tree-multiplan-check"
+              checked={masterInMultiplan}
+              onClick={(e) => e.stopPropagation()}
+              onChange={() => toggleMultiplanEntry(plan.id, null)}
+              title={`${masterInMultiplan ? 'Remove' : 'Add'} ${plan.name} (master) from multiplan view`}
+            />
+          )}
           {hasVariants ? (
             <button className="plan-tree-expand" onClick={() => toggleExpand(plan.id)}>
               {isExpanded ? '▾' : '▸'}
@@ -162,10 +186,22 @@ export function PlanTree() {
         {isExpanded && hasVariants && plan.variants.map((variant) => {
           const isVarActive = isActive && activeVariantId === variant.id;
           const varCount = variant.includedCurrentItemIds.length + variant.includedFutureItemIds.length;
+          const variantKey = `${plan.id}:${variant.id}`;
+          const variantInMultiplan = multiplanKeySet.has(variantKey);
           return (
             <div key={variant.id}
               className={`plan-tree-item variant ${isVarActive ? 'active' : ''}`}
               onClick={() => { setActivePlan(plan.id); setActiveVariant(variant.id); }}>
+              {isMultiplan && (
+                <input
+                  type="checkbox"
+                  className="plan-tree-multiplan-check variant"
+                  checked={variantInMultiplan}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleMultiplanEntry(plan.id, variant.id)}
+                  title={`${variantInMultiplan ? 'Remove' : 'Add'} ${plan.name} (${variant.name}) from multiplan view`}
+                />
+              )}
               <div className="plan-tree-variant-indent" />
               <div className="plan-tree-item-icon variant-icon">○</div>
               <div className="plan-tree-item-info">

@@ -34,9 +34,9 @@ interface ProjectStore {
   setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean }>) => void;
 
   // Views — lifted out of App local state so the export loop can drive them
-  activeView: 'transform' | 'range-design';
+  activeView: 'transform' | 'range-design' | 'multiplan';
   designShelfId: 'current' | 'future';
-  setActiveView: (view: 'transform' | 'range-design') => void;
+  setActiveView: (view: 'transform' | 'range-design' | 'multiplan') => void;
   setDesignShelfId: (shelfId: 'current' | 'future') => void;
 
   // Slide canvas size — baseScale grows the logical canvas so more content
@@ -81,6 +81,12 @@ interface ProjectStore {
   removeFolder: (folderId: string) => void;
   renameFolder: (folderId: string, name: string) => void;
   reorderFolders: (orderedFolderIds: string[]) => void;
+
+  // Multiplan view — ordered list of (plan, variant|master) rows and
+  // a global Current/Future shelf-side toggle. See types/MultiplanViewState.
+  setMultiplanShelfSide: (side: 'current' | 'future') => void;
+  toggleMultiplanEntry: (planId: string, variantId: string | null) => void;
+  clearMultiplanEntries: () => void;
 
   // Lens management — see types/Lens for the data model.
   createLens: (name: string) => void;
@@ -341,6 +347,55 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       project: {
         ...project,
         folders: [...reordered, ...leftover.map((f, i) => ({ ...f, order: reordered.length + i }))],
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  // Multiplan view — the shelf side is a global Current/Future toggle
+  // and the entries are an ordered list of (plan, variant|master)
+  // pairs. Entries are stored on the project so they persist across
+  // sessions. A (null) variantId means the plan's master range.
+  setMultiplanShelfSide: (side) => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.multiplanView ?? { shelfSide: 'current', entries: [] };
+    set({
+      project: {
+        ...project,
+        multiplanView: { ...current, shelfSide: side },
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  toggleMultiplanEntry: (planId, variantId) => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.multiplanView ?? { shelfSide: 'current' as const, entries: [] };
+    const exists = current.entries.some(
+      (e) => e.planId === planId && e.variantId === variantId,
+    );
+    const entries = exists
+      ? current.entries.filter((e) => !(e.planId === planId && e.variantId === variantId))
+      : [...current.entries, { planId, variantId }];
+    set({
+      project: {
+        ...project,
+        multiplanView: { ...current, entries },
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  clearMultiplanEntries: () => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.multiplanView ?? { shelfSide: 'current' as const, entries: [] };
+    set({
+      project: {
+        ...project,
+        multiplanView: { ...current, entries: [] },
         updatedAt: new Date().toISOString(),
       },
     });

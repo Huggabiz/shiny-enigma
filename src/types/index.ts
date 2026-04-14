@@ -209,6 +209,26 @@ export function isProductInLens(lens: Lens, product: Pick<Product, 'id' | 'sourc
   return lens.productIds.includes(product.id);
 }
 
+/** A single row in the Multiplan view — one (plan, variant|master)
+ * pair. `variantId === null` means the plan's master range. The user
+ * can include both the master AND one or more variants of the same
+ * plan in a single multiplan view, because the selection unit is a
+ * plan+variant tuple, not just a plan. */
+export interface MultiplanEntry {
+  planId: string;
+  /** null = master range */
+  variantId: string | null;
+}
+
+/** Project-level state for the Multiplan view. The shelf side toggle
+ * is global (one `Current | Future` switch applied to every row), and
+ * `entries` is an ordered list of plan+variant tuples that each become
+ * a stacked row in the view. */
+export interface MultiplanViewState {
+  shelfSide: 'current' | 'future';
+  entries: MultiplanEntry[];
+}
+
 // The full project state — now holds multiple range plans
 export interface Project {
   name: string;
@@ -231,6 +251,10 @@ export interface Project {
    * editable at a time. Built-in 'dev' lens can never be in edit mode
    * (implicit membership). */
   editingLensId?: string | null;
+  /** Multiplan view state — which plan+variant pairs to show stacked,
+   * and which side of the range (current / future) to render. Optional
+   * for backwards-compat; the store action lazily initialises it. */
+  multiplanView?: MultiplanViewState;
   createdAt: string;
   updatedAt: string;
 }

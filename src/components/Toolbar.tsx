@@ -7,7 +7,7 @@ import { APP_VERSION } from '../version';
 import './Toolbar.css';
 
 interface ToolbarProps {
-  activeView?: 'transform' | 'range-design';
+  activeView?: 'transform' | 'range-design' | 'multiplan';
 }
 
 export function Toolbar({ activeView }: ToolbarProps) {
