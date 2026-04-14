@@ -1,4 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useProjectStore } from '../store/useProjectStore';
 import { ProductCard } from './ProductCard';
 import { computeShelfLayout } from '../utils/layout';
@@ -7,6 +22,12 @@ import type { Product, RangePlan, Shelf, ShelfItem } from '../types';
 import './MultiplanView.css';
 
 const DERIVED_LABEL_ROW_HEIGHT = 18;
+
+/** Stable sortable id for a multiplan entry. Keeps master and a
+ * variant on the same plan distinguishable. */
+function entryKey(entry: { planId: string; variantId: string | null }): string {
+  return `${entry.planId}:${entry.variantId ?? 'master'}`;
+}
 
 /**
  * MultiplanView — stacked horizontal strips, one per selected
@@ -31,10 +52,18 @@ export function MultiplanView() {
     setActiveView,
     setMultiplanShelfSide,
     toggleMultiplanEntry,
+    reorderMultiplanEntries,
     clearMultiplanEntries,
     showGhosted,
     setShowGhosted,
   } = useProjectStore();
+
+  // Sensors for the row-reorder DndContext. Small activation distance
+  // so a click on the drag handle (label column) registers as a click
+  // unless the user actually drags — protects the remove ×, etc.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
 
   // Container width for computeShelfLayout — the multiplan rows share
   // the same flex column so one width serves every row. Measured via
@@ -84,6 +113,20 @@ export function MultiplanView() {
     setActiveVariant(variantId);
     setActiveView('transform');
   };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = entries.findIndex((e) => entryKey(e) === active.id);
+    const newIdx = entries.findIndex((e) => entryKey(e) === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    reorderMultiplanEntries(arrayMove(entries, oldIdx, newIdx));
+  };
+
+  const sortableIds = useMemo(
+    () => resolvedRows.map(({ plan, variant }) => entryKey({ planId: plan.id, variantId: variant?.id ?? null })),
+    [resolvedRows],
+  );
 
   return (
     <div className="multiplan-view">
@@ -137,23 +180,28 @@ export function MultiplanView() {
           </p>
         </div>
       ) : (
-        <div className="multiplan-rows">
-          {resolvedRows.map(({ plan, variant, shelf, rowItems }, rowIdx) => (
-            <MultiplanRow
-              key={`${plan.id}:${variant?.id ?? 'master'}`}
-              plan={plan}
-              variant={variant}
-              shelf={shelf}
-              rowItems={rowItems}
-              catalogue={project.catalogue}
-              railWidth={railWidth.width}
-              firstRow={rowIdx === 0}
-              onRailRef={rowIdx === 0 ? railWidth.attachRef : undefined}
-              onRemove={() => toggleMultiplanEntry(plan.id, variant?.id ?? null)}
-              onDoubleClick={() => handleOpenInTransform(plan, variant?.id ?? null)}
-            />
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+            <div className="multiplan-rows">
+              {resolvedRows.map(({ plan, variant, shelf, rowItems }, rowIdx) => (
+                <MultiplanRow
+                  key={entryKey({ planId: plan.id, variantId: variant?.id ?? null })}
+                  sortId={entryKey({ planId: plan.id, variantId: variant?.id ?? null })}
+                  plan={plan}
+                  variant={variant}
+                  shelf={shelf}
+                  rowItems={rowItems}
+                  catalogue={project.catalogue}
+                  railWidth={railWidth.width}
+                  firstRow={rowIdx === 0}
+                  onRailRef={rowIdx === 0 ? railWidth.attachRef : undefined}
+                  onRemove={() => toggleMultiplanEntry(plan.id, variant?.id ?? null)}
+                  onDoubleClick={() => handleOpenInTransform(plan, variant?.id ?? null)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );
@@ -190,6 +238,9 @@ interface MultiplanRowItem {
 }
 
 interface MultiplanRowProps {
+  /** Sortable id used by dnd-kit's SortableContext. Derived from the
+   * (plan, variant|master) pair via entryKey(). */
+  sortId: string;
   plan: RangePlan;
   variant: { id: string; name: string } | null;
   /** The shelf is resolved upstream (current vs future) and drives
@@ -205,6 +256,7 @@ interface MultiplanRowProps {
 }
 
 function MultiplanRow({
+  sortId,
   plan,
   variant,
   shelf,
@@ -216,6 +268,27 @@ function MultiplanRow({
   onRemove,
   onDoubleClick,
 }: MultiplanRowProps) {
+  // useSortable attaches drag listeners to the label column via
+  // spread {...attributes} {...listeners}. A 5px activation distance
+  // (set on the parent DndContext's PointerSensor) lets normal clicks
+  // on the label column still work (e.g. the remove ×) — only a real
+  // mouse drag starts the reorder.
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: sortId });
+
+  const rowStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 5 : undefined,
+  };
+
   const layout = useMemo(
     () => computeShelfLayout(rowItems.length, railWidth),
     [rowItems.length, railWidth],
@@ -236,8 +309,19 @@ function MultiplanRow({
   const nonGhostedCount = useMemo(() => rowItems.filter((r) => !r.ghosted).length, [rowItems]);
 
   return (
-    <div className="multiplan-row" onDoubleClick={onDoubleClick} title="Double-click to open in Transform view">
-      <div className="multiplan-row-label">
+    <div
+      ref={setNodeRef}
+      className={`multiplan-row ${isDragging ? 'dragging' : ''}`}
+      style={rowStyle}
+      onDoubleClick={onDoubleClick}
+      title="Drag the label column to reorder — double-click to open in Transform view"
+    >
+      <div
+        className="multiplan-row-label"
+        {...attributes}
+        {...listeners}
+      >
+        <div className="multiplan-row-drag-hint" aria-hidden>⋮⋮</div>
         <div className="multiplan-row-plan-name" title={plan.name}>{plan.name}</div>
         <div className="multiplan-row-variant-name">
           {variant ? variant.name : 'Master'}
@@ -246,6 +330,7 @@ function MultiplanRow({
         <button
           className="multiplan-row-remove"
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          onPointerDown={(e) => e.stopPropagation()}
           title="Remove from multiplan view"
         >×</button>
       </div>

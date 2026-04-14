@@ -163,17 +163,52 @@
 
 /* Fixed-width label column on the left of each row — like the matrix
    view's y-axis labels. Shows plan name, variant (or "Master"),
-   SKU count, and a remove button. */
+   SKU count, and a remove button.
+   Doubles as the drag handle for row reordering (dnd-kit listeners
+   are attached here), so cursor: grab and user-select: none. */
 .multiplan-row-label {
   flex: 0 0 160px;
   background: #fafafa;
   border-right: 1px solid #eee;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 20px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 2px;
   position: relative;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.multiplan-row-label:active {
+  cursor: grabbing;
+}
+
+/* Vertical "grip" glyph on the left edge of the label column — a
+   visual cue that the column is draggable. Positioned over the left
+   padding so it doesn't squash the text content. */
+.multiplan-row-drag-hint {
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #bbb;
+  pointer-events: none;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.multiplan-row-label:hover .multiplan-row-drag-hint {
+  color: #888;
+}
+
+.multiplan-row.dragging {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 
 .multiplan-row-plan-name {

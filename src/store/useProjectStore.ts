@@ -86,6 +86,7 @@ interface ProjectStore {
   // a global Current/Future shelf-side toggle. See types/MultiplanViewState.
   setMultiplanShelfSide: (side: 'current' | 'future') => void;
   toggleMultiplanEntry: (planId: string, variantId: string | null) => void;
+  reorderMultiplanEntries: (entries: import('../types').MultiplanEntry[]) => void;
   clearMultiplanEntries: () => void;
 
   // Lens management — see types/Lens for the data model.
@@ -379,6 +380,19 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const entries = exists
       ? current.entries.filter((e) => !(e.planId === planId && e.variantId === variantId))
       : [...current.entries, { planId, variantId }];
+    set({
+      project: {
+        ...project,
+        multiplanView: { ...current, entries },
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  reorderMultiplanEntries: (entries) => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.multiplanView ?? { shelfSide: 'current' as const, entries: [] };
     set({
       project: {
         ...project,
