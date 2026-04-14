@@ -32,6 +32,8 @@ export function MultiplanView() {
     setMultiplanShelfSide,
     toggleMultiplanEntry,
     clearMultiplanEntries,
+    showGhosted,
+    setShowGhosted,
   } = useProjectStore();
 
   // Container width for computeShelfLayout — the multiplan rows share
@@ -44,11 +46,12 @@ export function MultiplanView() {
   const shelfSide = multiplanView.shelfSide;
   const entries = multiplanView.entries;
 
-  // Resolve each entry to a concrete (plan, variant|null, visibleItems)
+  // Resolve each entry to a concrete (plan, variant|null, visibleRows)
   // tuple. Entries that reference a deleted plan/variant are filtered
-  // out silently so stale state doesn't crash the render. The early
-  // null-project case falls through as an empty list so the hook
-  // order stays stable regardless of load state.
+  // out silently so stale state doesn't crash the render. Each row
+  // item is wrapped with a `ghosted` flag so variant rows can render
+  // excluded items as ghost cards when `showGhosted` is enabled —
+  // matches the range-view behaviour so the checkbox is truly global.
   const resolvedRows = useMemo(() => {
     if (!project) return [];
     return entries
@@ -64,13 +67,15 @@ export function MultiplanView() {
         const shelf: Shelf = shelfSide === 'current' ? plan.currentShelf : plan.futureShelf;
         const variantIncludedKey = shelfSide === 'current' ? 'includedCurrentItemIds' : 'includedFutureItemIds';
         const includedIds = variant ? new Set(variant[variantIncludedKey]) : null;
-        const visibleItems: ShelfItem[] = includedIds
-          ? shelf.items.filter((i) => includedIds.has(i.id))
-          : shelf.items;
-        return { plan, variant, shelf, visibleItems };
+        const rowItems: Array<{ item: ShelfItem; ghosted: boolean }> = includedIds
+          ? shelf.items
+              .filter((i) => includedIds.has(i.id) || showGhosted)
+              .map((i) => ({ item: i, ghosted: !includedIds.has(i.id) }))
+          : shelf.items.map((i) => ({ item: i, ghosted: false }));
+        return { plan, variant, shelf, rowItems };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [entries, project, shelfSide]);
+  }, [entries, project, shelfSide, showGhosted]);
 
   if (!project) return null;
 
@@ -103,6 +108,14 @@ export function MultiplanView() {
           </button>
         </div>
         <div className="multiplan-toolbar-actions">
+          <label className="multiplan-show-excluded" title="Show items excluded from variants as ghost cards (global toggle — also affects the range view)">
+            <input
+              type="checkbox"
+              checked={showGhosted}
+              onChange={(e) => setShowGhosted(e.target.checked)}
+            />
+            Show excluded
+          </label>
           <span className="multiplan-toolbar-meta">
             {resolvedRows.length} row{resolvedRows.length === 1 ? '' : 's'}
           </span>
@@ -125,13 +138,13 @@ export function MultiplanView() {
         </div>
       ) : (
         <div className="multiplan-rows">
-          {resolvedRows.map(({ plan, variant, shelf, visibleItems }, rowIdx) => (
+          {resolvedRows.map(({ plan, variant, shelf, rowItems }, rowIdx) => (
             <MultiplanRow
               key={`${plan.id}:${variant?.id ?? 'master'}`}
               plan={plan}
               variant={variant}
               shelf={shelf}
-              visibleItems={visibleItems}
+              rowItems={rowItems}
               catalogue={project.catalogue}
               railWidth={railWidth.width}
               firstRow={rowIdx === 0}
@@ -168,16 +181,21 @@ function useRailWidth() {
   return { width, attachRef };
 }
 
+interface MultiplanRowItem {
+  item: ShelfItem;
+  /** True when the item is NOT included in this row's active variant
+   * but is being shown as a ghost because `showGhosted` is enabled.
+   * Always false for master-range rows. */
+  ghosted: boolean;
+}
+
 interface MultiplanRowProps {
   plan: RangePlan;
   variant: { id: string; name: string } | null;
-  /** The shelf is resolved upstream (current vs future) and only the
-   * visible items list is actually consumed inside the row — the
-   * shelf object itself is kept in the prop signature so future
-   * features (labels, sankey hints) have it to hand without a
-   * breaking refactor. */
+  /** The shelf is resolved upstream (current vs future) and drives
+   * matrix-derived label generation. */
   shelf: Shelf;
-  visibleItems: ShelfItem[];
+  rowItems: MultiplanRowItem[];
   catalogue: Product[];
   railWidth: number;
   firstRow: boolean;
@@ -190,7 +208,7 @@ function MultiplanRow({
   plan,
   variant,
   shelf,
-  visibleItems,
+  rowItems,
   catalogue,
   railWidth,
   firstRow,
@@ -199,15 +217,15 @@ function MultiplanRow({
   onDoubleClick,
 }: MultiplanRowProps) {
   const layout = useMemo(
-    () => computeShelfLayout(visibleItems.length, railWidth),
-    [visibleItems.length, railWidth],
+    () => computeShelfLayout(rowItems.length, railWidth),
+    [rowItems.length, railWidth],
   );
   const { cardWidth, slotWidth, offsetLeft } = layout;
 
   // Matrix-derived labels — same "matrix title format" the transform
   // view shows above each shelf rail. Uses the shared shelfLabels
   // util so the positioning maths match Shelf.tsx exactly.
-  const visibleItemIds = useMemo(() => visibleItems.map((i) => i.id), [visibleItems]);
+  const visibleItemIds = useMemo(() => rowItems.map((r) => r.item.id), [rowItems]);
   const { xLabels, yLabels } = useMemo(
     () => deriveLabelsFromMatrix(shelf, visibleItemIds),
     [shelf, visibleItemIds],
@@ -215,6 +233,7 @@ function MultiplanRow({
   const xLabelRows = useMemo(() => packLabelsIntoRows(xLabels), [xLabels]);
   const yLabelRows = useMemo(() => packLabelsIntoRows(yLabels), [yLabels]);
   const hasMatrixLabels = xLabelRows.length > 0 || yLabelRows.length > 0;
+  const nonGhostedCount = useMemo(() => rowItems.filter((r) => !r.ghosted).length, [rowItems]);
 
   return (
     <div className="multiplan-row" onDoubleClick={onDoubleClick} title="Double-click to open in Transform view">
@@ -223,7 +242,7 @@ function MultiplanRow({
         <div className="multiplan-row-variant-name">
           {variant ? variant.name : 'Master'}
         </div>
-        <div className="multiplan-row-count">{visibleItems.length} SKUs</div>
+        <div className="multiplan-row-count">{nonGhostedCount} SKUs</div>
         <button
           className="multiplan-row-remove"
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
@@ -234,7 +253,7 @@ function MultiplanRow({
         className="multiplan-row-rail"
         ref={firstRow ? onRailRef : undefined}
       >
-        {visibleItems.length === 0 ? (
+        {rowItems.length === 0 ? (
           <div className="multiplan-row-empty">No products on this shelf</div>
         ) : (
           <>
@@ -269,7 +288,7 @@ function MultiplanRow({
               </div>
             )}
             <div className="multiplan-row-cards" style={{ paddingLeft: offsetLeft }}>
-              {visibleItems.map((item, idx) => {
+              {rowItems.map(({ item, ghosted }, idx) => {
                 const product = item.isPlaceholder
                   ? undefined
                   : catalogue.find((p) => p.id === item.productId);
@@ -277,13 +296,14 @@ function MultiplanRow({
                   <div
                     key={item.id}
                     className="multiplan-card-slot"
-                    style={{ width: cardWidth, marginRight: idx === visibleItems.length - 1 ? 0 : slotWidth - cardWidth }}
+                    style={{ width: cardWidth, marginRight: idx === rowItems.length - 1 ? 0 : slotWidth - cardWidth }}
                   >
                     <ProductCard
                       item={item}
                       product={product}
                       overlay
                       cardWidth={cardWidth}
+                      isGhosted={ghosted}
                     />
                   </div>
                 );

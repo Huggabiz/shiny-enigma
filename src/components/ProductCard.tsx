@@ -141,15 +141,22 @@ export function ProductCard({
   editableFuturePricing,
 }: ProductCardProps) {
   const cardFormat = useProjectStore((s) => s.cardFormat);
-  // Lens tinting — if there's an active custom lens that contains this
-  // product, paint the card background in the lens colour. Mirrors the
-  // wiring in MatrixProductCard so shelf cards (transform view) and
-  // multiplan rows pick up lens visuals the same way matrix cards do.
+  // Lens tinting + edit mode — if there's an active custom lens that
+  // contains this product, paint the card background in the lens
+  // colour. If a custom lens is currently in edit mode, clicking the
+  // card toggles the product's membership in that lens (read-only
+  // views like multiplan are the main driver for this; transform
+  // view picks it up too since ProductCard is shared).
   const project = useProjectStore((s) => s.project);
+  const toggleLensProduct = useProjectStore((s) => s.toggleLensProduct);
   const activeLens = useMemo(() => {
     if (!project?.activeLensId) return null;
     return project.lenses?.find((l) => l.id === project.activeLensId) ?? null;
   }, [project?.activeLensId, project?.lenses]);
+  const editingLens = useMemo(() => {
+    if (!project?.editingLensId) return null;
+    return project.lenses?.find((l) => l.id === project.editingLensId) ?? null;
+  }, [project?.editingLensId, project?.lenses]);
   const productInActiveLens = useMemo(() => {
     if (!activeLens || !product) return false;
     // Built-in lenses (Dev) own their styling via existing CSS classes
@@ -165,7 +172,7 @@ export function ProductCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id, disabled: overlay });
+  } = useSortable({ id: item.id, disabled: overlay || !!editingLens });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -205,9 +212,24 @@ export function ProductCard({
     overlay ? 'overlay' : '',
     isCompact ? 'compact' : '',
     productInActiveLens ? 'lens-tinted' : '',
+    editingLens ? 'lens-edit-mode' : '',
   ]
     .filter(Boolean)
     .join(' ');
+
+  // When a custom lens is in edit mode, a click on the card toggles
+  // the product's membership in that lens and preempts the normal
+  // onClick (selection, link mode, etc.). Outside edit mode the
+  // original onClick prop is used unchanged.
+  const handleClick = (e: React.MouseEvent) => {
+    if (editingLens && product && !item.isPlaceholder) {
+      e.stopPropagation();
+      e.preventDefault();
+      toggleLensProduct(editingLens.id, product.id);
+      return;
+    }
+    onClick?.();
+  };
 
   // Build a synthetic product for placeholders so RrpRow can render
   const cardProduct: Product | undefined = item.isPlaceholder && phData
@@ -237,7 +259,7 @@ export function ProductCard({
       style={style}
       className={cardClass}
       data-item-id={item.id}
-      onClick={onClick}
+      onClick={handleClick}
       onDoubleClick={onDoubleClick}
       {...attributes}
       {...listeners}

@@ -50,20 +50,25 @@ export function deriveLabelsFromMatrix(
     });
   }
 
-  for (let col = 0; col < layout.xLabels.length; col++) {
-    for (let row = 0; row < layout.yLabels.length; row++) {
-      const positions = visibleAssignments
-        .filter((a) => a.col === col && a.row === row)
-        .map((a) => posMap.get(a.itemId))
-        .filter((p): p is number => p !== undefined);
-      if (positions.length === 0) continue;
-      yLabels.push({
-        text: layout.yLabels[row],
-        startPosition: Math.min(...positions),
-        endPosition: Math.max(...positions),
-        color: '#f0e6d6',
-        level: 'y',
-      });
+  // Skip y-labels entirely when the matrix only has a single row —
+  // a "Subset 1" bar under every card adds no information. 2+ rows
+  // means the labels differentiate zones, so we render them.
+  if (layout.yLabels.length >= 2) {
+    for (let col = 0; col < layout.xLabels.length; col++) {
+      for (let row = 0; row < layout.yLabels.length; row++) {
+        const positions = visibleAssignments
+          .filter((a) => a.col === col && a.row === row)
+          .map((a) => posMap.get(a.itemId))
+          .filter((p): p is number => p !== undefined);
+        if (positions.length === 0) continue;
+        yLabels.push({
+          text: layout.yLabels[row],
+          startPosition: Math.min(...positions),
+          endPosition: Math.max(...positions),
+          color: '#f0e6d6',
+          level: 'y',
+        });
+      }
     }
   }
 

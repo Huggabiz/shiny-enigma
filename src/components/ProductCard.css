@@ -65,6 +65,14 @@
   border-width: 2px;
 }
 
+/* Lens edit mode — a custom lens is being edited. Clicking the card
+   toggles its product's membership in the lens. useSortable is
+   disabled upstream so drag is off while edit mode is on; the
+   crosshair cursor signals the toggle behaviour. */
+.product-card.lens-edit-mode {
+  cursor: crosshair;
+}
+
 /* New / Dev badge — absolute, pointer-events: none so it cannot push
    the card's layout box or steal clicks from neighbours. */
 .card-new-badge {

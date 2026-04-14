@@ -63,7 +63,24 @@
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+}
+
+.multiplan-show-excluded {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #555;
+  cursor: pointer;
+  user-select: none;
+}
+
+.multiplan-show-excluded input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #1976d2;
+  cursor: pointer;
 }
 
 .multiplan-toolbar-meta {
@@ -131,7 +148,12 @@
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   overflow: hidden;
-  min-height: 128px;
+  min-height: 148px;
+  /* flex-shrink: 0 so rows retain their natural height when the
+     number of rows exceeds the vertical budget — the parent
+     .multiplan-rows scrolls instead of squeezing rows below the
+     space their labels + cards need. */
+  flex-shrink: 0;
   transition: box-shadow 0.12s;
 }
 
