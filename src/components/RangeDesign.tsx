@@ -450,7 +450,11 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     if (numCols === 0 || numRows === 0 || wrapperSize.w === 0 || wrapperSize.h === 0) {
       return { availW: 0, availH: 0, numCols, numRows };
     }
-    const scaledGap = BASE_GAP * uiScale;
+    // Ceil the scaled gap so JS over-counts chrome when CSS subpixels
+    // round up at non-integer scales (1.25 / 1.5 / 1.75). Under-counting
+    // chrome here leaves the layout solver with more "available" space
+    // than the browser actually has, and cards wrap.
+    const scaledGap = Math.ceil(BASE_GAP * uiScale);
     const wPad = 24;
     const availW = wrapperSize.w - wPad - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * scaledGap;
     const availH = wrapperSize.h - wPad - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * scaledGap;

@@ -46,6 +46,14 @@ export const EMPTY_SIZE = 30;
 // Empty rows still need a small visible band.
 export const MIN_ROW_H = 40;
 
+// .matrix-cell has `border: 1px solid #e8e8e8` — unscaled, 1px each side
+// regardless of the slide base scale. With box-sizing: border-box the
+// cell's outer width INCLUDES this border, so the flex content area
+// inside is `outerW - 2*CELL_BORDER - 2*cellPadding`. Forgetting the
+// border meant computeLayout planned column widths 2px too narrow per
+// cell, and the rightmost card wrapped to the next row at render time.
+const CELL_BORDER = 1;
+
 // Auto-tier ladder used by computeMatrixAutoTier.
 export const TIER_LADDER = [1, 1.25, 1.5, 1.75, 2] as const;
 
@@ -123,9 +131,11 @@ export function computeLayout(
 ): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
 
   // Column widths from the explicit cellCols. Empty columns shrink to
-  // EMPTY_SIZE so they don't eat horizontal budget.
+  // EMPTY_SIZE so they don't eat horizontal budget. The +CELL_BORDER*2
+  // accounts for the unscaled 1px cell border so the flex content area
+  // is wide enough for `cols` cards without wrapping.
   const colWidths = cellColsPerCol.map((cols) =>
-    cols === 0 ? EMPTY_SIZE : cols * (cardW + cardGap) - cardGap + cellPadding * 2
+    cols === 0 ? EMPTY_SIZE : cols * (cardW + cardGap) - cardGap + cellPadding * 2 + CELL_BORDER * 2
   );
   const totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * gap;
   if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
@@ -158,9 +168,11 @@ export function computeLayout(
     return { fits: true, colWidths, rowHeights: Array(numRows).fill(rowH) };
   }
 
-  // Compute natural row heights (minimum needed)
+  // Compute natural row heights (minimum needed). +CELL_BORDER*2 mirrors
+  // the column-width fix — the cell's vertical content area is also
+  // shrunk by its 1px top + 1px bottom border under box-sizing: border-box.
   const naturalRowH = maxCardRowsPerRow.map((r) =>
-    r === 0 ? MIN_ROW_H : r * (cardH + cardGap) - cardGap + cellPadding * 2
+    r === 0 ? MIN_ROW_H : r * (cardH + cardGap) - cardGap + cellPadding * 2 + CELL_BORDER * 2
   );
   const totalNaturalH = naturalRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * gap;
 
@@ -215,9 +227,14 @@ export function computeMatrixLayout(
     };
   }
 
-  const scaledGap = BASE_GAP * scale;
-  const scaledCardGap = BASE_GAP * scale;
-  const scaledCellPadding = BASE_GAP * scale;
+  // Math.ceil the scaled gap / padding so JS slightly OVER-allocates
+  // space when the browser snaps fractional CSS pixels (at scale 1.25 /
+  // 1.5 / 1.75) — under-allocation by even 0.5px wraps a card to the
+  // next row. Erring on the side of "JS plans for slightly more space"
+  // is harmless: the slack just becomes a sub-pixel gap.
+  const scaledGap = Math.ceil(BASE_GAP * scale);
+  const scaledCardGap = Math.ceil(BASE_GAP * scale);
+  const scaledCellPadding = Math.ceil(BASE_GAP * scale);
 
   const totalProducts = cellCounts.flat().reduce((s, n) => s + n, 0);
   if (totalProducts === 0) {
