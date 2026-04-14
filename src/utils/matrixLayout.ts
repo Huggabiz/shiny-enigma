@@ -424,12 +424,19 @@ export function computeMatrixLayout(
 // scale (a downgrade), require the layout at that scale to clear
 // MIN_CARD_WIDTH by at least HYSTERESIS_MARGIN before committing.
 // Otherwise tiny sub-pixel measurement drift between calls (e.g. 1px
-// from Math.ceil-ed gap rounding at non-integer scales) can ping-pong
-// the scale 1↔2 forever. Hysteresis is one-directional: upgrades
-// happen the moment the current scale stops fitting, so dense plans
-// still bump up promptly.
+// from Math.ceil-ed gap rounding at non-integer scales, or unscaled
+// chrome elements making wrapperSize non-linear in scale) can
+// ping-pong the recommended scale forever on borderline layouts.
+// Hysteresis is one-directional: upgrades happen the moment the
+// current scale stops fitting, so dense plans still bump promptly.
+//
+// Margin bumped 4 → 8 in v1.9.22 — 4 wasn't enough on borderline
+// layouts where wrapperSize.h drifted up to ~3px between scales due
+// to the unscaled .editable-title-pencil button. The CSS
+// slide-title min-height fix in v1.9.22 also addresses that root
+// cause; 8 is the belt-and-braces safety net.
 // ---------------------------------------------------------------
-const HYSTERESIS_MARGIN = 4;
+const HYSTERESIS_MARGIN = 8;
 
 export function computeMatrixAutoTier(
   cellCounts: number[][],

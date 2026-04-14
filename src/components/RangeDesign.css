@@ -115,6 +115,17 @@
 
 .slide-title {
   flex-shrink: 0;
+  /* Pinned height that scales linearly with --ui-scale. Without this,
+     the slide-title auto-sizes to its tallest child, which is the
+     UNSCALED 22px .editable-title-pencil button at low slide scales
+     and the SCALED title text at higher scales — making the title bar
+     height non-linear in uiScale. That non-linearity propagates into
+     wrapperSize.h via flex:1 on .matrix-wrapper, which makes
+     baseAvailH (currentAvailH / currentScale) different depending on
+     which scale we measured at, which makes computeMatrixAutoTier
+     ping-pong on borderline layouts. Forcing a linear min-height
+     keeps every downstream measurement perfectly proportional. */
+  min-height: calc(36px * var(--ui-scale, 1));
   padding: calc(10px * var(--ui-scale, 1)) calc(16px * var(--ui-scale, 1)) calc(4px * var(--ui-scale, 1));
   display: flex;
   align-items: center;
