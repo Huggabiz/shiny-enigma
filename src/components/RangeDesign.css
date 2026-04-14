@@ -287,27 +287,36 @@
 /* Product card — uses CSS variables for responsive sizing.
    Both width and height are set from the JS layout algorithm via
    --matrix-card-width and --matrix-card-height, so the rendered card
-   is EXACTLY the size the algorithm reserved space for. overflow: hidden
-   clips any content the card can't fit (usually only happens when the
-   user enables a lot of Card Format toggles on dense layouts).
-   justify-content: center keeps the content block visually centred
-   when it is shorter than the card's reserved height. */
+   is EXACTLY the size the algorithm reserved space for. The card box
+   itself has NO overflow clip so the dev badge / remove button can
+   stick out past its top corners; a child .matrix-card-content
+   element owns the flex layout + overflow:hidden so the card's
+   internal content (image, name, fields) still gets clipped. */
 .matrix-card {
   width: var(--matrix-card-width, 80px);
   height: var(--matrix-card-height, 112px);
   background: #fff;
   border: 1.5px solid #e0e0e0;
   border-radius: 6px;
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   cursor: grab;
   user-select: none;
   position: relative;
   transition: border-color 0.15s, box-shadow 0.15s;
   flex-shrink: 0;
+}
+
+/* Inner wrapper that owns the layout + the content clip. Sits inside
+   .matrix-card with width/height 100% so it fills the card box; the
+   border-box default + 4px padding match the old .matrix-card chrome,
+   so the height accounting in estimateCardHeight stays accurate. */
+.matrix-card-content {
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
 
@@ -324,8 +333,12 @@
 
 .matrix-card-dev-badge {
   position: absolute;
-  top: -5px;
-  left: -5px;
+  /* -3px (was -5px) keeps the badge inside the .matrix-cell padding
+     band at scale 1. Cell border 1 + cell padding 3 = 4px of room
+     above the card; -3 puts the badge top exactly at the padding
+     edge, fully visible at every slide scale. */
+  top: -3px;
+  left: -3px;
   background: #1565c0;
   color: #fff;
   font-size: 7px;
@@ -372,8 +385,11 @@
 
 .matrix-card-remove {
   position: absolute;
-  top: -5px;
-  right: -5px;
+  /* -3px (was -5px) — see the dev badge above for the cell-padding
+     reasoning. The remove button is 14×14 so it pops out the corner
+     by 3px while still sitting cleanly inside the cell border. */
+  top: -3px;
+  right: -3px;
   width: 14px;
   height: 14px;
   border: none;

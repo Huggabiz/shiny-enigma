@@ -268,42 +268,48 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
       data-item-id={itemId}
       onDoubleClick={(e) => { if (isPlaceholder && onEdit) { e.stopPropagation(); onEdit(); } }}
       {...attributes} {...listeners}>
+      {/* Badges sit OUTSIDE the .matrix-card-content overflow clip so
+          their negative top/left/right offsets stick out past the card
+          border instead of being masked. They're absolutely positioned
+          and don't affect the content layout. */}
       <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}><CloseIcon size={8} color="#fff" /></button>
       {isDev && <div className="matrix-card-dev-badge">DEV</div>}
-      {cardFormat.showImage && (
-        <div className="matrix-card-image">
-          {displayImageUrl ? (
-            <img src={displayImageUrl} alt={displayName} />
-          ) : (
-            <div className="matrix-card-image-ph">{isPlaceholder ? '+' : displayName.charAt(0)}</div>
-          )}
-        </div>
-      )}
-      {cardFormat.showName && <div className="matrix-card-name" title={displayName}>{displayName}</div>}
-      {cardFormat.showSku && <div className="matrix-card-sku">{displaySku || '—'}</div>}
-      {cardFormat.showRrp && <div className="matrix-card-rrp">{displayRrp ? `\u00A3${displayRrp}` : '\u2014'}{renderDelta(ukDelta, '\u00A3')}</div>}
-      {cardFormat.showUsRrp && displayUsRrp !== undefined && (
-        <div className="matrix-card-rrp matrix-card-us">${displayUsRrp}{renderDelta(usDelta, '$')}</div>
-      )}
-      {cardFormat.showEuRrp && displayEuRrp !== undefined && (
-        <div className="matrix-card-rrp matrix-card-eu">{'\u20AC'}{displayEuRrp}{renderDelta(euDelta, '\u20AC')}</div>
-      )}
-      {cardFormat.showAusRrp && displayAusRrp !== undefined && (
-        <div className="matrix-card-rrp matrix-card-aus">A${displayAusRrp}{renderDelta(ausDelta, 'A$')}</div>
-      )}
-      {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {displayVolume ? displayVolume.toLocaleString() : '—'}</div>}
-      {cardFormat.showForecastVolume && displayForecast !== undefined && (
-        <div className="matrix-card-forecast">Fcst: {displayForecast.toLocaleString()}</div>
-      )}
-      {cardFormat.showRevenue && displayRevenue !== undefined && displayRevenue > 0 && (
-        <div className="matrix-card-rev">Rev: {displayRevenue.toLocaleString()}</div>
-      )}
-      {cardFormat.showForecastRevenue && displayFcstRev !== undefined && (
-        <div className="matrix-card-forecast">Fcst Rev: {displayFcstRev.toLocaleString()}</div>
-      )}
-      {cardFormat.showCategory && displayCategory && (
-        <div className="matrix-card-category">{displayCategory}</div>
-      )}
+      <div className="matrix-card-content">
+        {cardFormat.showImage && (
+          <div className="matrix-card-image">
+            {displayImageUrl ? (
+              <img src={displayImageUrl} alt={displayName} />
+            ) : (
+              <div className="matrix-card-image-ph">{isPlaceholder ? '+' : displayName.charAt(0)}</div>
+            )}
+          </div>
+        )}
+        {cardFormat.showName && <div className="matrix-card-name" title={displayName}>{displayName}</div>}
+        {cardFormat.showSku && <div className="matrix-card-sku">{displaySku || '—'}</div>}
+        {cardFormat.showRrp && <div className="matrix-card-rrp">{displayRrp ? `\u00A3${displayRrp}` : '\u2014'}{renderDelta(ukDelta, '\u00A3')}</div>}
+        {cardFormat.showUsRrp && displayUsRrp !== undefined && (
+          <div className="matrix-card-rrp matrix-card-us">${displayUsRrp}{renderDelta(usDelta, '$')}</div>
+        )}
+        {cardFormat.showEuRrp && displayEuRrp !== undefined && (
+          <div className="matrix-card-rrp matrix-card-eu">{'\u20AC'}{displayEuRrp}{renderDelta(euDelta, '\u20AC')}</div>
+        )}
+        {cardFormat.showAusRrp && displayAusRrp !== undefined && (
+          <div className="matrix-card-rrp matrix-card-aus">A${displayAusRrp}{renderDelta(ausDelta, 'A$')}</div>
+        )}
+        {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {displayVolume ? displayVolume.toLocaleString() : '—'}</div>}
+        {cardFormat.showForecastVolume && displayForecast !== undefined && (
+          <div className="matrix-card-forecast">Fcst: {displayForecast.toLocaleString()}</div>
+        )}
+        {cardFormat.showRevenue && displayRevenue !== undefined && displayRevenue > 0 && (
+          <div className="matrix-card-rev">Rev: {displayRevenue.toLocaleString()}</div>
+        )}
+        {cardFormat.showForecastRevenue && displayFcstRev !== undefined && (
+          <div className="matrix-card-forecast">Fcst Rev: {displayFcstRev.toLocaleString()}</div>
+        )}
+        {cardFormat.showCategory && displayCategory && (
+          <div className="matrix-card-category">{displayCategory}</div>
+        )}
+      </div>
     </div>
   );
 }

@@ -24,8 +24,11 @@ import type { CardFormat } from '../types';
 export const BASE_GAP = 3;
 
 // Hard cap so cards never grow into "huge half-page" territory even when
-// the canvas has plenty of slack to give them.
-export const MAX_CARD_WIDTH = 150;
+// the canvas has plenty of slack to give them. v1.9.20 halved this from
+// 150 to 75 so sparse plans stop showing gigantic cards with tiny
+// content (image stays at 40px max regardless, so a 150px card was 73%
+// empty space).
+export const MAX_CARD_WIDTH = 75;
 
 // Replaces the old 22px absoluteFloor. The binary search refuses to
 // produce a layout below this width — if no `target` configuration fits
@@ -41,8 +44,11 @@ export const MIN_CARD_WIDTH = 60;
 // estimateCardHeight — see below.
 export const CARD_MIN_ASPECT = 1.4;
 
-// Empty matrix columns shrink to this many px so they don't eat budget.
-export const EMPTY_SIZE = 30;
+// Minimum column width — used as the size of empty columns AND as a
+// floor for non-empty columns. Bumped from 30 → 80 in v1.9.20 so the
+// matrix-col-header text ("Premium" / "Mid" / "Value") stops spilling
+// past narrow columns when they only hold one small card.
+export const MIN_COL_WIDTH = 80;
 // Empty rows still need a small visible band.
 export const MIN_ROW_H = 40;
 
@@ -140,14 +146,17 @@ export function computeLayout(
   cellPadding: number,
 ): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
 
-  // Column widths from the explicit cellCols. Empty columns shrink to
-  // EMPTY_SIZE so they don't eat horizontal budget. The +CELL_BORDER*2
+  // Column widths from the explicit cellCols. The +CELL_BORDER*2
   // accounts for the unscaled 1px cell border. The +CELL_SLACK gives
   // every cell a few pixels of horizontal breathing room so cards
   // never wrap due to subpixel rounding (see CELL_SLACK comment).
-  const colWidths = cellColsPerCol.map((cols) =>
-    cols === 0 ? EMPTY_SIZE : cols * (cardW + cardGap) - cardGap + cellPadding * 2 + CELL_BORDER * 2 + CELL_SLACK
-  );
+  // Math.max enforces MIN_COL_WIDTH on every column — including
+  // single-card columns — so the matrix-col-header titles never spill.
+  const colWidths = cellColsPerCol.map((cols) => {
+    if (cols === 0) return MIN_COL_WIDTH;
+    const natural = cols * (cardW + cardGap) - cardGap + cellPadding * 2 + CELL_BORDER * 2 + CELL_SLACK;
+    return Math.max(MIN_COL_WIDTH, natural);
+  });
   const totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * gap;
   if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
 
@@ -371,6 +380,19 @@ export function computeMatrixLayout(
         break; // re-run the outer while with the grown config
       }
     }
+  }
+
+  // Distribute leftover horizontal slack uniformly across all columns
+  // so the matrix fills the canvas instead of leaving an empty band on
+  // the right. The optimisation logic upstream is untouched (cardW and
+  // cellColsPerCol are already locked); the slack just becomes extra
+  // cell padding, growing the cells without changing the cards inside.
+  // v1.9.20 — the user explicitly asked for "let them fill" after
+  // tightening MAX_CARD_WIDTH so cells don't end up gigantic.
+  const totalColW = bestColW.reduce((s, w) => s + w, 0) + (numCols - 1) * scaledGap;
+  if (totalColW < availW) {
+    const extra = (availW - totalColW) / numCols;
+    bestColW = bestColW.map((w) => w + extra);
   }
 
   // Final cardH from the chosen cardW. Same value the caller will pass
