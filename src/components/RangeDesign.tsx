@@ -18,8 +18,9 @@ import { PillToggle } from './PillToggle';
 import { PlaceholderDialog } from './PlaceholderDialog';
 import { EditableTitle } from './EditableTitle';
 import { SlideCanvasControls } from './SlideCanvasControls';
-import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem, CardFormat } from '../types';
+import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem } from '../types';
 import { getActivePlan } from '../types';
+import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH } from '../utils/matrixLayout';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
@@ -30,78 +31,8 @@ interface RangeDesignProps {
 
 const ROW_HEADER_WIDTH = 60;
 const ADD_BTN_WIDTH = 28;
-// All inter-cell gaps + cell paddings are this many CSS pixels at
-// --ui-scale = 1. The CSS multiplies by var(--ui-scale, 1), so the JS
-// layout maths must do the same — the scaled values are passed through
-// to computeLayout so the algorithm's "how many card-slots fit per
-// column" decision matches what the browser renders.
-const BASE_GAP = 3;
-const MAX_CARD_WIDTH = 150;
-// No MIN_CARD_WIDTH anymore — the binary search uses an absoluteFloor
-// of 22px directly so dense plans can always find a fit.
-// Playing-card minimum aspect ratio. Cards never get shorter than
-// cardW * this factor, so the default-toggles card shape stays
-// pleasingly tall even as the binary search grows cardW to fill
-// available space. Content-heavy formats (US/EU/AUS RRP, revenue,
-// forecast revenue, category) grow the card past this floor via
-// estimateCardHeight — see below.
-const CARD_MIN_ASPECT = 1.4;
 const HEADER_ROW_HEIGHT = 28;
 const ADD_ROW_HEIGHT = 28;
-const EMPTY_SIZE = 30;
-const MIN_ROW_H = 40;
-
-// ---------------------------------------------------------------
-// Card-height estimator
-//
-// Every Card Format toggle adds a visible line to the matrix card,
-// and the JS layout maths has to know how tall the card actually is
-// to decide how many rows of cards a cell needs. Using a fixed
-// aspect-ratio constant (the pre-1.9.12 CARD_ASPECT = 1.4) worked
-// when only image + name + sku + vol + uk-rrp were on, but turning
-// on US/EU/AUS RRP, Revenue, Forecast Revenue, Category etc. grows
-// the card by ~10px per extra line and the algorithm under-allocated
-// row height, letting the bottom card clip at the cell border.
-//
-// Values here mirror the px / line-height in RangeDesign.css:
-//   .matrix-card         padding: 4px   border: 1.5px  (chrome = 8 + 3)
-//   .matrix-card-image   width: 70%; aspect-ratio: 1; max-height: 40px; margin-bottom: 2px  → ≈ 42
-//   .matrix-card-name    font-size: 8px; line-height: 1.15; max-height: 2.3em              → ≈ 21
-//   all other fields     font-size: 7px                                                    → ≈ 10 each
-// ---------------------------------------------------------------
-const CARD_PADDING_V = 8;    // .matrix-card padding: top + bottom
-const CARD_BORDER_V = 3;     // .matrix-card border: 1.5 top + 1.5 bottom
-const CARD_CHROME_V = CARD_PADDING_V + CARD_BORDER_V;
-const CARD_LINE_H = 10;    // one line of 7px-font field content
-const CARD_NAME_H = 21;    // name can wrap to 2 lines
-const CARD_IMG_MAX = 40;
-const CARD_IMG_MARGIN = 2;
-
-function estimateCardHeight(cf: CardFormat, cardW: number): number {
-  // Chrome (padding + border) is part of the card's outer box. Leaving
-  // the border out was a 3px drift that let borderline layouts squeak
-  // past the fit check and then clip at render time.
-  let h = CARD_CHROME_V;
-  if (cf.showImage) {
-    // Image is 70% of card width with aspect-ratio 1, capped at 40px.
-    h += Math.min(CARD_IMG_MAX, cardW * 0.7) + CARD_IMG_MARGIN;
-  }
-  if (cf.showName) h += CARD_NAME_H;
-  if (cf.showSku) h += CARD_LINE_H;
-  if (cf.showRrp) h += CARD_LINE_H;
-  if (cf.showUsRrp) h += CARD_LINE_H;
-  if (cf.showEuRrp) h += CARD_LINE_H;
-  if (cf.showAusRrp) h += CARD_LINE_H;
-  if (cf.showVolume) h += CARD_LINE_H;
-  if (cf.showForecastVolume) h += CARD_LINE_H;
-  if (cf.showRevenue) h += CARD_LINE_H;
-  if (cf.showForecastRevenue) h += CARD_LINE_H;
-  if (cf.showCategory) h += CARD_LINE_H;
-  // Clamp to the playing-card minimum. At the default toggle set the
-  // minimum usually wins so cards keep a ~1:1.4 shape; with extra
-  // fields on, content height takes over and cards grow past it.
-  return Math.max(h, cardW * CARD_MIN_ASPECT);
-}
 
 // Sort-by keys for the matrix cell sort dropdown. 'manual' keeps the
 // existing matrix order (the order the user dragged items into the cell).
@@ -166,84 +97,6 @@ function sortShelfItems<T extends ShelfItem>(
     if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * factor;
     return String(va).localeCompare(String(vb)) * factor;
   });
-}
-
-// Core layout algorithm. Given an explicit cellColsPerCol (how many
-// cards per row each matrix column will fit), compute concrete column
-// widths + row heights and report whether the layout fits.
-//
-// The caller drives this with different cellColsPerCol values derived
-// from a "target max rows per cell" loop, and picks the configuration
-// that yields the largest cardW. That's how we escape the old
-// sqrt-based heuristic which would pack e.g. a 10-card cell into 4
-// slots (3 rows) when 5 slots (2 rows) would free up enough vertical
-// budget to grow every card.
-function computeLayout(
-  cardW: number,
-  cardH: number,
-  cellCounts: number[][], // [row][col]
-  cellColsPerCol: number[], // [col]  — explicit horizontal slots per col
-  numCols: number,
-  numRows: number,
-  availW: number,
-  availH: number,
-  gap: number,
-  cardGap: number,
-  cellPadding: number,
-): { fits: boolean; colWidths: number[]; rowHeights: number[] } {
-
-  // Column widths from the explicit cellCols. Empty columns shrink to
-  // EMPTY_SIZE so they don't eat horizontal budget.
-  const colWidths = cellColsPerCol.map((cols) =>
-    cols === 0 ? EMPTY_SIZE : cols * (cardW + cardGap) - cardGap + cellPadding * 2
-  );
-  const totalW = colWidths.reduce((s, w) => s + w, 0) + (numCols - 1) * gap;
-  if (totalW > availW) return { fits: false, colWidths, rowHeights: [] };
-
-  // Cell row count = ceil(cellCount / cellCols) for each cell. Using
-  // cellColsPerCol directly (instead of deriving from cellGrid on the
-  // already-sized column) guarantees the actual render matches what
-  // this function planned for.
-  const cellRows: number[][] = [];
-  for (let row = 0; row < numRows; row++) {
-    cellRows.push([]);
-    for (let col = 0; col < numCols; col++) {
-      const n = cellCounts[row][col];
-      const cols = cellColsPerCol[col];
-      if (n === 0 || cols === 0) { cellRows[row].push(0); continue; }
-      cellRows[row].push(Math.ceil(n / cols));
-    }
-  }
-
-  const maxCardRowsPerRow = Array.from({ length: numRows }, (_, row) => {
-    const max = Math.max(...cellRows[row]);
-    return max > 0 ? max : 0;
-  });
-
-  const totalCardRows = maxCardRowsPerRow.reduce((s, r) => s + r, 0);
-
-  if (totalCardRows === 0) {
-    // All empty
-    const rowH = (availH - (numRows - 1) * gap) / numRows;
-    return { fits: true, colWidths, rowHeights: Array(numRows).fill(rowH) };
-  }
-
-  // Compute natural row heights (minimum needed)
-  const naturalRowH = maxCardRowsPerRow.map((r) =>
-    r === 0 ? MIN_ROW_H : r * (cardH + cardGap) - cardGap + cellPadding * 2
-  );
-  const totalNaturalH = naturalRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * gap;
-
-  if (totalNaturalH > availH) return { fits: false, colWidths, rowHeights: naturalRowH };
-
-  // Distribute extra height proportionally to rows with content
-  const extraH = availH - totalNaturalH;
-  const contentRows = maxCardRowsPerRow.filter((r) => r > 0).length || 1;
-  const rowHeights = naturalRowH.map((h, i) =>
-    maxCardRowsPerRow[i] > 0 ? h + extraH / contentRows : h
-  );
-
-  return { fits: true, colWidths, rowHeights };
 }
 
 function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cardHeight, cellHeight, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir }: {
@@ -474,6 +327,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     activeVariantId, showGhosted, setShowGhosted,
     showDiscontinued, setShowDiscontinued,
     slideBaseScale,
+    slideBaseScaleMode,
+    setSlideBaseScale,
     cardFormat,
   } = useProjectStore();
 
@@ -545,46 +400,26 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     return () => observer.disconnect();
   }, []);
 
-  // Build cell counts and compute layout
-  const { columnWidths, rowHeights, cardWidth, cardHeight } = useMemo(() => {
+  // Build the per-cell product counts that drive the layout solver.
+  // Includes future-shelf discontinued ghost cards when Show discontinued
+  // is on, so the algorithm reserves space for them at their original cell.
+  const cellCounts = useMemo(() => {
     const numCols = layout.xLabels.length;
     const numRows = layout.yLabels.length;
-    if (numCols === 0 || numRows === 0 || wrapperSize.w === 0 || wrapperSize.h === 0) {
-      return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH, cardHeight: MAX_CARD_WIDTH * 1.4 };
-    }
+    if (numCols === 0 || numRows === 0) return [] as number[][];
 
-    // Scaled gap / padding values that match what the CSS actually
-    // renders at the current --ui-scale. JS used to use literal 3/4
-    // constants which drifted from the stylesheet at scale > 1, causing
-    // cellGrid to think more cards fit per row than reality and
-    // under-allocating row height (cells then spilled vertically).
-    const scaledGap = BASE_GAP * uiScale;
-    const scaledCardGap = BASE_GAP * uiScale;
-    const scaledCellPadding = BASE_GAP * uiScale;
-
-    const wPad = 24;
-    const availW = wrapperSize.w - wPad - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * scaledGap;
-    const availH = wrapperSize.h - wPad - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * scaledGap;
-
-    const cellCounts: number[][] = [];
+    const counts: number[][] = [];
     for (let row = 0; row < numRows; row++) {
-      cellCounts.push([]);
+      counts.push([]);
       for (let col = 0; col < numCols; col++) {
-        cellCounts[row].push(layout.assignments.filter((a) => {
+        counts[row].push(layout.assignments.filter((a) => {
           if (a.row !== row || a.col !== col) return false;
-          // If variant active without ghost, only count included items
           if (variantIncludedIds && !showGhosted) return variantIncludedIds.has(a.itemId);
           return true;
         }).length);
       }
     }
 
-    // When the user is designing the future shelf and Show discontinued
-    // is on, the view ALSO renders current-shelf products that dropped
-    // out of the future range as ghost cards at their original cell
-    // position. Add them to the cell counts so the layout algorithm
-    // reserves the right amount of space per cell instead of shrinking
-    // them on top of the existing future items.
     if (shelfId === 'future' && showDiscontinued && activePlan) {
       const futureProductIds = new Set(activePlan.futureShelf.items.map((i) => i.productId));
       const currentLayout = activePlan.currentShelf.matrixLayout;
@@ -597,143 +432,65 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         for (const a of currentLayout.assignments) {
           if (!discIds.has(a.itemId)) continue;
           if (a.row >= 0 && a.row < numRows && a.col >= 0 && a.col < numCols) {
-            cellCounts[a.row][a.col] += 1;
+            counts[a.row][a.col] += 1;
           }
         }
       }
     }
+    return counts;
+  }, [layout.xLabels, layout.yLabels, layout.assignments, variantIncludedIds, showGhosted,
+      shelfId, showDiscontinued, activePlan]);
 
+  // Available area inside the matrix wrapper at the current uiScale.
+  // Memoised separately so the auto-tier useEffect can reuse it without
+  // re-deriving the chrome subtraction.
+  const availArea = useMemo(() => {
+    const numCols = layout.xLabels.length;
+    const numRows = layout.yLabels.length;
+    if (numCols === 0 || numRows === 0 || wrapperSize.w === 0 || wrapperSize.h === 0) {
+      return { availW: 0, availH: 0, numCols, numRows };
+    }
+    const scaledGap = BASE_GAP * uiScale;
+    const wPad = 24;
+    const availW = wrapperSize.w - wPad - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * scaledGap;
+    const availH = wrapperSize.h - wPad - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * scaledGap;
+    return { availW, availH, numCols, numRows };
+  }, [layout.xLabels, layout.yLabels, wrapperSize, uiScale,
+      scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH]);
+
+  // Run the matrix layout solver. Slot-growth slack absorption (inside
+  // computeMatrixLayout) replaces the old proportional column-padding
+  // distribution that produced "small cards in big cells".
+  const { columnWidths, rowHeights, cardWidth, cardHeight } = useMemo(() => {
+    const { availW, availH, numCols, numRows } = availArea;
+    if (numCols === 0 || numRows === 0 || availW <= 0 || availH <= 0) {
+      return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH, cardHeight: MAX_CARD_WIDTH * 1.4 };
+    }
+    const result = computeMatrixLayout(cellCounts, cardFormat, availW, availH, uiScale);
+    return {
+      columnWidths: result.colWidths,
+      rowHeights: result.rowHeights,
+      cardWidth: result.cardW,
+      cardHeight: result.cardH,
+    };
+  }, [cellCounts, availArea, cardFormat, uiScale]);
+
+  // Auto-tier: when in auto mode, pick the smallest slide base scale at
+  // which the layout fits with cardW >= MIN_CARD_WIDTH. Bumps the store
+  // mirror via setSlideBaseScale; App.tsx steps aside for the design view
+  // in auto mode (see App.tsx effective-slide-size mirror) so the two
+  // resolvers don't fight.
+  useEffect(() => {
+    if (slideBaseScaleMode !== 'auto') return;
+    const { availW, availH, numCols, numRows } = availArea;
+    if (numCols === 0 || numRows === 0 || availW <= 0 || availH <= 0) return;
     const totalProducts = cellCounts.flat().reduce((s, n) => s + n, 0);
-    if (totalProducts === 0) {
-      return {
-        columnWidths: Array(numCols).fill((availW - (numCols - 1) * scaledGap) / numCols),
-        rowHeights: Array(numRows).fill((availH - (numRows - 1) * scaledGap) / numRows),
-        cardWidth: MAX_CARD_WIDTH,
-        cardHeight: estimateCardHeight(cardFormat, MAX_CARD_WIDTH),
-      };
+    if (totalProducts === 0) return;
+    const recommended = computeMatrixAutoTier(cellCounts, cardFormat, availW, availH, uiScale);
+    if (recommended !== uiScale) {
+      setSlideBaseScale(recommended);
     }
-
-    // Max product count in any single column, used to bound the target
-    // "max card rows per cell" loop below.
-    const maxPerCol = Array.from({ length: numCols }, (_, col) => {
-      let max = 0;
-      for (let row = 0; row < numRows; row++) {
-        if (cellCounts[row][col] > max) max = cellCounts[row][col];
-      }
-      return max;
-    });
-    const absoluteMaxCount = Math.max(1, ...maxPerCol);
-
-    // Universal absolute floor. The binary search below maximises
-    // cardW anyway, so dropping the floor to 22 costs nothing in easy
-    // cases and rescues tight ones — including the "current view
-    // crops, future+discon view fits" asymmetry that came from the
-    // previous dual-floor (40 for current, 22 only for future+discon).
-    const absoluteFloor = 22;
-
-    // Outer loop: iterate over "target max card rows per cell".
-    // For each target we derive cellCols[col] = ceil(maxPerCol[col] / target)
-    // — i.e. how many horizontal slots each column needs so every cell in
-    // that column fits its contents in `target` rows or less. Then we
-    // binary search the biggest cardW that still fits this configuration,
-    // and keep whichever (target, cardW) pair yields the largest cardW.
-    //
-    // This is how the algorithm "maximises the space": the old sqrt-based
-    // heuristic would lock a dense column into 3 card-rows when 2 would
-    // have freed enough vertical budget to grow every card by 30-40%. By
-    // trying multiple targets we find the one whose horizontal vs vertical
-    // balance lets cards get biggest.
-    let bestCW = 0;
-    let bestColW: number[] = [];
-    let bestRowH: number[] = [];
-    let foundFit = false;
-
-    for (let target = 1; target <= absoluteMaxCount; target++) {
-      const cellColsPerCol = maxPerCol.map((n) =>
-        n === 0 ? 0 : Math.ceil(n / target),
-      );
-
-      let lo = absoluteFloor;
-      let hi = MAX_CARD_WIDTH;
-      let targetBestCW = 0;
-      let targetBestColW: number[] = [];
-      let targetBestRowH: number[] = [];
-
-      while (lo <= hi) {
-        const mid = Math.floor((lo + hi) / 2);
-        const cardH = estimateCardHeight(cardFormat, mid);
-        const result = computeLayout(
-          mid, cardH, cellCounts, cellColsPerCol,
-          numCols, numRows, availW, availH,
-          scaledGap, scaledCardGap, scaledCellPadding,
-        );
-        if (result.fits) {
-          targetBestCW = mid;
-          targetBestColW = result.colWidths;
-          targetBestRowH = result.rowHeights;
-          lo = mid + 1;
-        } else {
-          hi = mid - 1;
-        }
-      }
-
-      if (targetBestCW > bestCW) {
-        bestCW = targetBestCW;
-        bestColW = targetBestColW;
-        bestRowH = targetBestRowH;
-        foundFit = true;
-      }
-    }
-
-    // Absolute fallback: if no target produced a fit (pathological dense
-    // case) accept the layout at the floor with the loosest target so the
-    // render stays inside the canvas bounds instead of spilling.
-    if (!foundFit) {
-      const fallbackTarget = absoluteMaxCount;
-      const cellColsPerCol = maxPerCol.map((n) =>
-        n === 0 ? 0 : Math.ceil(n / fallbackTarget),
-      );
-      const fallbackCardH = estimateCardHeight(cardFormat, absoluteFloor);
-      const fallback = computeLayout(
-        absoluteFloor, fallbackCardH, cellCounts, cellColsPerCol,
-        numCols, numRows, availW, availH,
-        scaledGap, scaledCardGap, scaledCellPadding,
-      );
-      bestCW = absoluteFloor;
-      bestColW = fallback.colWidths.length ? fallback.colWidths : Array(numCols).fill((availW - (numCols - 1) * scaledGap) / numCols);
-      bestRowH = fallback.rowHeights.length ? fallback.rowHeights : Array(numRows).fill((availH - (numRows - 1) * scaledGap) / numRows);
-      const rowSum = bestRowH.reduce((s, h) => s + h, 0) + (numRows - 1) * scaledGap;
-      if (rowSum > availH) {
-        const scale = (availH - (numRows - 1) * scaledGap) / bestRowH.reduce((s, h) => s + h, 0);
-        bestRowH = bestRowH.map((h) => Math.max(MIN_ROW_H, h * scale));
-      }
-    }
-
-    // Distribute remaining horizontal width proportionally to each
-    // column's product count so dense columns (e.g. Mid with 10 items)
-    // get more of the slack than sparse ones, rather than the old
-    // uniform split which left denser cells looking pinched.
-    const totalColW = bestColW.reduce((s, w) => s + w, 0) + (numCols - 1) * scaledGap;
-    if (totalColW < availW) {
-      const extra = availW - totalColW;
-      const productSum = maxPerCol.reduce((s, n) => s + n, 0);
-      if (productSum > 0) {
-        bestColW = bestColW.map((w, i) =>
-          maxPerCol[i] === 0 ? w : w + extra * (maxPerCol[i] / productSum),
-        );
-      } else {
-        bestColW = bestColW.map((w) => w + extra / numCols);
-      }
-    }
-
-    // Use the SAME cardH the algorithm reserved space for. The card is
-    // given this exact height via the --matrix-card-height CSS variable,
-    // so JS and CSS can never drift.
-    const finalCardH = estimateCardHeight(cardFormat, bestCW);
-    return { columnWidths: bestColW, rowHeights: bestRowH, cardWidth: bestCW, cardHeight: finalCardH };
-  }, [layout.xLabels, layout.yLabels, layout.assignments, wrapperSize, variantIncludedIds, showGhosted,
-      scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH, uiScale,
-      shelfId, showDiscontinued, activePlan, cardFormat]);
+  }, [cellCounts, availArea, cardFormat, uiScale, slideBaseScaleMode, setSlideBaseScale]);
 
   const gridCols = `${scaledRowHeaderW}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${scaledAddBtnW}px`;
 

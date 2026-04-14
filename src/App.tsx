@@ -101,13 +101,20 @@ function App() {
   }, [activePlan, activeView, designShelfId]);
 
   useEffect(() => {
-    if (effectiveSlideSize.scale !== slideBaseScale) {
-      setSlideBaseScale(effectiveSlideSize.scale);
-    }
+    // Mode mirror always runs — SlideCanvasControls reads slideBaseScaleMode
+    // to render the auto/manual toggle correctly.
     if (effectiveSlideSize.mode !== slideBaseScaleMode) {
       useProjectStore.getState().setSlideBaseScaleMode(effectiveSlideSize.mode);
     }
-  }, [effectiveSlideSize, slideBaseScale, slideBaseScaleMode, setSlideBaseScale]);
+    // For Range Design view in auto mode, RangeDesign owns slideBaseScale
+    // via its own fit-driven auto-tier loop (see computeMatrixAutoTier).
+    // Skip the App-level item-count-based assignment so the two resolvers
+    // don't fight when the auto-tier wants to upgrade or downgrade.
+    if (activeView === 'range-design' && effectiveSlideSize.mode === 'auto') return;
+    if (effectiveSlideSize.scale !== slideBaseScale) {
+      setSlideBaseScale(effectiveSlideSize.scale);
+    }
+  }, [effectiveSlideSize, slideBaseScale, slideBaseScaleMode, setSlideBaseScale, activeView]);
 
   // Keep store.cardFormat in sync with the effective plan+variant format
   // so the Toolbar dropdown and every card reading the mirror reflect
