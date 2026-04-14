@@ -6,13 +6,13 @@
 //       Pure function. Returns { fits, cardW, cardH, colWidths, rowHeights,
 //       cellColsPerCol }. Used by RangeDesign at render time and by the
 //       auto-tier loop below.
-//   - computeMatrixAutoTier(cellCounts, cardFormat, currentAvailW,
-//       currentAvailH, currentScale)
-//       Walks [1, 1.25, 1.5, 1.75, 2] and returns the smallest scale at
-//       which computeMatrixLayout reports fits === true and cardW >=
-//       MIN_CARD_WIDTH. Falls through to 2 if nothing fits — at 2× even
-//       if cards are still under MIN_CARD_WIDTH the cells `overflow:
-//       hidden` keeps the render tidy.
+//   - computeMatrixAutoTier(cellCounts, cardFormat, baseAvailW,
+//       baseAvailH, currentScale)
+//       Walks [1, 1.25, 1.5, 1.75, 2] and returns the smallest scale
+//       at which computeMatrixLayout reports fits=true and cardW >=
+//       MIN_CARD_WIDTH. The caller must pass a CACHED canonical
+//       scale-1 baseAvailW/H — see the comment on the function for
+//       why deriving it inside causes auto-tier ping-pong.
 
 import type { CardFormat } from '../types';
 
@@ -423,33 +423,31 @@ export function computeMatrixLayout(
 // Hysteresis: when the *smallest* fitting scale is BELOW the current
 // scale (a downgrade), require the layout at that scale to clear
 // MIN_CARD_WIDTH by at least HYSTERESIS_MARGIN before committing.
-// Otherwise tiny sub-pixel measurement drift between calls (e.g. 1px
-// from Math.ceil-ed gap rounding at non-integer scales, or unscaled
-// chrome elements making wrapperSize non-linear in scale) can
-// ping-pong the recommended scale forever on borderline layouts.
-// Hysteresis is one-directional: upgrades happen the moment the
-// current scale stops fitting, so dense plans still bump promptly.
-//
-// Margin bumped 4 → 8 in v1.9.22 — 4 wasn't enough on borderline
-// layouts where wrapperSize.h drifted up to ~3px between scales due
-// to the unscaled .editable-title-pencil button. The CSS
-// slide-title min-height fix in v1.9.22 also addresses that root
-// cause; 8 is the belt-and-braces safety net.
-// ---------------------------------------------------------------
+// One-directional: upgrades happen the moment the current scale
+// stops fitting, so dense plans still bump promptly.
 const HYSTERESIS_MARGIN = 8;
 
+// IMPORTANT: takes baseAvailW / baseAvailH directly, NOT the current
+// measurement. The caller (RangeDesign) is expected to cache a single
+// canonical scale-1 baseline in a ref and pass it in. Deriving the
+// baseline inside this function via `currentAvailW / currentScale`
+// makes the auto-tier ping-pong on borderline layouts: even with a
+// perfectly linear chrome subtraction, ResizeObserver fires AFTER
+// React commits a scale change, so the same effect re-runs first
+// with stale wrapperSize at the new scale and then with fresh
+// wrapperSize, and the two derive subtly different baselines that
+// can flip the fit/no-fit decision. Caching once and reusing kills
+// the feedback loop entirely.
 export function computeMatrixAutoTier(
   cellCounts: number[][],
   cardFormat: CardFormat,
-  currentAvailW: number,
-  currentAvailH: number,
+  baseAvailW: number,
+  baseAvailH: number,
   currentScale: number,
 ): number {
-  if (currentScale <= 0 || currentAvailW <= 0 || currentAvailH <= 0) {
+  if (baseAvailW <= 0 || baseAvailH <= 0) {
     return 1;
   }
-  const baseAvailW = currentAvailW / currentScale;
-  const baseAvailH = currentAvailH / currentScale;
 
   for (const scale of TIER_LADDER) {
     const availW = baseAvailW * scale;

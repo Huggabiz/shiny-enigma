@@ -491,6 +491,18 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     };
   }, [cellCounts, availArea, cardFormat, uiScale]);
 
+  // Canonical baseAvail cache for the auto-tier projection. See the
+  // comment on computeMatrixAutoTier for why this MUST be cached and
+  // not derived from the live measurement: the React-effect ↔
+  // ResizeObserver race feeds two slightly different baselines into
+  // the auto-tier on every scale change, and on borderline layouts
+  // the two flip the fit/no-fit decision and the recommended scale
+  // ping-pongs. Caching once kills the feedback loop. Invalidate
+  // only when the matrix dimensions actually change (axis labels
+  // added/removed) — viewport resizes don't change wrapperSize because
+  // .matrix-16-9 is a fixed `1100*scale × 619*scale` canvas.
+  const baseAvailRef = useRef<{ baseW: number; baseH: number; numCols: number; numRows: number } | null>(null);
+
   // Auto-tier: when in auto mode, pick the smallest slide base scale at
   // which the layout fits with cardW >= MIN_CARD_WIDTH. Bumps the store
   // mirror via setSlideBaseScale; App.tsx steps aside for the design view
@@ -502,7 +514,28 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     if (numCols === 0 || numRows === 0 || availW <= 0 || availH <= 0) return;
     const totalProducts = cellCounts.flat().reduce((s, n) => s + n, 0);
     if (totalProducts === 0) return;
-    const recommended = computeMatrixAutoTier(cellCounts, cardFormat, availW, availH, uiScale);
+
+    // Invalidate the cache if the matrix dimensions changed (the user
+    // added/removed an axis label).
+    if (baseAvailRef.current &&
+        (baseAvailRef.current.numCols !== numCols ||
+         baseAvailRef.current.numRows !== numRows)) {
+      baseAvailRef.current = null;
+    }
+    // Initialize the cache from the first valid measurement at any
+    // scale. Once set it stays put — every subsequent auto-tier call
+    // projects from the SAME baseline so the recommendation is stable.
+    if (!baseAvailRef.current) {
+      baseAvailRef.current = {
+        baseW: availW / uiScale,
+        baseH: availH / uiScale,
+        numCols,
+        numRows,
+      };
+    }
+
+    const { baseW, baseH } = baseAvailRef.current;
+    const recommended = computeMatrixAutoTier(cellCounts, cardFormat, baseW, baseH, uiScale);
     if (recommended !== uiScale) {
       setSlideBaseScale(recommended);
     }
