@@ -73,6 +73,41 @@
   cursor: crosshair;
 }
 
+/* Orphan state — shelf item whose productId is not in the current
+   master catalogue (result of an Append import whose SKU didn't
+   match). Red dashed border + muted background signal the broken
+   link; the card renders just "Not in catalogue" + the SKU. */
+.product-card.orphan {
+  background: #fff5f5;
+  border: 2px dashed #ef9a9a;
+  color: #b71c1c;
+  justify-content: center;
+  text-align: center;
+}
+
+.product-card.orphan:hover {
+  border-color: #e57373;
+  box-shadow: 0 1px 6px rgba(239, 83, 80, 0.15);
+}
+
+.card-orphan-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #c62828;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+.card-orphan-sku {
+  font-size: 10px;
+  font-weight: 600;
+  color: #555;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  padding: 0 4px;
+}
+
 /* New / Dev badge — absolute, pointer-events: none so it cannot push
    the card's layout box or steal clicks from neighbours. */
 .card-new-badge {

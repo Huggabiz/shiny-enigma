@@ -184,6 +184,12 @@ export function ProductCard({
       : {}),
   };
 
+  // Orphan state: shelf item has a productId but the product isn't
+  // in the master catalogue (set by the Append import flow when the
+  // SKU didn't match). Render a stripped-down "(Not in catalogue)"
+  // card with just the SKU instead of the normal product data.
+  const isOrphan = !item.isPlaceholder && !product && !!item.orphanSku;
+
   // Pull display data from placeholderData when present
   const phData = item.placeholderData;
   const displayName = item.isPlaceholder
@@ -202,6 +208,7 @@ export function ProductCard({
     'product-card',
     item.isPlaceholder ? 'placeholder' : '',
     isDev ? 'dev-product' : '',
+    isOrphan ? 'orphan' : '',
     isSelected ? 'selected' : '',
     isLinkMode ? 'link-mode' : '',
     isLinkSource ? 'link-source' : '',
@@ -252,6 +259,28 @@ export function ProductCard({
         source: phData.source,
       }
     : product;
+
+  if (isOrphan) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={cardClass}
+        data-item-id={item.id}
+        onClick={handleClick}
+        onDoubleClick={onDoubleClick}
+        {...attributes}
+        {...listeners}
+        title="This SKU is not in the loaded catalogue"
+      >
+        {onRemove && !isDimmed && (
+          <button className="card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}><CloseIcon size={8} color="#fff" /></button>
+        )}
+        <div className="card-orphan-label">Not in catalogue</div>
+        <div className="card-orphan-sku">{item.orphanSku}</div>
+      </div>
+    );
+  }
 
   return (
     <div

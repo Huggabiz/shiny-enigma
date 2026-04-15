@@ -62,6 +62,12 @@ export interface ShelfItem {
   isPlaceholder: boolean;
   placeholderName?: string;          // legacy: simple text-only placeholder
   placeholderData?: PlaceholderData; // full data for new placeholders
+  /** Set when this shelf item was appended via the "Append project"
+   * import and its product SKU wasn't found in the master catalogue.
+   * The card renders as "(Not in catalogue)" + the SKU until the
+   * user loads a catalogue that contains this SKU, at which point
+   * `setCatalogue` auto-relinks the item and clears `orphanSku`. */
+  orphanSku?: string;
 }
 
 // A labelled section on a shelf

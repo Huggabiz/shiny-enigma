@@ -342,6 +342,37 @@
   border-color: #0097a7;
 }
 
+/* Orphan — shelf item whose productId is not in the current master
+   catalogue (result of an Append import whose SKU didn't match).
+   Red dashed border + muted background; the card renders only
+   "Not in catalogue" + the SKU in place of the usual content. */
+.matrix-card.orphan {
+  background: #fff5f5;
+  border: 2px dashed #ef9a9a;
+}
+
+.matrix-card-orphan-content {
+  color: #b71c1c;
+  text-align: center;
+}
+
+.matrix-card-orphan-label {
+  font-size: 7px;
+  font-weight: 700;
+  color: #c62828;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 3px;
+}
+
+.matrix-card-orphan-sku {
+  font-size: 8px;
+  font-weight: 600;
+  color: #555;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+
 /* Lens edit mode — cursor swaps to a crosshair so the user knows
    clicking will toggle membership in the lens currently in edit mode.
    No outline highlight on member cards: the lens tint already shows

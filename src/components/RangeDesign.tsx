@@ -160,6 +160,7 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cardHeight
           <MatrixProductCard key={item.id} itemId={item.id} product={product}
             isPlaceholder={item.isPlaceholder} placeholderName={item.placeholderName}
             placeholderData={item.placeholderData}
+            orphanSku={item.orphanSku}
             isGhosted={isGhosted}
             isFutureShelf={isFutureShelf}
             onEdit={item.isPlaceholder && onEditPlaceholder ? () => onEditPlaceholder(item.id) : undefined}
@@ -180,6 +181,7 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cardHeight
         return (
           <MatrixProductCard key={`disc-${item.id}`} itemId={item.id} product={product}
             isPlaceholder={false}
+            orphanSku={item.orphanSku}
             isDiscontinued={true}
             isFutureShelf={true}
             onRemove={() => { /* discontinued cards are read-only */ }} />
@@ -190,9 +192,12 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cardHeight
   );
 }
 
-function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, placeholderData, isGhosted, isDiscontinued, isFutureShelf, onRemove, onEdit }: {
+function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, placeholderData, orphanSku, isGhosted, isDiscontinued, isFutureShelf, onRemove, onEdit }: {
   itemId: string; product?: Product; isPlaceholder: boolean;
   placeholderName?: string; placeholderData?: import('../types').PlaceholderData;
+  /** When set and `product` is undefined, the card renders as
+   * "(Not in catalogue)" + SKU — see ShelfItem.orphanSku. */
+  orphanSku?: string;
   isGhosted?: boolean;
   isDiscontinued?: boolean;
   isFutureShelf?: boolean;
@@ -265,11 +270,17 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   const euDelta = isFutureShelf && !isPlaceholder ? rrpDelta(displayEuRrp, product?.euRrp) : null;
   const ausDelta = isFutureShelf && !isPlaceholder ? rrpDelta(displayAusRrp, product?.ausRrp) : null;
 
+  // Orphan state — shelf item whose SKU didn't match the master
+  // catalogue when it was imported. Card renders "(Not in catalogue)"
+  // + the SKU. See ShelfItem.orphanSku.
+  const isOrphan = !isPlaceholder && !product && !!orphanSku;
+
   const cardClasses = [
     'matrix-card',
     isDragging ? 'dragging' : '',
     isPlaceholder ? 'placeholder' : '',
     isDev ? 'dev-product' : '',
+    isOrphan ? 'orphan' : '',
     isGhosted ? 'ghosted' : '',
     isDiscontinued ? 'ghosted-discontinued' : '',
     productInActiveLens ? 'lens-tinted' : '',
@@ -303,6 +314,25 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
       </span>
     );
   };
+
+  if (isOrphan) {
+    return (
+      <div
+        ref={setNodeRef}
+        className={cardClasses}
+        data-item-id={itemId}
+        title="This SKU is not in the loaded catalogue"
+        {...attributes}
+        {...listeners}
+      >
+        <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}><CloseIcon size={8} color="#fff" /></button>
+        <div className="matrix-card-content matrix-card-orphan-content">
+          <div className="matrix-card-orphan-label">Not in catalogue</div>
+          <div className="matrix-card-orphan-sku">{orphanSku}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={setNodeRef} className={cardClasses}

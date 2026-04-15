@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { saveProject, saveRangeStructure, loadProjectFile } from '../utils/projectFile';
+import { computeImportPlan, type ImportPlanPreview } from '../utils/importProject';
 import { exportToPptx } from '../utils/exportPptx';
 import { exportToExcel } from '../utils/exportExcel';
 import { APP_VERSION } from '../version';
+import { ImportProjectDialog } from './ImportProjectDialog';
 import './Toolbar.css';
 
 interface ToolbarProps {
@@ -47,7 +49,9 @@ export function Toolbar({ activeView }: ToolbarProps) {
       ? `Saving to plan: ${activePlan.name}`
       : 'Saving to default';
   const loadRef = useRef<HTMLInputElement>(null);
+  const appendRef = useRef<HTMLInputElement>(null);
   const [openMenu, setOpenMenu] = useState<'save' | 'manage' | 'format' | null>(null);
+  const [appendPreview, setAppendPreview] = useState<{ fileName: string; preview: ImportPlanPreview } | null>(null);
 
   const closeMenus = () => setOpenMenu(null);
 
@@ -61,6 +65,26 @@ export function Toolbar({ activeView }: ToolbarProps) {
       alert('Failed to load project file. Please check the file format.');
     }
     e.target.value = '';
+  };
+
+  // Append import — read a project file and compute the merged
+  // result as a dry run, then show the preview dialog. The actual
+  // apply happens inside the dialog on confirm via `appendImport`.
+  const handleAppend = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!project) {
+      alert('Load or create a project first before appending.');
+      return;
+    }
+    try {
+      const imported = await loadProjectFile(file);
+      const preview = computeImportPlan(project, imported);
+      setAppendPreview({ fileName: file.name, preview });
+    } catch {
+      alert('Failed to read the import file. Please check the file format.');
+    }
   };
 
   return (
@@ -214,6 +238,15 @@ export function Toolbar({ activeView }: ToolbarProps) {
 
         <input ref={loadRef} type="file" accept=".json" onChange={handleLoad} hidden />
         <button className="toolbar-btn" onClick={() => loadRef.current?.click()}>Load</button>
+        <input ref={appendRef} type="file" accept=".json" onChange={handleAppend} hidden />
+        <button
+          className="toolbar-btn"
+          onClick={() => appendRef.current?.click()}
+          title="Append plans and lenses from another project file into this one"
+          disabled={!project}
+        >
+          Append
+        </button>
       </div>
       {exportProgress && (
         <div className="export-progress-overlay" role="status" aria-live="polite">
@@ -224,6 +257,13 @@ export function Toolbar({ activeView }: ToolbarProps) {
             <div className="export-progress-hint">Leave this tab visible while the capture runs.</div>
           </div>
         </div>
+      )}
+      {appendPreview && (
+        <ImportProjectDialog
+          preview={appendPreview.preview}
+          fileName={appendPreview.fileName}
+          onClose={() => setAppendPreview(null)}
+        />
       )}
     </div>
   );

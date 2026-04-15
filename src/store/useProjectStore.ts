@@ -67,6 +67,11 @@ interface ProjectStore {
   // Project actions
   createProject: (name: string, catalogue: Product[]) => void;
   loadProject: (project: Project) => void;
+  /** Replace the current project with a merged state produced by
+   * `computeImportPlan` (see src/utils/importProject.ts). Used by
+   * the Append import flow — the caller shows a preview dialog and
+   * calls this on confirm. */
+  appendImport: (nextProject: Project) => void;
   updateProjectName: (name: string) => void;
 
   // Plan management
@@ -258,6 +263,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // never has to special-case its presence.
     const ensured = ensureLenses(migrated);
     set({ project: ensured, selectedItemId: null, linkMode: false, linkSource: null });
+  },
+
+  appendImport: (nextProject) => {
+    // Caller has already produced the fully-merged state via
+    // computeImportPlan; just swap it in. selectedItemId / linkMode
+    // get reset since the plan/item ids all changed in the merge.
+    set({ project: { ...nextProject, updatedAt: new Date().toISOString() }, selectedItemId: null, linkMode: false, linkSource: null });
   },
 
   updateProjectName: (name) => {
@@ -694,12 +706,49 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }
     }
 
-    set({ project: { ...project, catalogue: updatedCatalogue, updatedAt: new Date().toISOString() } });
+    // Orphan re-link — any shelf item left as an orphan by a previous
+    // Append import is silently reconnected when the newly-loaded
+    // catalogue contains its SKU. productId is rewritten to the
+    // new master id and orphanSku is dropped, so the card goes back
+    // to rendering normally.
+    let relinkedOrphanCount = 0;
+    const reanchorItem = (item: import('../types').ShelfItem): import('../types').ShelfItem => {
+      if (!item.orphanSku) return item;
+      const match = newBySku.get(item.orphanSku);
+      if (!match) return item;
+      relinkedOrphanCount++;
+      // Use the updatedCatalogue's id for this product (which may have
+      // been preserved from an existing master product or freshly
+      // minted) so plans remain consistent with the catalogue.
+      const catalogueEntry = updatedCatalogue.find((p) => p.sku === match.sku);
+      const { orphanSku: _dropSku, ...rest } = item;
+      void _dropSku;
+      return { ...rest, productId: catalogueEntry?.id ?? match.id };
+    };
+    const relinkedPlans = project.plans.map((p) => ({
+      ...p,
+      currentShelf: { ...p.currentShelf, items: p.currentShelf.items.map(reanchorItem) },
+      futureShelf: { ...p.futureShelf, items: p.futureShelf.items.map(reanchorItem) },
+    }));
+
+    set({
+      project: {
+        ...project,
+        plans: relinkedPlans,
+        catalogue: updatedCatalogue,
+        updatedAt: new Date().toISOString(),
+      },
+    });
 
     if (missingProducts.length > 0) {
       setTimeout(() => {
         alert(`Missing from new catalogue:\n\n${[...new Set(missingProducts)].join('\n')}\n\nKept with old data.`);
       }, 100);
+    }
+    if (relinkedOrphanCount > 0) {
+      setTimeout(() => {
+        alert(`${relinkedOrphanCount} imported item${relinkedOrphanCount === 1 ? '' : 's'} reconnected to the new catalogue (they were previously marked "(Not in catalogue)").`);
+      }, 150);
     }
   },
 
