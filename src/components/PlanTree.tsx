@@ -14,7 +14,7 @@ const DND_MIME = 'application/x-range-plan-id';
 
 export function PlanTree() {
   const {
-    project, addPlan, removePlan, setActivePlan, setShowPlanTree,
+    project, addPlan, removePlan, duplicatePlan, setActivePlan, setShowPlanTree,
     activeVariantId, setActiveVariant, addVariant, removeVariant,
     addFolder, removeFolder, renameFolder, setPlanFolder,
     activeView, toggleMultiplanEntry,
@@ -174,6 +174,10 @@ export function PlanTree() {
           </div>
           <button className="plan-tree-add-variant" onClick={(e) => { e.stopPropagation(); handleNewVariant(plan.id); }} title="Add variant">+ Add Variant</button>
           <div className="plan-tree-item-actions">
+            <button className="plan-tree-item-duplicate" onClick={(e) => {
+              e.stopPropagation();
+              duplicatePlan(plan.id);
+            }} title="Duplicate plan">⧉</button>
             {!isActive && project.plans.length > 1 && (
               <button className="plan-tree-item-delete" onClick={(e) => {
                 e.stopPropagation();

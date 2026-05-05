@@ -368,6 +368,28 @@
   opacity: 0;
 }
 
+.plan-tree-item-duplicate {
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  font-size: 10px;
+  opacity: 0;
+}
+
+.plan-tree-item-duplicate:hover {
+  background: #bbdefb;
+}
+
+.plan-tree-item:hover .plan-tree-item-duplicate,
 .plan-tree-item:hover .plan-tree-item-delete {
   opacity: 1;
 }

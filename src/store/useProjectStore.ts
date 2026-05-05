@@ -77,6 +77,11 @@ interface ProjectStore {
   // Plan management
   addPlan: (name: string, folderId?: string) => void;
   removePlan: (planId: string) => void;
+  /** Deep-clone a plan with fresh IDs for everything (plan, shelves,
+   * items, variants, sankey links, matrix assignments). The clone
+   * lands in the same folder and becomes the active plan. Name gets
+   * a "(Copy)" suffix. */
+  duplicatePlan: (planId: string) => void;
   setActivePlan: (planId: string) => void;
   renamePlan: (planId: string, name: string) => void;
   setPlanFolder: (planId: string, folderId: string | undefined) => void;
@@ -291,6 +296,101 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         activePlanId: newPlan.id,
         updatedAt: new Date().toISOString(),
       },
+      linkMode: false,
+      linkSource: null,
+    });
+  },
+
+  duplicatePlan: (planId) => {
+    const { project } = get();
+    if (!project) return;
+    const source = project.plans.find((p) => p.id === planId);
+    if (!source) return;
+
+    // Build a name that doesn't clash.
+    const existingNames = new Set(project.plans.map((p) => p.name));
+    let name = `${source.name} (Copy)`;
+    let n = 2;
+    while (existingNames.has(name)) { name = `${source.name} (Copy ${n++})`; }
+
+    // Fresh ids for every internal entity. A counter + random suffix
+    // prevents collisions even in a tight loop.
+    let counter = 0;
+    const freshId = (prefix: string) => {
+      counter++;
+      return `${prefix}-${Date.now()}-${counter}-${Math.random().toString(36).slice(2, 7)}`;
+    };
+
+    // Map old shelf-item ids → new ids (used to rewrite links,
+    // matrix assignments, and variant inclusion lists).
+    const itemIdMap = new Map<string, string>();
+    const cloneItems = (items: ShelfItem[]): ShelfItem[] =>
+      items.map((item) => {
+        const newId = freshId('item');
+        itemIdMap.set(item.id, newId);
+        return { ...item, id: newId };
+      });
+
+    const currentItems = cloneItems(source.currentShelf.items);
+    const futureItems = cloneItems(source.futureShelf.items);
+
+    const cloneMatrix = (ml: import('../types').MatrixLayout | undefined) => {
+      if (!ml) return undefined;
+      return {
+        ...ml,
+        title: name,
+        assignments: ml.assignments
+          .map((a) => {
+            const newId = itemIdMap.get(a.itemId);
+            return newId ? { ...a, itemId: newId } : null;
+          })
+          .filter((a): a is NonNullable<typeof a> => a !== null),
+      };
+    };
+
+    const newPlanId = freshId('plan');
+
+    const clonedPlan: RangePlan = {
+      ...source,
+      id: newPlanId,
+      name,
+      currentShelf: {
+        ...source.currentShelf,
+        items: currentItems,
+        matrixLayout: cloneMatrix(source.currentShelf.matrixLayout),
+      },
+      futureShelf: {
+        ...source.futureShelf,
+        items: futureItems,
+        matrixLayout: cloneMatrix(source.futureShelf.matrixLayout),
+      },
+      sankeyLinks: source.sankeyLinks
+        .map((link) => {
+          const s = itemIdMap.get(link.sourceItemId);
+          const t = itemIdMap.get(link.targetItemId);
+          return s && t ? { ...link, sourceItemId: s, targetItemId: t } : null;
+        })
+        .filter((l): l is NonNullable<typeof l> => l !== null),
+      variants: source.variants.map((v) => ({
+        ...v,
+        id: freshId('var'),
+        includedCurrentItemIds: v.includedCurrentItemIds
+          .map((id) => itemIdMap.get(id))
+          .filter((id): id is string => !!id),
+        includedFutureItemIds: v.includedFutureItemIds
+          .map((id) => itemIdMap.get(id))
+          .filter((id): id is string => !!id),
+      })),
+    };
+
+    set({
+      project: {
+        ...project,
+        plans: [...project.plans, clonedPlan],
+        activePlanId: newPlanId,
+        updatedAt: new Date().toISOString(),
+      },
+      activeVariantId: null,
       linkMode: false,
       linkSource: null,
     });
