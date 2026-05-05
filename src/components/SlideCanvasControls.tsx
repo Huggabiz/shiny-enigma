@@ -7,21 +7,28 @@ interface SlideCanvasControlsProps {
 }
 
 const SLIDE_LOGICAL_WIDTH = 1100;
+const SLIDE_LOGICAL_HEIGHT = 619;
 
 /**
- * Fit the slide to the scroll area's current width by computing the right
- * zoom level and centring scroll. Called by the toolbar button AND by
- * App.tsx effects whenever the active view or resolution tier changes.
+ * Fit the slide so the entire canvas is visible without scrolling on
+ * either axis. Picks the tighter of width-fit and height-fit so
+ * ultra-wide or ultra-tall viewports don't push one dimension off-
+ * screen. Called by the toolbar button AND by App.tsx effects whenever
+ * the active view or resolution tier changes.
  */
 export function fitSlideToWidth(scrollAreaSelector: string): void {
   const el = document.querySelector(scrollAreaSelector) as HTMLElement | null;
   if (!el) return;
   const padding = 40;
-  const avail = el.clientWidth - padding;
+  const availW = el.clientWidth - padding;
+  const availH = el.clientHeight - padding;
   const scale = useProjectStore.getState().slideBaseScale;
   const canvasWidth = SLIDE_LOGICAL_WIDTH * scale;
-  if (canvasWidth <= 0 || avail <= 0) return;
-  const zoom = Math.max(0.3, Math.min(3, avail / canvasWidth));
+  const canvasHeight = SLIDE_LOGICAL_HEIGHT * scale;
+  if (canvasWidth <= 0 || canvasHeight <= 0 || availW <= 0 || availH <= 0) return;
+  const zoomW = availW / canvasWidth;
+  const zoomH = availH / canvasHeight;
+  const zoom = Math.max(0.3, Math.min(3, Math.min(zoomW, zoomH)));
   useProjectStore.getState().setSlideZoom(zoom);
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
