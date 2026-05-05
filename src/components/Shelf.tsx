@@ -47,31 +47,39 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
 
   const handleCardClick = (item: ShelfItem) => {
     if (linkMode) {
-      if (shelf.id === 'current') {
+      // Forecast mode (reverse direction): click a FUTURE card to
+      // select it as the forecast target; click a CURRENT card to
+      // create/remove a sankey link FROM that current card TO the
+      // selected target. linkSource stores the FUTURE item id.
+      if (shelf.id === 'future') {
         setLinkSource(item.id);
-      } else if (shelf.id === 'future' && linkSource) {
+      } else if (shelf.id === 'current' && linkSource) {
         const plan = useProjectStore.getState().project ? getActivePlan(useProjectStore.getState().project!) : undefined;
-        const existingLinks = plan?.sankeyLinks.filter(
-          (l: { sourceItemId: string }) => l.sourceItemId === linkSource
-        ) || [];
-        const existingLink = existingLinks.find((l: { targetItemId: string }) => l.targetItemId === item.id);
+        const existingLink = plan?.sankeyLinks.find(
+          (l) => l.sourceItemId === item.id && l.targetItemId === linkSource,
+        );
         if (existingLink) {
-          removeLink(linkSource, item.id);
+          removeLink(item.id, linkSource);
         } else {
-          const sourceItem = plan?.currentShelf.items.find((i: { id: string }) => i.id === linkSource);
-          const sourceProduct = sourceItem ? catalogue.find((p) => p.id === sourceItem.productId) : null;
-          const usedPercent = existingLinks.reduce((sum, l) => sum + (l.percent ?? 100), 0);
-          const remaining = Math.max(0, 100 - usedPercent);
+          const sourceProduct = catalogue.find((p) => p.id === item.productId);
           const sourceVolume = sourceProduct?.volume || 0;
+          // Default to a remaining-share allocation so adding
+          // multiple sources auto-distributes. Cap per-link at 100%.
+          const existingInbound = (plan?.sankeyLinks ?? []).filter(
+            (l) => l.targetItemId === linkSource,
+          );
+          const usedPercent = existingInbound
+            .filter((l) => l.sourceItemId === item.id)
+            .reduce((sum, l) => sum + (l.percent ?? 100), 0);
+          void usedPercent; // each source can only link once to a target
           addLink({
-            sourceItemId: linkSource,
-            targetItemId: item.id,
-            percent: remaining,
-            volume: Math.round(sourceVolume * remaining / 100),
+            sourceItemId: item.id,
+            targetItemId: linkSource,
+            percent: 100,
+            volume: sourceVolume,
             type: 'transfer',
           });
         }
-        setLinkSource(linkSource); // stay on same source
       }
     } else {
       setSelectedItem(item.id === selectedItemId ? null : item.id);

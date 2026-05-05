@@ -131,7 +131,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
 
                 <button className={`toolbar-btn ${linkMode ? 'active' : ''}`}
                   onClick={() => { setLinkMode(!linkMode); setLinkSource(null); }}>
-                  {linkMode ? 'Exit Link Mode' : 'Link Mode'}
+                  {linkMode ? 'Exit Forecast' : 'Forecast'}
                 </button>
               </>
             )}

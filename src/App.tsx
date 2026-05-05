@@ -20,7 +20,7 @@ import { Catalogue } from './components/Catalogue';
 import { SankeyFlow } from './components/SankeyFlow';
 import { ImportDialog } from './components/ImportDialog';
 import { ProductCard } from './components/ProductCard';
-import { LinkPanel } from './components/LinkPanel';
+import { ForecastPanel } from './components/ForecastPanel';
 import { RangeDesign } from './components/RangeDesign';
 import { MultiplanView } from './components/MultiplanView';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -266,15 +266,17 @@ function App() {
     });
   }, [activePlan]);
 
-  const linkSourceItem = useMemo(() => {
+  // In forecast mode, linkSource stores the FUTURE item being
+  // forecasted (the reverse of the old forward-link direction).
+  const forecastTargetItem = useMemo(() => {
     if (!linkMode || !linkSource || !activePlan) return null;
-    return activePlan.currentShelf.items.find((i) => i.id === linkSource) || null;
+    return activePlan.futureShelf.items.find((i) => i.id === linkSource) || null;
   }, [linkMode, linkSource, activePlan]);
 
-  const linkSourceProduct = useMemo(() => {
-    if (!linkSourceItem || !project) return undefined;
-    return project.catalogue.find((p) => p.id === linkSourceItem.productId);
-  }, [linkSourceItem, project]);
+  const forecastTargetProduct = useMemo(() => {
+    if (!forecastTargetItem || !project) return undefined;
+    return project.catalogue.find((p) => p.id === forecastTargetItem.productId);
+  }, [forecastTargetItem, project]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -356,30 +358,40 @@ function App() {
 
   const handleRailWidthChange = useCallback((width: number) => setShelfRailWidth(width), []);
 
-  const enterLinkModeFor = useCallback((itemId: string) => {
+  const enterForecastModeFor = useCallback((futureItemId: string) => {
     setLinkMode(true);
-    setLinkSource(itemId);
+    setLinkSource(futureItemId);
   }, [setLinkMode, setLinkSource]);
 
-  // Double-click on a current shelf item: edit if placeholder, otherwise enter link mode
+  // Double-click on a current shelf item: edit if placeholder
   const handleCurrentDoubleClick = useCallback((itemId: string) => {
     const item = activePlan?.currentShelf.items.find((i) => i.id === itemId);
     if (item?.isPlaceholder) {
       handleEditPlaceholder('current', itemId);
-    } else {
-      enterLinkModeFor(itemId);
     }
-  }, [activePlan, enterLinkModeFor, handleEditPlaceholder]);
+  }, [activePlan, handleEditPlaceholder]);
 
-  // Double-click on a future shelf item: edit if placeholder
+  // Double-click on a future shelf item: edit if placeholder,
+  // otherwise enter forecast mode for that product.
   const handleFutureDoubleClick = useCallback((itemId: string) => {
     const item = activePlan?.futureShelf.items.find((i) => i.id === itemId);
     if (item?.isPlaceholder) {
       handleEditPlaceholder('future', itemId);
+    } else {
+      enterForecastModeFor(itemId);
     }
-  }, [activePlan, handleEditPlaceholder]);
+  }, [activePlan, enterForecastModeFor, handleEditPlaceholder]);
 
-  const handleSankeyClick = useCallback((sourceItemId: string) => enterLinkModeFor(sourceItemId), [enterLinkModeFor]);
+  // Clicking a sankey flow enters forecast mode for the TARGET
+  // (the future product receiving the flow) so the user sees
+  // "what feeds this?" rather than "where does this go?".
+  const handleSankeyClick = useCallback((sourceItemId: string) => {
+    // Find the first link from this source to get a target.
+    const link = activePlan?.sankeyLinks.find((l) => l.sourceItemId === sourceItemId);
+    if (link) {
+      enterForecastModeFor(link.targetItemId);
+    }
+  }, [activePlan, enterForecastModeFor]);
 
   // Drag handlers
   const findShelfForItem = (itemId: string): string | null => {
@@ -575,9 +587,9 @@ function App() {
                 </div>
               </div>
 
-              {linkMode && linkSourceItem && (
-                <LinkPanel sourceItem={linkSourceItem} sourceProduct={linkSourceProduct}
-                  links={activePlan.sankeyLinks} futureItems={activePlan.futureShelf.items}
+              {linkMode && forecastTargetItem && (
+                <ForecastPanel targetItem={forecastTargetItem} targetProduct={forecastTargetProduct}
+                  links={activePlan.sankeyLinks} currentItems={activePlan.currentShelf.items}
                   catalogue={project!.catalogue} />
               )}
 

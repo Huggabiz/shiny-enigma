@@ -68,7 +68,42 @@ export interface ShelfItem {
    * user loads a catalogue that contains this SKU, at which point
    * `setCatalogue` auto-relinks the item and clears `orphanSku`. */
   orphanSku?: string;
+  /** Forecast adjustments for a future-shelf item. Only meaningful on
+   * items in the future shelf — ignored on current-shelf items. The
+   * forecast volume is derived from sankey inbound volume multiplied
+   * by these factors + organic growth. See ForecastConfig. */
+  forecastConfig?: ForecastConfig;
 }
+
+/** Per-item forecast adjustments applied ON TOP of the sankey-derived
+ * base volume. All percentage fields default to 100 (= no effect).
+ *
+ * Forecast volume = base × (distribution/100) × (ramp/100) × (rrpEffect/100) + organicGrowth
+ *
+ * where `base = Σ(source.volume × link.percent / 100)` across all
+ * inbound sankey links. */
+export interface ForecastConfig {
+  /** % of full channel/customer distribution. 60 = launching in 60%
+   * of channels initially. Default 100 = full distribution. */
+  distributionPct: number;
+  /** % of steady-state volume expected in the first period due to
+   * awareness ramp-up. 40 = expecting 40% of full-rate volume
+   * while the product builds awareness. Default 100 = no ramp. */
+  rampPct: number;
+  /** Manual price-effect factor. 95 = expect 5% volume drop from a
+   * price increase. Default 100 = no price effect. */
+  rrpEffectPct: number;
+  /** Absolute incremental units added AFTER the multiplicative
+   * factors. Default 0 = no organic uplift. */
+  organicGrowth: number;
+}
+
+export const DEFAULT_FORECAST_CONFIG: ForecastConfig = {
+  distributionPct: 100,
+  rampPct: 100,
+  rrpEffectPct: 100,
+  organicGrowth: 0,
+};
 
 // A labelled section on a shelf
 export interface ShelfLabel {

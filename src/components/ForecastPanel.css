@@ -1,0 +1,268 @@
+/* ForecastPanel — positioned at the right of the shelves area when
+   forecast mode is active. Replaces the old LinkPanel. */
+.forecast-panel {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  width: 320px;
+  max-height: calc(100% - 80px);
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.forecast-panel-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.forecast-panel-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: #7b1fa2;
+  padding: 2px 8px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.forecast-panel-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.forecast-panel-sku {
+  font-size: 11px;
+  color: #888;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.forecast-panel-rrp {
+  font-size: 11px;
+  color: #2e7d32;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Sections — Sources and Adjustments */
+.forecast-panel-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.forecast-panel-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.forecast-panel-empty {
+  font-size: 11px;
+  color: #bbb;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* Source rows */
+.forecast-source-row {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.forecast-source-row:last-child {
+  margin-bottom: 4px;
+  border-bottom: none;
+}
+
+.forecast-source-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.forecast-source-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.forecast-slider {
+  flex: 1;
+  height: 4px;
+  accent-color: #7b1fa2;
+  cursor: pointer;
+}
+
+.forecast-source-pct {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1a1a2e;
+  min-width: 32px;
+  text-align: right;
+}
+
+.forecast-source-remove {
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.forecast-source-remove:hover {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.forecast-source-vol {
+  font-size: 10px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.forecast-source-warn {
+  color: #e65100;
+  font-weight: 700;
+}
+
+.forecast-base-volume {
+  font-size: 12px;
+  color: #555;
+  padding: 6px 0 0;
+  border-top: 1px solid #eee;
+  margin-top: 4px;
+}
+
+/* Adjustment controls */
+.forecast-adjustments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.forecast-adj-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.forecast-adj-label {
+  flex: 1;
+  font-size: 11px;
+  color: #555;
+  cursor: help;
+}
+
+.forecast-adj-input {
+  width: 52px;
+  padding: 3px 6px;
+  font-size: 11px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: right;
+  outline: none;
+}
+
+.forecast-adj-input.wide {
+  width: 72px;
+}
+
+.forecast-adj-input:focus {
+  border-color: #7b1fa2;
+  box-shadow: 0 0 0 2px rgba(123, 31, 162, 0.1);
+}
+
+.forecast-adj-unit {
+  font-size: 10px;
+  color: #999;
+  min-width: 28px;
+}
+
+/* Forecast result */
+.forecast-panel-result {
+  padding: 12px 16px;
+  background: #f9f0ff;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.forecast-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #1a1a2e;
+}
+
+.forecast-result-row strong {
+  font-size: 15px;
+  color: #7b1fa2;
+}
+
+.forecast-result-row.revenue {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #555;
+}
+
+.forecast-result-row.revenue strong {
+  font-size: 13px;
+  color: #2e7d32;
+}
+
+/* Footer */
+.forecast-panel-footer {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.forecast-panel-hint {
+  font-size: 10px;
+  color: #bbb;
+  flex: 1;
+}
+
+.forecast-panel-done {
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #7b1fa2;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.forecast-panel-done:hover {
+  background: #6a1b9a;
+}
