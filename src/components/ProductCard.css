@@ -49,8 +49,15 @@
 }
 
 .product-card.link-source {
-  border-color: #2196f3;
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.4);
+  border-color: #7b1fa2;
+  box-shadow: 0 0 0 3px rgba(123, 31, 162, 0.35);
+}
+
+/* Highlight current-shelf cards that already have a sankey link
+   feeding the selected forecast target. Green glow = "contributing". */
+.product-card.link-highlight {
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.3);
 }
 
 .product-card.overlay {

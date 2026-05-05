@@ -216,9 +216,38 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
             })
             .map((item) => {
             const isSourceSelected = !!(linkMode && linkSource);
-            const isDimmed = isSourceSelected && shelf.id === 'current' && item.id !== linkSource;
+            // Forecast mode: dim FUTURE items except the selected target.
+            // Current items stay un-dimmed so the user can click them to
+            // add sources. (The old forward direction dimmed current items
+            // except the selected source — that's reversed now.)
+            const isDimmed = isSourceSelected && shelf.id === 'future' && item.id !== linkSource;
+            // The forecast target itself gets the blue highlight.
             const isLinkHighlight = isSourceSelected && item.id === linkSource;
+            // Green highlight on CURRENT cards that already have a sankey
+            // link feeding into the forecast target.
+            const isForecastSource = isSourceSelected && shelf.id === 'current' &&
+              !!(useProjectStore.getState().project && getActivePlan(useProjectStore.getState().project!)?.sankeyLinks.some(
+                (l) => l.sourceItemId === item.id && l.targetItemId === linkSource,
+              ));
             const isGhosted = variantIncludedIds ? !variantIncludedIds.has(item.id) : false;
+
+            // For future-shelf items, compute the forecast from inbound
+            // sankey links + forecastConfig adjustments. Passed to ProductCard
+            // so it can show "Fcst: <N>" instead of the raw catalogue volume.
+            let computedForecast: number | undefined;
+            if (shelf.id === 'future') {
+              const plan = useProjectStore.getState().project ? getActivePlan(useProjectStore.getState().project!) : undefined;
+              if (plan) {
+                const inbound = plan.sankeyLinks.filter((l) => l.targetItemId === item.id);
+                const base = inbound.reduce((sum, l) => sum + (l.volume ?? 0), 0);
+                const fc = item.forecastConfig;
+                const dist = fc?.distributionPct ?? 100;
+                const ramp = fc?.rampPct ?? 100;
+                const rrp = fc?.rrpEffectPct ?? 100;
+                const organic = fc?.organicGrowth ?? 0;
+                computedForecast = Math.round(base * (dist / 100) * (ramp / 100) * (rrp / 100) + organic);
+              }
+            }
 
             return (
               <ProductCard
@@ -230,7 +259,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
                 isLinkSource={linkSource === item.id}
                 isDimmed={isDimmed}
                 isGhosted={isGhosted}
-                isLinkHighlight={isLinkHighlight}
+                isLinkHighlight={isLinkHighlight || isForecastSource}
                 editableFuturePricing={editableFuturePricing}
                 onClick={() => handleCardClick(item)}
                 onDoubleClick={() => {
@@ -238,6 +267,8 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
                 }}
                 onRemove={() => removeItemFromShelf(shelf.id, item.id)}
                 cardWidth={cardWidth}
+                computedForecast={computedForecast}
+                isFutureShelf={shelf.id === 'future'}
               />
             );
           })}

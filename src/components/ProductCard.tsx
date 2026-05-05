@@ -23,6 +23,14 @@ interface ProductCardProps {
   overlay?: boolean;
   cardWidth?: number;
   editableFuturePricing?: boolean;
+  /** Sankey-derived forecast volume for future-shelf items. When set,
+   * ProductCard renders this as "Fcst: <N>" instead of the raw
+   * catalogue volume. Computed upstream in the Shelf render loop. */
+  computedForecast?: number;
+  /** True when this card sits on the future shelf. Drives display
+   * rules: future cards show the computed forecast, not raw volume;
+   * current cards show volume, not catalogue forecastVolume. */
+  isFutureShelf?: boolean;
 }
 
 type RrpRegion = 'ukRrp' | 'usRrp' | 'euRrp' | 'ausRrp';
@@ -139,6 +147,8 @@ export function ProductCard({
   overlay,
   cardWidth,
   editableFuturePricing,
+  computedForecast,
+  isFutureShelf,
 }: ProductCardProps) {
   const cardFormat = useProjectStore((s) => s.cardFormat);
   // Lens tinting + edit mode — if there's an active custom lens that
@@ -321,21 +331,21 @@ export function ProductCard({
       {cardProduct && (
         <div className="card-stats">
           {cardFormat.showSku && !isCompact && <span className="card-sku">{displaySku || '\u2014'}</span>}
-          {cardFormat.showVolume && (
+          {/* Current shelf: show volume only (no catalogue forecast).
+              Future shelf: show the sankey-computed forecast instead of raw volume. */}
+          {!isFutureShelf && cardFormat.showVolume && (
             <span className="card-volume">{isCompact ? '' : 'Vol: '}{cardProduct.volume ? cardProduct.volume.toLocaleString() : '\u2014'}</span>
           )}
-          {cardFormat.showForecastVolume && cardProduct.forecastVolume !== undefined && (
-            <span className="card-forecast">{isCompact ? '' : 'Fcst: '}{cardProduct.forecastVolume.toLocaleString()}</span>
+          {isFutureShelf && computedForecast !== undefined && (
+            <span className="card-forecast">{isCompact ? '' : 'Fcst: '}{computedForecast.toLocaleString()}</span>
           )}
+          {!isFutureShelf && !isCompact && cardFormat.showVolume && computedForecast === undefined && cardProduct.volume === 0 && null}
           {cardFormat.showRrp && <RrpRow product={cardProduct} region="ukRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={false} />}
           {cardFormat.showUsRrp && <RrpRow product={cardProduct} region="usRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={false} />}
           {cardFormat.showEuRrp && <RrpRow product={cardProduct} region="euRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={false} />}
           {cardFormat.showAusRrp && <RrpRow product={cardProduct} region="ausRrp" editable={!!editableFuturePricing && !item.isPlaceholder} showLabel={false} />}
           {cardFormat.showRevenue && cardProduct.revenue > 0 && (
             <span className="card-revenue">{isCompact ? '' : 'Rev: '}{cardProduct.revenue.toLocaleString()}</span>
-          )}
-          {cardFormat.showForecastRevenue && cardProduct.forecastRevenue !== undefined && (
-            <span className="card-forecast-revenue">{isCompact ? '' : 'Fcst Rev: '}{cardProduct.forecastRevenue.toLocaleString()}</span>
           )}
           {cardFormat.showCategory && !isCompact && <span className="card-category">{cardProduct.category || '\u2014'}</span>}
         </div>
