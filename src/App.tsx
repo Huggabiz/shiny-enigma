@@ -272,22 +272,25 @@ function App() {
     [activeVariant]
   );
 
-  // Discontinued items: current shelf products not in future shelf
+  // Discontinued items: products in the FROM stage that aren't in the
+  // TO stage. Uses the transform view's selected stages so the
+  // comparison is always between the two stages the user is looking at,
+  // not hardcoded current vs future.
   const discontinuedItems = useMemo(() => {
-    if (!activePlan) return [];
-    const futureProductIds = new Set(activePlan.futureShelf.items.map((i) => i.productId));
-    return activePlan.currentShelf.items.filter((item) => {
+    if (!transformFrom || !transformTo) return [];
+    const toProductIds = new Set(transformTo.shelf.items.map((i) => i.productId));
+    return transformFrom.shelf.items.filter((item) => {
       if (item.isPlaceholder || !item.productId) return false;
-      return !futureProductIds.has(item.productId);
+      return !toProductIds.has(item.productId);
     });
-  }, [activePlan]);
+  }, [transformFrom, transformTo]);
 
-  // In forecast mode, linkSource stores the FUTURE item being
-  // forecasted (the reverse of the old forward-link direction).
+  // In forecast mode, linkSource stores the TO-stage item being
+  // forecasted. Look it up in the transform TO stage's shelf.
   const forecastTargetItem = useMemo(() => {
-    if (!linkMode || !linkSource || !activePlan) return null;
-    return activePlan.futureShelf.items.find((i) => i.id === linkSource) || null;
-  }, [linkMode, linkSource, activePlan]);
+    if (!linkMode || !linkSource || !transformTo) return null;
+    return transformTo.shelf.items.find((i) => i.id === linkSource) || null;
+  }, [linkMode, linkSource, transformTo]);
 
   const forecastTargetProduct = useMemo(() => {
     if (!forecastTargetItem || !project) return undefined;
@@ -658,7 +661,7 @@ function App() {
 
               {linkMode && forecastTargetItem && (
                 <ForecastPanel targetItem={forecastTargetItem} targetProduct={forecastTargetProduct}
-                  links={activePlan.sankeyLinks} currentItems={activePlan.currentShelf.items}
+                  links={activePlan.sankeyLinks} currentItems={transformFrom?.shelf.items ?? activePlan.currentShelf.items}
                   catalogue={project!.catalogue} />
               )}
 

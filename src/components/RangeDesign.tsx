@@ -100,9 +100,13 @@ function sortShelfItems<T extends ShelfItem>(
   });
 }
 
-function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cardHeight, cellHeight, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir }: {
+function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, cardHeight, cellHeight, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir }: {
   row: number; col: number; itemIds: string[];
-  shelf: Shelf; catalogue: Product[];
+  shelf: Shelf;
+  /** Stage key ('current', 'future', or 'stage-<id>') used by store
+   * actions that need to resolve which shelf to update. */
+  stageKey: string;
+  catalogue: Product[];
   cardWidth: number;
   /** Hard pixel cap on each card box. Applied as an inline CSS
    * variable that the .matrix-card rule reads for its `height`. This
@@ -166,10 +170,10 @@ function MatrixCell({ row, col, itemIds, shelf, catalogue, cardWidth, cardHeight
             onEdit={item.isPlaceholder && onEditPlaceholder ? () => onEditPlaceholder(item.id) : undefined}
             onRemove={() => {
               if (storeVariantId) {
-                toggleVariantItem(storeVariantId, shelf.id, item.id);
+                toggleVariantItem(storeVariantId, stageKey, item.id);
               } else {
-                removeItemFromShelf(shelf.id, item.id);
-                removeMatrixAssignment(shelf.id, item.id);
+                removeItemFromShelf(stageKey, item.id);
+                removeMatrixAssignment(stageKey, item.id);
               }
             }} />
         );
@@ -905,7 +909,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                   {layout.xLabels.map((_, col) => (
                     <MatrixCell key={`${row}-${col}`} row={row} col={col}
                       itemIds={cellMap.get(`${row}-${col}`) || []}
-                      shelf={shelf} catalogue={catalogue}
+                      shelf={shelf} stageKey={shelfId} catalogue={catalogue}
                       cardWidth={cardWidth}
                       cardHeight={cardHeight}
                       cellHeight={rowHeights[row] || 80}
