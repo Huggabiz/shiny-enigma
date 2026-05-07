@@ -297,26 +297,18 @@ export interface PlanSlideSettings {
   range?: SlideViewSize;      // shared by current + future range matrix views
 }
 
-// A single range plan (current + future + optional intermediate stages + sankey links + variants)
+// A single range plan (current + future + optional intermediate shelves + sankey links + variants)
 export interface RangePlan {
   id: string;
   name: string;
   currentShelf: Shelf;
   futureShelf: Shelf;
-  /** User-visible label for the current stage, e.g. "SS26".
-   * Defaults to "Current Range" in the UI when absent. */
-  currentLabel?: string;
-  /** User-visible label for the future/goal stage, e.g. "Goal Range".
-   * Defaults to "Future Range" in the UI when absent. */
-  futureLabel?: string;
-  /** Ordered intermediate stages between current and future — the
-   * "stepping stones" toward the goal range. Each has an id, a
-   * user-visible name (e.g. "AW26 Launch"), and its own Shelf.
-   * The stages render in array order: current → intermediates[0]
-   * → intermediates[1] → ... → future. */
-  intermediateStages?: Array<{
-    id: string;
-    name: string;
+  /** Per-stage shelves for intermediate stages. Each entry references
+   * a StageDefinition.id from Project.stageDefinitions. When a
+   * project-level stage is created, every plan gets a shelf for it
+   * seeded from the plan's current shelf + matrix layout. */
+  intermediateShelves?: Array<{
+    stageId: string;
     shelf: Shelf;
   }>;
   sankeyLinks: SankeyLink[];
@@ -388,6 +380,14 @@ export function isProductInLens(lens: Lens, product: Pick<Product, 'id' | 'sourc
   return lens.productIds.includes(product.id);
 }
 
+/** A named stage in the project timeline. The definition is project-
+ * level (shared across all plans); each plan stores its own Shelf
+ * content for each stage via RangePlan.intermediateShelves. */
+export interface StageDefinition {
+  id: string;
+  name: string;
+}
+
 /** A single row in the Multiplan view — one (plan, variant|master)
  * pair. `variantId === null` means the plan's master range. The user
  * can include both the master AND one or more variants of the same
@@ -430,6 +430,15 @@ export interface Project {
    * editable at a time. Built-in 'dev' lens can never be in edit mode
    * (implicit membership). */
   editingLensId?: string | null;
+  /** Project-level stage timeline. Stages are shared across ALL plans
+   * in the project — they represent the business timeline (SS26, AW26,
+   * etc.), not plan-specific data. Each plan stores its own shelf for
+   * each stage via `intermediateShelves`. */
+  stageDefinitions?: StageDefinition[];
+  /** Label for the "current" baseline stage, e.g. "SS26". */
+  currentStageLabel?: string;
+  /** Label for the "future" goal stage, e.g. "Goal Range". */
+  futureStageLabel?: string;
   /** Multiplan view state — which plan+variant pairs to show stacked,
    * and which side of the range (current / future) to render. Optional
    * for backwards-compat; the store action lazily initialises it. */
@@ -454,33 +463,32 @@ export interface StageEntry {
   position: 'current' | 'intermediate' | 'future';
 }
 
-/** Returns the ordered list of stages for a plan:
- * [current, ...intermediates, future]. Each entry has a uniform
- * shape (key, name, shelf, position) so the UI can iterate without
- * special-casing the first and last. */
-export function getStages(plan: RangePlan): StageEntry[] {
+/** Returns the ordered list of stages for a plan, using the project-
+ * level stage definitions for names/order and the plan's shelves for
+ * content: [current, ...intermediates, future]. */
+export function getStages(plan: RangePlan, project: Project): StageEntry[] {
   const stages: StageEntry[] = [];
+  const currentLabel = project.currentStageLabel;
   stages.push({
     key: 'current',
-    // Always include "(Current)" so the user can tell which stage is
-    // the as-is baseline even when an explicit label (e.g. "SS26") is set.
-    name: plan.currentLabel ? `${plan.currentLabel} (Current)` : 'Current Range',
+    name: currentLabel ? `${currentLabel} (Current)` : 'Current Range',
     shelf: plan.currentShelf,
     position: 'current',
   });
-  if (plan.intermediateStages) {
-    for (const s of plan.intermediateStages) {
+  for (const def of project.stageDefinitions ?? []) {
+    const entry = (plan.intermediateShelves ?? []).find((s) => s.stageId === def.id);
+    if (entry) {
       stages.push({
-        key: `stage-${s.id}`,
-        name: s.name,
-        shelf: s.shelf,
+        key: `stage-${def.id}`,
+        name: def.name,
+        shelf: entry.shelf,
         position: 'intermediate',
       });
     }
   }
   stages.push({
     key: 'future',
-    name: plan.futureLabel || 'Future Range',
+    name: project.futureStageLabel || 'Future Range',
     shelf: plan.futureShelf,
     position: 'future',
   });

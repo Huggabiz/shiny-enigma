@@ -28,12 +28,12 @@ function updateShelf(project: Project, shelfId: string, updater: (shelf: Shelf) 
       futureShelf: updater(p.futureShelf),
     }));
   }
-  // Intermediate stage: key is 'stage-<id>'
+  // Intermediate stage: key is 'stage-<id>' where id = StageDefinition.id
   const stageId = shelfId.replace('stage-', '');
   return updatePlan(project, plan.id, (p) => ({
     ...p,
-    intermediateStages: (p.intermediateStages ?? []).map((s) =>
-      s.id === stageId ? { ...s, shelf: updater(s.shelf) } : s,
+    intermediateShelves: (p.intermediateShelves ?? []).map((s) =>
+      s.stageId === stageId ? { ...s, shelf: updater(s.shelf) } : s,
     ),
   }));
 }
@@ -132,12 +132,13 @@ interface ProjectStore {
    * isn't already in use by another lens. No-op for built-in lenses. */
   cycleLensColor: (lensId: string) => void;
 
-  // Stage labels + intermediate stages
-  setCurrentLabel: (planId: string, label: string) => void;
-  setFutureLabel: (planId: string, label: string) => void;
-  addIntermediateStage: (planId: string, name: string) => void;
-  removeIntermediateStage: (planId: string, stageId: string) => void;
-  renameIntermediateStage: (planId: string, stageId: string, name: string) => void;
+  // Stage management — stages are PROJECT-level (shared across all plans).
+  // Each plan stores its own shelf for each stage.
+  setCurrentStageLabel: (label: string) => void;
+  setFutureStageLabel: (label: string) => void;
+  addIntermediateStage: (name: string) => void;
+  removeIntermediateStage: (stageId: string) => void;
+  renameIntermediateStage: (stageId: string, name: string) => void;
 
   // Variant management
   activeVariantId: string | null;
@@ -744,75 +745,115 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     });
   },
 
-  // Stage labels + intermediate stages
-  setCurrentLabel: (planId, label) => {
+  // Stage management — stages are PROJECT-level. When a new intermediate
+  // is added, every plan in the project gets a shelf for it, seeded from
+  // each plan's current shelf (items + matrix layout carried forward).
+  setCurrentStageLabel: (label) => {
     const { project } = get();
     if (!project) return;
-    set({ project: updatePlan(project, planId, (p) => ({ ...p, currentLabel: label || undefined })) });
+    set({ project: { ...project, currentStageLabel: label || undefined, updatedAt: new Date().toISOString() } });
   },
 
-  setFutureLabel: (planId, label) => {
+  setFutureStageLabel: (label) => {
     const { project } = get();
     if (!project) return;
-    set({ project: updatePlan(project, planId, (p) => ({ ...p, futureLabel: label || undefined })) });
+    set({ project: { ...project, futureStageLabel: label || undefined, updatedAt: new Date().toISOString() } });
   },
 
-  addIntermediateStage: (planId, name) => {
+  addIntermediateStage: (name) => {
     const { project } = get();
     if (!project) return;
-    const plan = project.plans.find((p) => p.id === planId);
-    if (!plan) return;
-    // Seed the new stage with the current shelf's products — the
-    // assumption is that products carry forward through stages.
-    // Each item gets a fresh id so shelf-item references stay unique
-    // across stages.
+    const stageId = `stage-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    // Add the definition project-level
+    const defs = [...(project.stageDefinitions ?? []), { id: stageId, name }];
+
+    // For every plan, create a shelf seeded from the plan's current
+    // shelf — items + matrix layout (labels + assignments) so the
+    // new stage inherits the full range structure.
     let counter = 0;
-    const seededItems: ShelfItem[] = plan.currentShelf.items.map((item) => {
-      counter++;
+    const updatedPlans = project.plans.map((plan) => {
+      const itemIdMap = new Map<string, string>();
+      const seededItems: ShelfItem[] = plan.currentShelf.items.map((item) => {
+        counter++;
+        const newId = `item-${Date.now()}-${counter}-${Math.random().toString(36).slice(2, 7)}`;
+        itemIdMap.set(item.id, newId);
+        return { ...item, id: newId };
+      });
+      // Copy matrix layout with remapped item ids so assignments
+      // point at the new shelf items, not the current-shelf ones.
+      const sourceLayout = plan.currentShelf.matrixLayout;
+      const seededLayout = sourceLayout ? {
+        ...sourceLayout,
+        title: name,
+        assignments: sourceLayout.assignments
+          .map((a) => {
+            const newId = itemIdMap.get(a.itemId);
+            return newId ? { ...a, itemId: newId } : null;
+          })
+          .filter((a): a is NonNullable<typeof a> => a !== null),
+      } : undefined;
+
+      const newShelfEntry = {
+        stageId,
+        shelf: {
+          id: `shelf-${stageId}-${plan.id}`,
+          name,
+          items: seededItems,
+          labels: [],
+          matrixLayout: seededLayout,
+        } as import('../types').Shelf,
+      };
       return {
-        ...item,
-        id: `item-${Date.now()}-${counter}-${Math.random().toString(36).slice(2, 7)}`,
+        ...plan,
+        intermediateShelves: [...(plan.intermediateShelves ?? []), newShelfEntry],
       };
     });
-    const newStage = {
-      id: `stage-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name,
-      shelf: {
-        id: `shelf-stage-${Date.now()}`,
-        name,
-        items: seededItems,
-        labels: [],
-      } as import('../types').Shelf,
-    };
+
     set({
-      project: updatePlan(project, planId, (p) => ({
-        ...p,
-        intermediateStages: [...(p.intermediateStages ?? []), newStage],
-      })),
+      project: {
+        ...project,
+        stageDefinitions: defs,
+        plans: updatedPlans,
+        updatedAt: new Date().toISOString(),
+      },
     });
   },
 
-  removeIntermediateStage: (planId, stageId) => {
+  removeIntermediateStage: (stageId) => {
     const { project } = get();
     if (!project) return;
     set({
-      project: updatePlan(project, planId, (p) => ({
-        ...p,
-        intermediateStages: (p.intermediateStages ?? []).filter((s) => s.id !== stageId),
-      })),
+      project: {
+        ...project,
+        stageDefinitions: (project.stageDefinitions ?? []).filter((d) => d.id !== stageId),
+        plans: project.plans.map((plan) => ({
+          ...plan,
+          intermediateShelves: (plan.intermediateShelves ?? []).filter((s) => s.stageId !== stageId),
+        })),
+        updatedAt: new Date().toISOString(),
+      },
     });
   },
 
-  renameIntermediateStage: (planId, stageId, name) => {
+  renameIntermediateStage: (stageId, name) => {
     const { project } = get();
     if (!project) return;
     set({
-      project: updatePlan(project, planId, (p) => ({
-        ...p,
-        intermediateStages: (p.intermediateStages ?? []).map((s) =>
-          s.id === stageId ? { ...s, name, shelf: { ...s.shelf, name } } : s,
+      project: {
+        ...project,
+        stageDefinitions: (project.stageDefinitions ?? []).map((d) =>
+          d.id === stageId ? { ...d, name } : d,
         ),
-      })),
+        // Also update the shelf name on each plan for consistency
+        plans: project.plans.map((plan) => ({
+          ...plan,
+          intermediateShelves: (plan.intermediateShelves ?? []).map((s) =>
+            s.stageId === stageId ? { ...s, shelf: { ...s.shelf, name } } : s,
+          ),
+        })),
+        updatedAt: new Date().toISOString(),
+      },
     });
   },
 
@@ -1009,7 +1050,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (item.productId) {
       const plan = getActivePlan(updated);
       if (plan) {
-        const stages = getStages(plan);
+        const stages = getStages(plan, updated);
         const sourceIdx = stages.findIndex((s) => s.key === shelfId);
         let counter = 0;
         for (let i = sourceIdx + 1; i < stages.length; i++) {

@@ -72,7 +72,7 @@ function App() {
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
-  const stages = useMemo(() => activePlan ? getStages(activePlan) : [], [activePlan]);
+  const stages = useMemo(() => activePlan && project ? getStages(activePlan, project) : [], [activePlan, project]);
   // Resolve transform view from/to stages — fall back to first/last
   // if the stored keys don't match (e.g. after stage deletion).
   const transformFrom = useMemo(
@@ -112,7 +112,7 @@ function App() {
       );
       return resolvePlanSlideSize(activePlan, 'transform', autoCount);
     }
-    const stages = getStages(activePlan);
+    const stages = getStages(activePlan, project!);
     const activeStage = stages.find((s) => s.key === designShelfId) ?? stages[0];
     return resolvePlanSlideSize(activePlan, 'range', activeStage?.shelf.items.length ?? 0);
   }, [activePlan, activeView, designShelfId]);

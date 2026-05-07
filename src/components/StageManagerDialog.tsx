@@ -11,8 +11,8 @@ interface StageManagerDialogProps {
 export function StageManagerDialog({ onClose }: StageManagerDialogProps) {
   const {
     project,
-    setCurrentLabel,
-    setFutureLabel,
+    setCurrentStageLabel,
+    setFutureStageLabel,
     addIntermediateStage,
     removeIntermediateStage,
     renameIntermediateStage,
@@ -21,15 +21,15 @@ export function StageManagerDialog({ onClose }: StageManagerDialogProps) {
   const [newStageName, setNewStageName] = useState('');
   const activePlan = project ? getActivePlan(project) : undefined;
 
-  if (!activePlan) return null;
+  if (!activePlan || !project) return null;
 
-  const stages = getStages(activePlan);
-  const intermediates = activePlan.intermediateStages ?? [];
+  const stages = getStages(activePlan, project);
+  const stageDefs = project.stageDefinitions ?? [];
 
   const handleAdd = () => {
     const trimmed = newStageName.trim();
     if (!trimmed) return;
-    addIntermediateStage(activePlan.id, trimmed);
+    addIntermediateStage(trimmed);
     setNewStageName('');
   };
 
@@ -52,35 +52,39 @@ export function StageManagerDialog({ onClose }: StageManagerDialogProps) {
             <input
               className="stage-mgr-input"
               placeholder="e.g. SS26"
-              value={activePlan.currentLabel ?? ''}
-              onChange={(e) => setCurrentLabel(activePlan.id, e.target.value)}
+              value={project.currentStageLabel ?? ''}
+              onChange={(e) => setCurrentStageLabel(e.target.value)}
             />
             <span className="stage-mgr-badge">always first</span>
           </div>
 
-          {/* Intermediate stages */}
-          {intermediates.map((s, idx) => (
-            <div key={s.id} className="stage-mgr-row intermediate">
-              <span className="stage-mgr-position">Stage {idx + 1}</span>
-              <input
-                className="stage-mgr-input"
-                value={s.name}
-                onChange={(e) => renameIntermediateStage(activePlan.id, s.id, e.target.value)}
-              />
-              <button
-                className="stage-mgr-remove"
-                onClick={() => {
-                  if (s.shelf.items.length > 0) {
-                    if (!confirm(`"${s.name}" has ${s.shelf.items.length} products. Remove this stage?`)) return;
-                  }
-                  removeIntermediateStage(activePlan.id, s.id);
-                }}
-                title="Remove stage"
-              >
-                <CloseIcon size={7} color="currentColor" />
-              </button>
-            </div>
-          ))}
+          {/* Intermediate stages — from project-level definitions */}
+          {stageDefs.map((def, idx) => {
+            const planShelf = (activePlan.intermediateShelves ?? []).find((s) => s.stageId === def.id);
+            const itemCount = planShelf?.shelf.items.length ?? 0;
+            return (
+              <div key={def.id} className="stage-mgr-row intermediate">
+                <span className="stage-mgr-position">Stage {idx + 1}</span>
+                <input
+                  className="stage-mgr-input"
+                  value={def.name}
+                  onChange={(e) => renameIntermediateStage(def.id, e.target.value)}
+                />
+                <button
+                  className="stage-mgr-remove"
+                  onClick={() => {
+                    if (itemCount > 0) {
+                      if (!confirm(`"${def.name}" has products across ${project.plans.length} plan(s). Remove this stage from all plans?`)) return;
+                    }
+                    removeIntermediateStage(def.id);
+                  }}
+                  title="Remove stage from all plans"
+                >
+                  <CloseIcon size={7} color="currentColor" />
+                </button>
+              </div>
+            );
+          })}
 
           {/* Add new stage */}
           <div className="stage-mgr-add">
@@ -102,8 +106,8 @@ export function StageManagerDialog({ onClose }: StageManagerDialogProps) {
             <input
               className="stage-mgr-input"
               placeholder="e.g. Goal Range"
-              value={activePlan.futureLabel ?? ''}
-              onChange={(e) => setFutureLabel(activePlan.id, e.target.value)}
+              value={project.futureStageLabel ?? ''}
+              onChange={(e) => setFutureStageLabel(e.target.value)}
             />
             <span className="stage-mgr-badge">always last</span>
           </div>
