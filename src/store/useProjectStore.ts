@@ -1249,8 +1249,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!project) return;
     const plan = getActivePlan(project);
     if (!plan) return;
-    const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
-    const shelf = plan[shelfKey];
+    // Resolve the shelf via the same stage-key logic updateShelf uses.
+    const stageList = getStages(plan, project);
+    const stage = stageList.find((s) => s.key === shelfId);
+    if (!stage) return;
+    const shelf = stage.shelf;
     const layout = shelf.matrixLayout;
     if (!layout || layout.assignments.length === 0) return;
 

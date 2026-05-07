@@ -28,14 +28,16 @@ function UsageBadges({ productId, currentProductIds, futureProductIds, otherCurr
   const inFuture = futureProductIds.has(productId);
   const inOtherCurrent = otherCurrentIds?.has(productId);
   const inOtherFuture = otherFutureIds?.has(productId);
-  if (!inCurrent && !inFuture && !inOtherCurrent && !inOtherFuture) return null;
+  // Simplified: "Used" if the product is in ANY stage of this plan;
+  // dotted-outline "Used" if it's in a different plan only.
+  const inThisPlan = inCurrent || inFuture;
+  const inOtherPlan = !inThisPlan && (inOtherCurrent || inOtherFuture);
+  if (!inThisPlan && !inOtherPlan) return null;
 
   return (
     <div className="catalogue-usage-badges">
-      {inCurrent && <span className="usage-badge current" title="In Current Range (this plan)">C</span>}
-      {!inCurrent && inOtherCurrent && <span className="usage-badge current other" title="In Current Range (other plan)">C</span>}
-      {inFuture && <span className="usage-badge future" title="In Future Range (this plan)">F</span>}
-      {!inFuture && inOtherFuture && <span className="usage-badge future other" title="In Future Range (other plan)">F</span>}
+      {inThisPlan && <span className="usage-badge used" title="Used in this range plan">Used</span>}
+      {inOtherPlan && <span className="usage-badge used other" title="Used in another range plan">Used</span>}
     </div>
   );
 }

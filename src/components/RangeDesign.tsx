@@ -665,7 +665,14 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     if (activeId.startsWith('catalogue-')) {
       const data = active.data.current as { product: Product };
       if (!data?.product) return;
-      if (shelf.items.some((i) => i.productId === data.product.id)) return;
+      // If the product is already on this stage's shelf (e.g. from
+      // the carry-forward seed), just place the existing item in the
+      // target matrix cell — don't create a duplicate.
+      const existingItem = shelf.items.find((i) => i.productId === data.product.id);
+      if (existingItem) {
+        setMatrixAssignment(shelfId, existingItem.id, row, col);
+        return;
+      }
       const newItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       addItemToShelf(shelfId, {
         id: newItemId, productId: data.product.id,

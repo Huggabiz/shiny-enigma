@@ -397,40 +397,31 @@
 }
 
 .usage-badge {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  font-size: 9px;
+  height: 16px;
+  border-radius: 8px;
+  padding: 0 6px;
+  font-size: 8px;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 
-.usage-badge.current {
+/* Solid badge: product is used in THIS plan (any stage) */
+.usage-badge.used {
   background: #7b1fa2;
+  color: #fff;
 }
 
-.usage-badge.future {
-  background: #0097a7;
-}
-
-/* Dotted outline for products used in other plans */
-.usage-badge.other {
+/* Dotted-outline badge: product used only in a DIFFERENT plan */
+.usage-badge.used.other {
   background: transparent;
-  border: 1.5px dashed;
-}
-
-.usage-badge.current.other {
-  border-color: #7b1fa2;
+  border: 1.5px dashed #7b1fa2;
   color: #7b1fa2;
-}
-
-.usage-badge.future.other {
-  border-color: #0097a7;
-  color: #0097a7;
+  box-shadow: none;
 }
 
 /* Dim used items slightly */
