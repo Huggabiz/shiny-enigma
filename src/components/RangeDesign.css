@@ -16,6 +16,56 @@
 }
 
 /* Title */
+/* Stage selector — multi-step tab row replacing the old Current/Future
+   pill toggle. Each tab represents a stage from getStages(). */
+.range-stage-selector {
+  display: inline-flex;
+  background: #f0f0f0;
+  border: 1px solid #e0e0e0;
+  border-radius: 16px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.range-stage-tab {
+  padding: 4px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.range-stage-tab:hover {
+  color: #333;
+  background: #e8e8e8;
+}
+
+.range-stage-tab.active {
+  background: #1976d2;
+  color: #fff;
+}
+
+.range-stage-tab.active.future {
+  background: #7b1fa2;
+}
+
+/* Stage name bubble on the slide title — sits next to the variant
+   badge, same shape but a different colour. */
+.stage-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: #1976d2;
+  padding: 2px 10px;
+  border-radius: 10px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
 .range-design-title-bar {
   width: 100%;
   margin-bottom: 10px;

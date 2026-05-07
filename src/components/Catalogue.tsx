@@ -14,7 +14,7 @@ interface CatalogueProps {
   isDropTarget?: boolean;
   dropZoneId?: string;
   /** When set the catalogue shows the "Hide Used" toggle, scoped to this shelf. */
-  designShelfId?: 'current' | 'future';
+  designShelfId?: string;
 }
 
 function UsageBadges({ productId, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds }: {

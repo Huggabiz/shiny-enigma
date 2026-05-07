@@ -14,19 +14,19 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Catalogue } from './Catalogue';
 import { useProjectStore } from '../store/useProjectStore';
 import { CloseIcon } from './Icons';
-import { PillToggle } from './PillToggle';
 import { PlaceholderDialog } from './PlaceholderDialog';
 import { EditableTitle } from './EditableTitle';
 import { SlideCanvasControls } from './SlideCanvasControls';
 import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem } from '../types';
-import { getActivePlan } from '../types';
+import { getActivePlan, getStages } from '../types';
 import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH } from '../utils/matrixLayout';
 import { hexToRgba } from '../utils/color';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
-  shelfId: 'current' | 'future';
-  onShelfChange: (shelfId: 'current' | 'future') => void;
+  /** Stage key: 'current', 'future', or 'stage-<id>' for intermediates. */
+  shelfId: string;
+  onShelfChange: (shelfId: string) => void;
   onImport: () => void;
 }
 
@@ -437,7 +437,10 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const [wrapperSize, setWrapperSize] = useState({ w: 0, h: 0 });
 
   const activePlan = project ? getActivePlan(project) : undefined;
-  const shelf = activePlan?.[shelfId === 'current' ? 'currentShelf' : 'futureShelf'];
+  const stages = activePlan ? getStages(activePlan) : [];
+  const activeStage = stages.find((s) => s.key === shelfId) ?? stages[0];
+  const shelf = activeStage?.shelf;
+  const isFutureShelf = activeStage?.position === 'future';
   const catalogue = project?.catalogue || [];
   const layout: MatrixLayout = useMemo(() =>
     shelf?.matrixLayout || { title: shelf?.name || '', xLabels: [], yLabels: [], assignments: [] },
@@ -503,7 +506,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       }
     }
 
-    if (shelfId === 'future' && showDiscontinued && activePlan) {
+    if (isFutureShelf && showDiscontinued && activePlan) {
       const futureProductIds = new Set(activePlan.futureShelf.items.map((i) => i.productId));
       const currentLayout = activePlan.currentShelf.matrixLayout;
       if (currentLayout) {
@@ -800,7 +803,21 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="range-design-canvas">
           <div className="range-design-title-bar">
-            <PillToggle value={shelfId} onChange={onShelfChange} />
+            {/* Stage selector — replaces the old Current/Future pill toggle.
+                Renders a tab-like row of all stages from getStages(). */}
+            <div className="range-stage-selector" role="tablist">
+              {stages.map((s) => (
+                <button
+                  key={s.key}
+                  role="tab"
+                  aria-selected={s.key === shelfId}
+                  className={`range-stage-tab ${s.key === shelfId ? 'active' : ''} ${s.position}`}
+                  onClick={() => onShelfChange(s.key)}
+                >
+                  {s.name}
+                </button>
+              ))}
+            </div>
             <div className="range-design-canvas-controls">
               {activeVariant && (
                 <label className="ghost-toggle" title="Show products excluded from this variant as ghost cards">
@@ -852,7 +869,10 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                 className="range-design-title"
                 value={activePlan?.name || layout.title}
                 onSave={(next) => updateTitle(next)}
-                trailing={activeVariant ? <span className="variant-badge">{activeVariant.name}</span> : null}
+                trailing={<>
+                  {activeStage && <span className="stage-badge">{activeStage.name}</span>}
+                  {activeVariant && <span className="variant-badge">{activeVariant.name}</span>}
+                </>}
               />
             </div>
             <div className="matrix-wrapper" ref={wrapperRef}>
@@ -894,7 +914,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                       variantIncludedIds={variantIncludedIds}
                       showGhostedProp={showGhosted}
                       discontinuedItems={discontinuedByCell.get(`${row}-${col}`)}
-                      isFutureShelf={shelfId === 'future'}
+                      isFutureShelf={isFutureShelf}
                       sortBy={sortBy}
                       sortDir={sortDir} />
                   ))}

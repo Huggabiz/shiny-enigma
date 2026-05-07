@@ -297,20 +297,32 @@ export interface PlanSlideSettings {
   range?: SlideViewSize;      // shared by current + future range matrix views
 }
 
-// A single range plan (current + future + sankey links + variants)
+// A single range plan (current + future + optional intermediate stages + sankey links + variants)
 export interface RangePlan {
   id: string;
   name: string;
   currentShelf: Shelf;
   futureShelf: Shelf;
+  /** User-visible label for the current stage, e.g. "SS26".
+   * Defaults to "Current Range" in the UI when absent. */
+  currentLabel?: string;
+  /** User-visible label for the future/goal stage, e.g. "Goal Range".
+   * Defaults to "Future Range" in the UI when absent. */
+  futureLabel?: string;
+  /** Ordered intermediate stages between current and future — the
+   * "stepping stones" toward the goal range. Each has an id, a
+   * user-visible name (e.g. "AW26 Launch"), and its own Shelf.
+   * The stages render in array order: current → intermediates[0]
+   * → intermediates[1] → ... → future. */
+  intermediateStages?: Array<{
+    id: string;
+    name: string;
+    shelf: Shelf;
+  }>;
   sankeyLinks: SankeyLink[];
   variants: RangeVariant[];
   slideSettings?: PlanSlideSettings;
-  /** Optional card-format override for this plan. Variants within the
-   * plan can further override by setting their own cardFormat. */
   cardFormat?: Partial<CardFormat>;
-  /** Optional folder membership — plans without a folderId live in the
-   * top-level "Unfiled" bucket. Folders are user-defined via PlanTree. */
   folderId?: string;
 }
 
@@ -429,6 +441,48 @@ export interface Project {
 // Helper to get the active plan from a project
 export function getActivePlan(project: Project): RangePlan | undefined {
   return project.plans.find((p) => p.id === project.activePlanId) || project.plans[0];
+}
+
+/** A stage entry in the ordered stage list — uniform accessor for
+ * current, intermediates, and future. `key` is the shelf accessor
+ * key used by store actions: 'current', 'future', or 'stage-<id>'
+ * for intermediates. */
+export interface StageEntry {
+  key: string;
+  name: string;
+  shelf: Shelf;
+  position: 'current' | 'intermediate' | 'future';
+}
+
+/** Returns the ordered list of stages for a plan:
+ * [current, ...intermediates, future]. Each entry has a uniform
+ * shape (key, name, shelf, position) so the UI can iterate without
+ * special-casing the first and last. */
+export function getStages(plan: RangePlan): StageEntry[] {
+  const stages: StageEntry[] = [];
+  stages.push({
+    key: 'current',
+    name: plan.currentLabel || 'Current Range',
+    shelf: plan.currentShelf,
+    position: 'current',
+  });
+  if (plan.intermediateStages) {
+    for (const s of plan.intermediateStages) {
+      stages.push({
+        key: `stage-${s.id}`,
+        name: s.name,
+        shelf: s.shelf,
+        position: 'intermediate',
+      });
+    }
+  }
+  stages.push({
+    key: 'future',
+    name: plan.futureLabel || 'Future Range',
+    shelf: plan.futureShelf,
+    position: 'future',
+  });
+  return stages;
 }
 
 export const DEFAULT_MATRIX_LAYOUT: MatrixLayout = {

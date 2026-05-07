@@ -28,7 +28,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { PlaceholderDialog } from './components/PlaceholderDialog';
 import { EditableTitle } from './components/EditableTitle';
 import { useProjectStore } from './store/useProjectStore';
-import { getActivePlan } from './types';
+import { getActivePlan, getStages } from './types';
 import type { Product, ShelfItem, PlaceholderData } from './types';
 import { SlideCanvasControls, fitSlideToWidth } from './components/SlideCanvasControls';
 import { resolvePlanSlideSize } from './utils/slideSize';
@@ -98,8 +98,9 @@ function App() {
       );
       return resolvePlanSlideSize(activePlan, 'transform', autoCount);
     }
-    const shelf = designShelfId === 'current' ? activePlan.currentShelf : activePlan.futureShelf;
-    return resolvePlanSlideSize(activePlan, 'range', shelf.items.length);
+    const stages = getStages(activePlan);
+    const activeStage = stages.find((s) => s.key === designShelfId) ?? stages[0];
+    return resolvePlanSlideSize(activePlan, 'range', activeStage?.shelf.items.length ?? 0);
   }, [activePlan, activeView, designShelfId]);
 
   useEffect(() => {

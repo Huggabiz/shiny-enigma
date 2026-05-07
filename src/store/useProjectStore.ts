@@ -35,9 +35,9 @@ interface ProjectStore {
 
   // Views — lifted out of App local state so the export loop can drive them
   activeView: 'transform' | 'range-design' | 'multiplan' | 'forecast-lab';
-  designShelfId: 'current' | 'future';
+  designShelfId: string;
   setActiveView: (view: 'transform' | 'range-design' | 'multiplan' | 'forecast-lab') => void;
-  setDesignShelfId: (shelfId: 'current' | 'future') => void;
+  setDesignShelfId: (shelfId: string) => void;
 
   // Slide canvas size — baseScale grows the logical canvas so more content
   // fits without shrinking; zoom is a visual multiplier for navigation.
@@ -109,6 +109,13 @@ interface ProjectStore {
   /** Cycle a custom lens's colour to the next palette entry that
    * isn't already in use by another lens. No-op for built-in lenses. */
   cycleLensColor: (lensId: string) => void;
+
+  // Stage labels + intermediate stages
+  setCurrentLabel: (planId: string, label: string) => void;
+  setFutureLabel: (planId: string, label: string) => void;
+  addIntermediateStage: (planId: string, name: string) => void;
+  removeIntermediateStage: (planId: string, stageId: string) => void;
+  renameIntermediateStage: (planId: string, stageId: string, name: string) => void;
 
   // Variant management
   activeVariantId: string | null;
@@ -708,6 +715,64 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           ...p.futureShelf,
           matrixLayout: p.futureShelf.matrixLayout ? { ...p.futureShelf.matrixLayout, title: name } : undefined,
         },
+      })),
+    });
+  },
+
+  // Stage labels + intermediate stages
+  setCurrentLabel: (planId, label) => {
+    const { project } = get();
+    if (!project) return;
+    set({ project: updatePlan(project, planId, (p) => ({ ...p, currentLabel: label || undefined })) });
+  },
+
+  setFutureLabel: (planId, label) => {
+    const { project } = get();
+    if (!project) return;
+    set({ project: updatePlan(project, planId, (p) => ({ ...p, futureLabel: label || undefined })) });
+  },
+
+  addIntermediateStage: (planId, name) => {
+    const { project } = get();
+    if (!project) return;
+    const newStage = {
+      id: `stage-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      shelf: {
+        id: `shelf-stage-${Date.now()}`,
+        name,
+        items: [],
+        labels: [],
+      } as import('../types').Shelf,
+    };
+    set({
+      project: updatePlan(project, planId, (p) => ({
+        ...p,
+        intermediateStages: [...(p.intermediateStages ?? []), newStage],
+      })),
+    });
+  },
+
+  removeIntermediateStage: (planId, stageId) => {
+    const { project } = get();
+    if (!project) return;
+    set({
+      project: updatePlan(project, planId, (p) => ({
+        ...p,
+        intermediateStages: (p.intermediateStages ?? []).filter((s) => s.id !== stageId),
+      })),
+    });
+  },
+
+  renameIntermediateStage: (planId, stageId, name) => {
+    const { project } = get();
+    if (!project) return;
+    set({
+      project: updatePlan(project, planId, (p) => ({
+        ...p,
+        intermediateStages: (p.intermediateStages ?? []).map((s) =>
+          s.id === stageId ? { ...s, name, shelf: { ...s.shelf, name } } : s,
+        ),
       })),
     });
   },
