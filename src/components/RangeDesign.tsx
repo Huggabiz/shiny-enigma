@@ -490,6 +490,14 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     return () => observer.disconnect();
   }, []);
 
+  // Previous stage in the timeline — used for discontinued-item
+  // detection. Declared before cellCounts because the cell-count
+  // layout reservation needs it to include discontinued ghost cards.
+  const previousStage = useMemo(() => {
+    const idx = stages.findIndex((s) => s.key === shelfId);
+    return idx > 0 ? stages[idx - 1] : null;
+  }, [stages, shelfId]);
+
   // Build the per-cell product counts that drive the layout solver.
   // Includes future-shelf discontinued ghost cards when Show discontinued
   // is on, so the algorithm reserves space for them at their original cell.
@@ -781,13 +789,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
   // Discontinued: products in the current shelf whose productId is absent
   // Discontinued items: products that were in the PREVIOUS stage but
-  // are not in THIS stage. For stage 0 (current) there's no previous,
-  // so no discontinued items.
-  const previousStage = useMemo(() => {
-    const idx = stages.findIndex((s) => s.key === shelfId);
-    return idx > 0 ? stages[idx - 1] : null;
-  }, [stages, shelfId]);
-
+  // are not in THIS stage. previousStage is declared above (before
+  // cellCounts) so both memos can access it.
   const discontinuedItems = useMemo(() => {
     if (!previousStage || !shelf || !showDiscontinued) return [];
     const thisProductIds = new Set(shelf.items.map((i) => i.productId));
