@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat, SlideViewSize, PlanFolder, Lens } from '../types';
-import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan, DEFAULT_DEV_LENS, LENS_PALETTE } from '../types';
+import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan, getStages, DEFAULT_DEV_LENS, LENS_PALETTE } from '../types';
 
 // Helper: update a specific plan in the plans array
 function updatePlan(project: Project, planId: string, updater: (plan: RangePlan) => RangePlan): Project {
@@ -11,14 +11,30 @@ function updatePlan(project: Project, planId: string, updater: (plan: RangePlan)
   };
 }
 
-// Helper: update a shelf within the active plan
+// Helper: update a shelf within the active plan. Handles 'current',
+// 'future', and 'stage-<id>' keys for intermediate stages.
 function updateShelf(project: Project, shelfId: string, updater: (shelf: Shelf) => Shelf): Project {
   const plan = getActivePlan(project);
   if (!plan) return project;
-  const shelfKey = shelfId === 'current' ? 'currentShelf' : 'futureShelf';
+  if (shelfId === 'current') {
+    return updatePlan(project, plan.id, (p) => ({
+      ...p,
+      currentShelf: updater(p.currentShelf),
+    }));
+  }
+  if (shelfId === 'future') {
+    return updatePlan(project, plan.id, (p) => ({
+      ...p,
+      futureShelf: updater(p.futureShelf),
+    }));
+  }
+  // Intermediate stage: key is 'stage-<id>'
+  const stageId = shelfId.replace('stage-', '');
   return updatePlan(project, plan.id, (p) => ({
     ...p,
-    [shelfKey]: updater(p[shelfKey]),
+    intermediateStages: (p.intermediateStages ?? []).map((s) =>
+      s.id === stageId ? { ...s, shelf: updater(s.shelf) } : s,
+    ),
   }));
 }
 
@@ -744,13 +760,27 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   addIntermediateStage: (planId, name) => {
     const { project } = get();
     if (!project) return;
+    const plan = project.plans.find((p) => p.id === planId);
+    if (!plan) return;
+    // Seed the new stage with the current shelf's products — the
+    // assumption is that products carry forward through stages.
+    // Each item gets a fresh id so shelf-item references stay unique
+    // across stages.
+    let counter = 0;
+    const seededItems: ShelfItem[] = plan.currentShelf.items.map((item) => {
+      counter++;
+      return {
+        ...item,
+        id: `item-${Date.now()}-${counter}-${Math.random().toString(36).slice(2, 7)}`,
+      };
+    });
     const newStage = {
       id: `stage-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name,
       shelf: {
         id: `shelf-stage-${Date.now()}`,
         name,
-        items: [],
+        items: seededItems,
         labels: [],
       } as import('../types').Shelf,
     };
@@ -971,6 +1001,32 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     let updated = updateShelf(project, shelfId, (shelf) => ({
       ...shelf, items: [...shelf.items, item],
     }));
+
+    // Cascade forward: when adding a product to a stage, also add it
+    // to all SUBSEQUENT stages (including future) so products carry
+    // forward through the timeline. Skip if the product is already on
+    // the target stage. Each cascade item gets a fresh id.
+    if (item.productId) {
+      const plan = getActivePlan(updated);
+      if (plan) {
+        const stages = getStages(plan);
+        const sourceIdx = stages.findIndex((s) => s.key === shelfId);
+        let counter = 0;
+        for (let i = sourceIdx + 1; i < stages.length; i++) {
+          const stage = stages[i];
+          if (stage.shelf.items.some((si) => si.productId === item.productId)) continue;
+          counter++;
+          const cascadeItem: ShelfItem = {
+            ...item,
+            id: `item-${Date.now()}-cascade-${counter}-${Math.random().toString(36).slice(2, 7)}`,
+          };
+          updated = updateShelf(updated, stage.key, (shelf) => ({
+            ...shelf, items: [...shelf.items, cascadeItem],
+          }));
+        }
+      }
+    }
+
     // If adding while viewing a variant, also include the item in that variant
     if (activeVariantId) {
       const plan = getActivePlan(updated);

@@ -462,7 +462,9 @@ export function getStages(plan: RangePlan): StageEntry[] {
   const stages: StageEntry[] = [];
   stages.push({
     key: 'current',
-    name: plan.currentLabel || 'Current Range',
+    // Always include "(Current)" so the user can tell which stage is
+    // the as-is baseline even when an explicit label (e.g. "SS26") is set.
+    name: plan.currentLabel ? `${plan.currentLabel} (Current)` : 'Current Range',
     shelf: plan.currentShelf,
     position: 'current',
   });
