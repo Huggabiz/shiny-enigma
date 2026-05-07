@@ -18,6 +18,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { ProductCard } from './ProductCard';
 import { computeShelfLayout } from '../utils/layout';
 import { deriveLabelsFromMatrix, packLabelsIntoRows } from '../utils/shelfLabels';
+import { getActivePlan, getStages } from '../types';
 import type { Product, RangePlan, Shelf, ShelfItem } from '../types';
 import './MultiplanView.css';
 
@@ -70,6 +71,13 @@ export function MultiplanView() {
   // a ref set on the first row's cards area (simpler than a dedicated
   // ResizeObserver since every row has the same width).
   const railWidth = useRailWidth();
+
+  // Stages from the first plan (definitions are project-level).
+  const firstPlan = project ? getActivePlan(project) : undefined;
+  const stagesForToggle = useMemo(
+    () => firstPlan && project ? getStages(firstPlan, project) : [],
+    [firstPlan, project],
+  );
 
   const multiplanView = project?.multiplanView ?? { shelfSide: 'current' as const, entries: [] };
   const shelfSide = multiplanView.shelfSide;
@@ -146,22 +154,17 @@ export function MultiplanView() {
       <div className="multiplan-toolbar">
         <h2 className="multiplan-title">Multiplan</h2>
         <div className="multiplan-shelf-toggle" role="tablist">
-          <button
-            role="tab"
-            aria-selected={shelfSide === 'current'}
-            className={shelfSide === 'current' ? 'active' : ''}
-            onClick={() => setMultiplanShelfSide('current')}
-          >
-            Current
-          </button>
-          <button
-            role="tab"
-            aria-selected={shelfSide === 'future'}
-            className={shelfSide === 'future' ? 'active' : ''}
-            onClick={() => setMultiplanShelfSide('future')}
-          >
-            Future
-          </button>
+          {stagesForToggle.map((s) => (
+            <button
+              key={s.key}
+              role="tab"
+              aria-selected={shelfSide === s.key}
+              className={shelfSide === s.key ? 'active' : ''}
+              onClick={() => setMultiplanShelfSide(s.key)}
+            >
+              {s.name}
+            </button>
+          ))}
         </div>
         <div className="multiplan-toolbar-actions">
           <label className="multiplan-show-excluded" title="Show items excluded from variants as ghost cards (global toggle — also affects the range view)">

@@ -116,7 +116,7 @@ interface ProjectStore {
 
   // Multiplan view — ordered list of (plan, variant|master) rows and
   // a global Current/Future shelf-side toggle. See types/MultiplanViewState.
-  setMultiplanShelfSide: (side: 'current' | 'future') => void;
+  setMultiplanShelfSide: (side: string) => void;
   toggleMultiplanEntry: (planId: string, variantId: string | null) => void;
   reorderMultiplanEntries: (entries: import('../types').MultiplanEntry[]) => void;
   clearMultiplanEntries: () => void;

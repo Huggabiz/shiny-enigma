@@ -510,16 +510,19 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       }
     }
 
-    if (isFutureShelf && showDiscontinued && activePlan) {
-      const futureProductIds = new Set(activePlan.futureShelf.items.map((i) => i.productId));
-      const currentLayout = activePlan.currentShelf.matrixLayout;
-      if (currentLayout) {
+    // When Show discontinued is on, add discontinued items (from the
+    // PREVIOUS stage) to the cell counts so the layout algorithm
+    // reserves space for their ghost cards.
+    if (previousStage && showDiscontinued && shelf) {
+      const thisProductIds = new Set(shelf.items.map((i) => i.productId));
+      const prevLayout = previousStage.shelf.matrixLayout;
+      if (prevLayout) {
         const discIds = new Set(
-          activePlan.currentShelf.items
-            .filter((i) => !i.isPlaceholder && i.productId && !futureProductIds.has(i.productId))
+          previousStage.shelf.items
+            .filter((i) => !i.isPlaceholder && i.productId && !thisProductIds.has(i.productId))
             .map((i) => i.id),
         );
-        for (const a of currentLayout.assignments) {
+        for (const a of prevLayout.assignments) {
           if (!discIds.has(a.itemId)) continue;
           if (a.row >= 0 && a.row < numRows && a.col >= 0 && a.col < numCols) {
             counts[a.row][a.col] += 1;
@@ -777,27 +780,33 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const unassigned = shelf.items.filter((i) => !assignedItemIds.has(i.id));
 
   // Discontinued: products in the current shelf whose productId is absent
-  // from the future shelf. Only surfaced when the user is looking at the
-  // future matrix AND the Show discontinued toggle is on.
-  const discontinuedItems = useMemo(() => {
-    if (!activePlan || shelfId !== 'future' || !showDiscontinued) return [];
-    const futureProductIds = new Set(activePlan.futureShelf.items.map((i) => i.productId));
-    return activePlan.currentShelf.items.filter((item) => {
-      if (item.isPlaceholder || !item.productId) return false;
-      return !futureProductIds.has(item.productId);
-    });
-  }, [activePlan, shelfId, showDiscontinued]);
+  // Discontinued items: products that were in the PREVIOUS stage but
+  // are not in THIS stage. For stage 0 (current) there's no previous,
+  // so no discontinued items.
+  const previousStage = useMemo(() => {
+    const idx = stages.findIndex((s) => s.key === shelfId);
+    return idx > 0 ? stages[idx - 1] : null;
+  }, [stages, shelfId]);
 
-  // Group discontinued items by the cell they occupied in the CURRENT
-  // shelf's matrix so we can render them as ghost cards in the future
-  // matrix at their original (row, col) positions.
+  const discontinuedItems = useMemo(() => {
+    if (!previousStage || !shelf || !showDiscontinued) return [];
+    const thisProductIds = new Set(shelf.items.map((i) => i.productId));
+    return previousStage.shelf.items.filter((item) => {
+      if (item.isPlaceholder || !item.productId) return false;
+      return !thisProductIds.has(item.productId);
+    });
+  }, [previousStage, shelf, showDiscontinued]);
+
+  // Group discontinued items by the cell they occupied in the PREVIOUS
+  // stage's matrix so we can render them as ghost cards in this matrix
+  // at their original (row, col) positions.
   const discontinuedByCell = useMemo(() => {
     const map = new Map<string, ShelfItem[]>();
-    if (discontinuedItems.length === 0 || !activePlan) return map;
-    const currentLayout = activePlan.currentShelf.matrixLayout;
-    if (!currentLayout) return map;
+    if (discontinuedItems.length === 0 || !previousStage) return map;
+    const prevLayout = previousStage.shelf.matrixLayout;
+    if (!prevLayout) return map;
     const byId = new Map<string, ShelfItem>(discontinuedItems.map((i) => [i.id, i]));
-    for (const a of currentLayout.assignments) {
+    for (const a of prevLayout.assignments) {
       const item = byId.get(a.itemId);
       if (!item) continue;
       const key = `${a.row}-${a.col}`;
@@ -806,7 +815,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       map.set(key, arr);
     }
     return map;
-  }, [discontinuedItems, activePlan]);
+  }, [discontinuedItems, previousStage]);
 
   return (
     <div className="range-design">
