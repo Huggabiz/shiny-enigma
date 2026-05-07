@@ -1306,11 +1306,36 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setMatrixAssignment: (shelfId, itemId, row, col) => {
     const { project } = get();
     if (!project) return;
-    set({ project: updateShelf(project, shelfId, (shelf) => {
+    let updated = updateShelf(project, shelfId, (shelf) => {
       const layout = shelf.matrixLayout || { title: '', xLabels: [], yLabels: [], assignments: [] };
       const filtered = layout.assignments.filter((a) => a.itemId !== itemId);
       return { ...shelf, matrixLayout: { ...layout, assignments: [...filtered, { itemId, row, col }] } };
-    })});
+    });
+
+    // Cascade the matrix placement forward: if subsequent stages
+    // have the same product (matched by productId) and that item
+    // isn't already placed in the matrix, give it the same (row, col).
+    const plan = getActivePlan(updated);
+    if (plan) {
+      const stageList = getStages(plan, updated);
+      const sourceIdx = stageList.findIndex((s) => s.key === shelfId);
+      const sourceItem = stageList[sourceIdx]?.shelf.items.find((i) => i.id === itemId);
+      if (sourceItem?.productId) {
+        for (let i = sourceIdx + 1; i < stageList.length; i++) {
+          const stage = stageList[i];
+          const match = stage.shelf.items.find((si) => si.productId === sourceItem.productId);
+          if (!match) continue;
+          const alreadyPlaced = stage.shelf.matrixLayout?.assignments.some((a) => a.itemId === match.id);
+          if (alreadyPlaced) continue;
+          updated = updateShelf(updated, stage.key, (shelf) => {
+            const ml = shelf.matrixLayout || { title: '', xLabels: [], yLabels: [], assignments: [] };
+            return { ...shelf, matrixLayout: { ...ml, assignments: [...ml.assignments, { itemId: match.id, row, col }] } };
+          });
+        }
+      }
+    }
+
+    set({ project: updated });
     get().reorderShelfByMatrix(shelfId);
   },
 
