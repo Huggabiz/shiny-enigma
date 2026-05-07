@@ -55,6 +55,9 @@ function App() {
     activeVariantId,
     showGhosted,
     setShowGhosted,
+    transformFromKey,
+    transformToKey,
+    setTransformStages,
     showDiscontinued,
     setShowDiscontinued,
     renamePlan,
@@ -69,6 +72,17 @@ function App() {
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
+  const stages = useMemo(() => activePlan ? getStages(activePlan) : [], [activePlan]);
+  // Resolve transform view from/to stages — fall back to first/last
+  // if the stored keys don't match (e.g. after stage deletion).
+  const transformFrom = useMemo(
+    () => stages.find((s) => s.key === transformFromKey) ?? stages[0],
+    [stages, transformFromKey],
+  );
+  const transformTo = useMemo(
+    () => stages.find((s) => s.key === transformToKey) ?? stages[stages.length - 1],
+    [stages, transformToKey],
+  );
 
   const [showImport, setShowImport] = useState(false);
   const [showNewProject, setShowNewProject] = useState(!project);
@@ -530,6 +544,53 @@ function App() {
             onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
             <div className="shelves-area">
               <div className="transform-title-bar">
+                {/* Stage from/to selectors — same visual language as the
+                    range view's multi-step tab selector but with two
+                    dropdowns so the user picks any from→to pair. */}
+                <div className="transform-stage-selectors">
+                  <label className="transform-stage-label">
+                    From
+                    <select
+                      className="transform-stage-select"
+                      value={transformFrom?.key ?? 'current'}
+                      onChange={(e) => {
+                        const fromIdx = stages.findIndex((s) => s.key === e.target.value);
+                        const toIdx = stages.findIndex((s) => s.key === (transformTo?.key ?? 'future'));
+                        // Enforce from < to in stage order
+                        if (fromIdx >= toIdx && fromIdx < stages.length - 1) {
+                          setTransformStages(e.target.value, stages[fromIdx + 1].key);
+                        } else {
+                          setTransformStages(e.target.value, transformTo?.key ?? 'future');
+                        }
+                      }}
+                    >
+                      {stages.slice(0, -1).map((s) => (
+                        <option key={s.key} value={s.key}>{s.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <span className="transform-stage-arrow">→</span>
+                  <label className="transform-stage-label">
+                    To
+                    <select
+                      className="transform-stage-select"
+                      value={transformTo?.key ?? 'future'}
+                      onChange={(e) => {
+                        const toIdx = stages.findIndex((s) => s.key === e.target.value);
+                        const fromIdx = stages.findIndex((s) => s.key === (transformFrom?.key ?? 'current'));
+                        if (toIdx <= fromIdx && toIdx > 0) {
+                          setTransformStages(stages[toIdx - 1].key, e.target.value);
+                        } else {
+                          setTransformStages(transformFrom?.key ?? 'current', e.target.value);
+                        }
+                      }}
+                    >
+                      {stages.slice(1).map((s) => (
+                        <option key={s.key} value={s.key}>{s.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
                 <div className="transform-title-actions">
                   {activeVariant && (
                     <label className="ghost-toggle" title="Show products not in this variant">
@@ -559,14 +620,17 @@ function App() {
                       />
                 </div>
 
-                <Shelf shelf={activePlan.currentShelf} catalogue={project!.catalogue}
-                  onAddPlaceholder={() => handleAddPlaceholder('current')}
-                  onRailWidthChange={handleRailWidthChange}
-                  onDoubleClickItem={handleCurrentDoubleClick}
-                  variantIncludedIds={variantCurrentIds}
-                  showGhosted={showGhosted} />
+                {/* From stage — top shelf */}
+                {transformFrom && (
+                  <Shelf shelf={transformFrom.shelf} catalogue={project!.catalogue}
+                    onAddPlaceholder={() => handleAddPlaceholder(transformFrom.key === 'current' ? 'current' : 'future')}
+                    onRailWidthChange={handleRailWidthChange}
+                    onDoubleClickItem={handleCurrentDoubleClick}
+                    variantIncludedIds={variantCurrentIds}
+                    showGhosted={showGhosted} />
+                )}
 
-                <SankeyFlow currentShelf={activePlan.currentShelf} futureShelf={activePlan.futureShelf}
+                <SankeyFlow currentShelf={transformFrom?.shelf ?? activePlan.currentShelf} futureShelf={transformTo?.shelf ?? activePlan.futureShelf}
                   links={activePlan.sankeyLinks} catalogue={project!.catalogue}
                   railWidth={shelfRailWidth}
                   variantCurrentIds={variantCurrentIds} variantFutureIds={variantFutureIds}
@@ -575,15 +639,18 @@ function App() {
                   showDiscontinued={showDiscontinued}
                   onClickFlow={handleSankeyClick} />
 
-                <Shelf shelf={activePlan.futureShelf} catalogue={project!.catalogue}
-                  onAddPlaceholder={() => handleAddPlaceholder('future')}
-                  onDoubleClickItem={handleFutureDoubleClick}
-                  variantIncludedIds={variantFutureIds}
-                  showGhosted={showGhosted}
-                  editableFuturePricing={true}
-                  discontinuedItems={discontinuedItems}
-                  showDiscontinued={showDiscontinued}
-                  flipped={true} />
+                {/* To stage — bottom shelf */}
+                {transformTo && (
+                  <Shelf shelf={transformTo.shelf} catalogue={project!.catalogue}
+                    onAddPlaceholder={() => handleAddPlaceholder(transformTo.key === 'current' ? 'current' : 'future')}
+                    onDoubleClickItem={handleFutureDoubleClick}
+                    variantIncludedIds={variantFutureIds}
+                    showGhosted={showGhosted}
+                    editableFuturePricing={transformTo.position !== 'current'}
+                    discontinuedItems={discontinuedItems}
+                    showDiscontinued={showDiscontinued}
+                    flipped={true} />
+                )}
                   </div>
                   </div>
                 </div>

@@ -6,6 +6,7 @@ import { exportToPptx } from '../utils/exportPptx';
 import { exportToExcel } from '../utils/exportExcel';
 import { APP_VERSION } from '../version';
 import { ImportProjectDialog } from './ImportProjectDialog';
+import { StageManagerDialog } from './StageManagerDialog';
 import './Toolbar.css';
 
 interface ToolbarProps {
@@ -52,6 +53,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
   const appendRef = useRef<HTMLInputElement>(null);
   const [openMenu, setOpenMenu] = useState<'save' | 'manage' | 'format' | null>(null);
   const [appendPreview, setAppendPreview] = useState<{ fileName: string; preview: ImportPlanPreview } | null>(null);
+  const [showStageManager, setShowStageManager] = useState(false);
 
   const closeMenus = () => setOpenMenu(null);
 
@@ -222,6 +224,8 @@ export function Toolbar({ activeView }: ToolbarProps) {
               </button>
               {openMenu === 'manage' && (
                 <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
+                  <button onClick={() => { closeMenus(); setShowStageManager(true); }}>Manage Stages</button>
+                  <hr />
                   <button onClick={() => {
                     if (confirm('Clear all ranges? Products removed from both shelves. Catalogue and matrix labels kept.')) clearRanges();
                     closeMenus();
@@ -264,6 +268,9 @@ export function Toolbar({ activeView }: ToolbarProps) {
           fileName={appendPreview.fileName}
           onClose={() => setAppendPreview(null)}
         />
+      )}
+      {showStageManager && (
+        <StageManagerDialog onClose={() => setShowStageManager(false)} />
       )}
     </div>
   );

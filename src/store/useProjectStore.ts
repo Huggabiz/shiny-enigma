@@ -36,8 +36,14 @@ interface ProjectStore {
   // Views — lifted out of App local state so the export loop can drive them
   activeView: 'transform' | 'range-design' | 'multiplan' | 'forecast-lab';
   designShelfId: string;
+  /** Transform view stage selection — which two stages to compare.
+   * Defaults to 'current' and 'future'. Must satisfy from < to in
+   * the getStages() order. */
+  transformFromKey: string;
+  transformToKey: string;
   setActiveView: (view: 'transform' | 'range-design' | 'multiplan' | 'forecast-lab') => void;
   setDesignShelfId: (shelfId: string) => void;
+  setTransformStages: (fromKey: string, toKey: string) => void;
 
   // Slide canvas size — baseScale grows the logical canvas so more content
   // fits without shrinking; zoom is a visual multiplier for navigation.
@@ -187,8 +193,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   activeView: 'range-design',
   designShelfId: 'current',
+  transformFromKey: 'current',
+  transformToKey: 'future',
   setActiveView: (view) => set({ activeView: view }),
   setDesignShelfId: (shelfId) => set({ designShelfId: shelfId }),
+  setTransformStages: (fromKey, toKey) => set({ transformFromKey: fromKey, transformToKey: toKey }),
 
   slideBaseScale: 1,
   slideBaseScaleMode: 'auto',
