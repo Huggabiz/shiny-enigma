@@ -29,7 +29,7 @@ import { PlaceholderDialog } from './components/PlaceholderDialog';
 import { EditableTitle } from './components/EditableTitle';
 import { useProjectStore } from './store/useProjectStore';
 import { getActivePlan, getStages } from './types';
-import type { Product, ShelfItem, PlaceholderData } from './types';
+import type { Product, ShelfItem, PlaceholderData, SankeyLink } from './types';
 import { SlideCanvasControls, fitSlideToWidth } from './components/SlideCanvasControls';
 import { resolvePlanSlideSize } from './utils/slideSize';
 import { resolveEffectiveCardFormat } from './utils/cardFormat';
@@ -284,6 +284,36 @@ function App() {
       return !toProductIds.has(item.productId);
     });
   }, [transformFrom, transformTo]);
+
+  // Effective sankey links for the selected stage pair. When viewing
+  // the original current→future pair, use the plan's real sankey links.
+  // For any other pair (involving intermediate stages), generate implied
+  // connections by matching productId between the two shelves — every
+  // product in both stages gets a 100% "continuity" link.
+  const effectiveSankeyLinks = useMemo(() => {
+    if (!activePlan || !transformFrom || !transformTo) return [];
+    const isDefault = transformFrom.key === 'current' && transformTo.key === 'future';
+    if (isDefault) return activePlan.sankeyLinks;
+    // Generate implied links by matching productId
+    const implied: SankeyLink[] = [];
+    for (const fromItem of transformFrom.shelf.items) {
+      if (!fromItem.productId || fromItem.isPlaceholder) continue;
+      const toItem = transformTo.shelf.items.find(
+        (ti) => ti.productId === fromItem.productId && !ti.isPlaceholder,
+      );
+      if (toItem) {
+        const product = project!.catalogue.find((p) => p.id === fromItem.productId);
+        implied.push({
+          sourceItemId: fromItem.id,
+          targetItemId: toItem.id,
+          percent: 100,
+          volume: product?.volume ?? 0,
+          type: 'transfer',
+        });
+      }
+    }
+    return implied;
+  }, [activePlan, transformFrom, transformTo, project]);
 
   // In forecast mode, linkSource stores the TO-stage item being
   // forecasted. Look it up in the transform TO stage's shelf.
@@ -634,7 +664,7 @@ function App() {
                 )}
 
                 <SankeyFlow currentShelf={transformFrom?.shelf ?? activePlan.currentShelf} futureShelf={transformTo?.shelf ?? activePlan.futureShelf}
-                  links={activePlan.sankeyLinks} catalogue={project!.catalogue}
+                  links={effectiveSankeyLinks} catalogue={project!.catalogue}
                   railWidth={shelfRailWidth}
                   variantCurrentIds={variantCurrentIds} variantFutureIds={variantFutureIds}
                   showGhosted={showGhosted}
