@@ -8,6 +8,34 @@ export interface FuturePricing {
 
 export type SapCollection = 'Core' | 'Duo';
 
+/** Per-warehouse volume breakdown. The five warehouses are:
+ *   UK  — domestic UK warehouse
+ *   EU  — European distribution
+ *   AUS — Australia
+ *   US  — United States
+ *   CN  — China / distribution hub
+ * All values are optional; the total `volume` on Product is the sum
+ * of whichever warehouses are populated (or the legacy single-value
+ * import when warehouse columns aren't present). */
+export interface WarehouseVolumes {
+  uk?: number;
+  eu?: number;
+  aus?: number;
+  us?: number;
+  cn?: number;
+}
+
+export const WAREHOUSE_KEYS = ['uk', 'eu', 'aus', 'us', 'cn'] as const;
+export type WarehouseKey = typeof WAREHOUSE_KEYS[number];
+
+export const WAREHOUSE_LABELS: Record<WarehouseKey, string> = {
+  uk: 'UK',
+  eu: 'EU',
+  aus: 'AUS',
+  us: 'US',
+  cn: 'CN',
+};
+
 // Core product type matching the data schema
 export interface Product {
   id: string;
@@ -17,8 +45,12 @@ export interface Product {
   subCategory: string;
   productFamily: string;
   sapCollection?: SapCollection;  // "Collection" column from the SAP export
-  volume: number;           // last year's volume (actual)
-  forecastVolume?: number;  // next year's volume (forecast)
+  volume: number;           // last year's volume (actual) — total across all warehouses
+  /** Per-warehouse volume breakdown. When populated, `volume` is the
+   * sum. When absent (legacy imports), `volume` is the single value
+   * from the "Volume" column and no breakdown is available. */
+  warehouseVolumes?: WarehouseVolumes;
+  forecastVolume?: number;  // next year's volume (forecast) — legacy; tool builds its own now
   rrp: number;              // UK RRP
   usRrp?: number;
   euRrp?: number;
@@ -43,6 +75,7 @@ export interface PlaceholderData {
   productFamily: string;
   sapCollection?: SapCollection;
   volume: number;
+  warehouseVolumes?: WarehouseVolumes;
   forecastVolume?: number;
   rrp: number;
   usRrp?: number;
@@ -468,6 +501,11 @@ export interface ColumnMapping {
   productFamily: string;
   sapCollection: string;
   volume: string;
+  volumeUk: string;
+  volumeEu: string;
+  volumeAus: string;
+  volumeUs: string;
+  volumeCn: string;
   forecastVolume: string;
   rrp: string;
   usRrp: string;
@@ -487,6 +525,11 @@ export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
   productFamily: 'Product Family',
   sapCollection: 'SAP Collection',
   volume: 'Volume',
+  volumeUk: 'Volume UK',
+  volumeEu: 'Volume EU',
+  volumeAus: 'Volume AUS',
+  volumeUs: 'Volume US',
+  volumeCn: 'Volume CN',
   forecastVolume: 'Forecast Volume',
   rrp: 'RRP',
   usRrp: 'US RRP',

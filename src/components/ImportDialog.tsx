@@ -23,23 +23,54 @@ const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: str
     aliases: ['collection', 'sap collection'],
   },
   volume: {
-    label: 'Volume',
-    hint: 'Last year\'s actual sales volume (numeric)',
-    required: true,
+    label: 'Volume (Total)',
+    hint: 'Total last-year volume — used when per-warehouse columns are not present',
+    required: false,
     aliases: [
       'units', 'actual volume', 'ly volume', 'last year volume',
       '12m vol q ly', '12m volume ly', 'vol ly', 'volume ly',
+      'total volume',
     ],
   },
+  volumeUk: {
+    label: 'Volume UK',
+    hint: 'UK warehouse volume (numeric)',
+    required: false,
+    aliases: ['volume uk', 'vol uk', 'uk vol', 'uk volume', 'uk units'],
+  },
+  volumeEu: {
+    label: 'Volume EU',
+    hint: 'EU warehouse volume (numeric)',
+    required: false,
+    aliases: ['volume eu', 'vol eu', 'eu vol', 'eu volume', 'eu units', 'europe volume'],
+  },
+  volumeAus: {
+    label: 'Volume AUS',
+    hint: 'Australia warehouse volume (numeric)',
+    required: false,
+    aliases: ['volume aus', 'vol aus', 'aus vol', 'aus volume', 'aus units', 'australia volume'],
+  },
+  volumeUs: {
+    label: 'Volume US',
+    hint: 'US warehouse volume (numeric)',
+    required: false,
+    aliases: ['volume us', 'vol us', 'us vol', 'us volume', 'us units', 'usa volume'],
+  },
+  volumeCn: {
+    label: 'Volume CN',
+    hint: 'CN (China/distribution) warehouse volume (numeric)',
+    required: false,
+    aliases: ['volume cn', 'vol cn', 'cn vol', 'cn volume', 'cn units', 'china volume'],
+  },
+  // forecastVolume removed from import — the tool builds its own
+  // forecast via the Forecast Lab. The entry stays for type-compat
+  // with Record<keyof ColumnMapping> but `hidden: true` keeps it
+  // out of the UI and the parser ignores it.
   forecastVolume: {
     label: 'Forecast Volume',
-    hint: 'Next year\'s forecast sales volume (numeric)',
+    hint: '(No longer imported — tool builds its own forecast)',
     required: false,
-    aliases: [
-      'forecast', 'forecasted volume', 'ny volume', 'next year volume', 'projected volume',
-      '12m vol q / yr1 fc', '12m vol q yr1 fc', 'vol yr1 fc', 'volume yr1 fc',
-      'yr1 fc volume', 'fc volume',
-    ],
+    aliases: [],
   },
   rrp: { label: 'UK RRP', hint: 'UK recommended retail price (numeric)', required: false, aliases: ['rrp', 'uk rrp', 'rrp uk', 'rrp uk (gbp)', 'rrp (gbp)', 'uk rrp (gbp)', 'gbp rrp'] },
   usRrp: { label: 'US RRP', hint: 'US recommended retail price (numeric)', required: false, aliases: ['us rrp', 'usa rrp', 'rrp us', 'rrp us (usd)', 'rrp (usd)', 'us rrp (usd)', 'usd rrp'] },
