@@ -9,7 +9,7 @@ import { ImportProjectDialog } from './ImportProjectDialog';
 import './Toolbar.css';
 
 interface ToolbarProps {
-  activeView?: 'transform' | 'range-design' | 'multiplan';
+  activeView?: 'transform' | 'range-design' | 'multiplan' | 'forecast-lab';
 }
 
 export function Toolbar({ activeView }: ToolbarProps) {

@@ -1,0 +1,478 @@
+/* Forecast Lab — full-width two-panel view: SKU list on the left,
+   pipeline canvas on the right. */
+.forecast-lab {
+  flex: 1;
+  display: flex;
+  background: #f5f5f5;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.forecast-lab-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  font-size: 14px;
+}
+
+/* ---- SKU list (left panel) ---- */
+.flab-sku-list {
+  width: 240px;
+  min-width: 240px;
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.flab-sku-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.flab-sku-list-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.flab-dev-toggle {
+  font-size: 10px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.flab-dev-toggle input { accent-color: #1976d2; width: 13px; height: 13px; }
+
+.flab-sku-list-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.flab-sku-row {
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  border: 1px solid transparent;
+}
+
+.flab-sku-row:hover { background: #f5f5f5; }
+.flab-sku-row.active { background: #f3e5f5; border-color: #ce93d8; }
+
+.flab-sku-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flab-sku-meta {
+  font-size: 10px;
+  color: #999;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flab-sku-badge {
+  color: #7b1fa2;
+  font-weight: 700;
+}
+
+.flab-sku-empty {
+  padding: 20px;
+  text-align: center;
+  color: #bbb;
+  font-size: 12px;
+}
+
+/* ---- Pipeline canvas (right area) ---- */
+.flab-canvas {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px;
+  min-width: 0;
+}
+
+.flab-canvas-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #888;
+}
+.flab-canvas-empty h3 { margin: 0 0 8px; font-size: 18px; color: #1a1a2e; }
+.flab-canvas-empty p { margin: 0; font-size: 13px; max-width: 360px; }
+
+.flab-canvas-header {
+  margin-bottom: 20px;
+}
+.flab-canvas-header h2 { margin: 0; font-size: 18px; font-weight: 700; color: #1a1a2e; }
+.flab-canvas-sku { font-size: 12px; color: #888; font-family: ui-monospace, monospace; }
+
+/* ---- Pipeline sections ---- */
+.flab-pipeline {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.flab-section {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 260px;
+}
+
+.flab-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 10px;
+}
+
+/* ---- Lane (reference → modifiers → output) ---- */
+.flab-lane {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.flab-lane:last-of-type { border-bottom: none; }
+
+.flab-ref-card {
+  background: #f9f0ff;
+  border: 1px solid #ce93d8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 160px;
+  position: relative;
+}
+
+.flab-ref-type {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #7b1fa2;
+  margin-bottom: 2px;
+}
+
+.flab-ref-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flab-ref-vol {
+  font-size: 10px;
+  color: #888;
+}
+
+.flab-ref-take {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #555;
+}
+
+.flab-ref-take-vol {
+  font-weight: 600;
+  color: #7b1fa2;
+}
+
+.flab-ref-type-toggle, .flab-ref-remove {
+  position: absolute;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  font-size: 10px;
+  color: #999;
+}
+.flab-ref-card:hover .flab-ref-type-toggle,
+.flab-ref-card:hover .flab-ref-remove { opacity: 1; }
+.flab-ref-type-toggle { top: 4px; right: 20px; }
+.flab-ref-type-toggle:hover { color: #7b1fa2; }
+.flab-ref-remove { top: 4px; right: 4px; }
+.flab-ref-remove:hover { color: #c62828; }
+
+.flab-lane-arrow {
+  color: #bbb;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.flab-lane-output {
+  font-size: 13px;
+  font-weight: 700;
+  color: #7b1fa2;
+  white-space: nowrap;
+}
+
+/* ---- Modifier block ---- */
+.flab-mod-block {
+  background: #fff3e0;
+  border: 1px solid #ffe0b2;
+  border-radius: 6px;
+  padding: 6px 8px;
+  min-width: 100px;
+}
+
+.flab-mod-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #e65100;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.flab-mod-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flab-num-input {
+  width: 50px;
+  padding: 2px 4px;
+  font-size: 11px;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  text-align: right;
+  outline: none;
+}
+.flab-num-input:focus { border-color: #7b1fa2; }
+
+.flab-mod-pct {
+  font-size: 10px;
+  color: #999;
+}
+
+.flab-mod-remove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #ccc;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+.flab-mod-remove:hover { color: #c62828; }
+
+/* ---- Add modifier ---- */
+.flab-add-mod-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.flab-add-mod {
+  width: 24px;
+  height: 24px;
+  border: 1px dashed #bbb;
+  background: #fafafa;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.flab-add-mod:hover { border-color: #7b1fa2; color: #7b1fa2; background: #f9f0ff; }
+
+.flab-add-mod-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  padding: 4px;
+  min-width: 180px;
+  margin-top: 4px;
+}
+
+.flab-add-mod-dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  color: #333;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.flab-add-mod-dropdown button:hover { background: #f5f5f5; }
+
+/* ---- Add reference ---- */
+.flab-add-ref {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f9f0ff;
+  color: #7b1fa2;
+  border: 1px dashed #ce93d8;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.flab-add-ref:hover { background: #f3e5f5; }
+
+/* ---- Reference picker ---- */
+.flab-ref-picker {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  margin-top: 8px;
+  overflow: hidden;
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.flab-ref-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.flab-ref-picker-search {
+  flex: 1;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  outline: none;
+}
+.flab-ref-picker-search:focus { border-color: #7b1fa2; }
+
+.flab-ref-picker-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.flab-ref-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.flab-ref-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+.flab-ref-picker-row:hover { background: #f5f5f5; }
+
+.flab-ref-picker-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.flab-ref-picker-name { font-size: 11px; font-weight: 600; color: #333; }
+.flab-ref-picker-sku { font-size: 9px; color: #999; }
+.flab-ref-picker-vol { font-size: 9px; color: #888; }
+
+.flab-ref-picker-btn {
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 600;
+  border: 1px solid #ce93d8;
+  background: #f9f0ff;
+  color: #7b1fa2;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.flab-ref-picker-btn:hover { background: #f3e5f5; }
+
+.flab-ref-picker-empty {
+  padding: 16px;
+  text-align: center;
+  color: #bbb;
+  font-size: 11px;
+}
+
+/* ---- Merge + forecast badges ---- */
+.flab-merge-line {
+  padding: 10px 0;
+  text-align: center;
+}
+
+.flab-merge-label {
+  font-size: 12px;
+  color: #555;
+}
+.flab-merge-label strong { color: #7b1fa2; }
+
+.flab-forecast-badge {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.flab-forecast-badge.clean {
+  background: #f3e5f5;
+  color: #4a148c;
+}
+.flab-forecast-badge.clean strong { font-size: 16px; }
+
+.flab-forecast-badge.year1 {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+.flab-forecast-badge.year1 strong { font-size: 16px; }
+
+/* ---- Target section ---- */
+.flab-target-section {
+  border-color: #ce93d8;
+  background: #fdf8ff;
+}
+
+.flab-post-section {
+  border-color: #a5d6a7;
+  background: #f8fdf8;
+}

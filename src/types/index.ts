@@ -73,6 +73,9 @@ export interface ShelfItem {
    * forecast volume is derived from sankey inbound volume multiplied
    * by these factors + organic growth. See ForecastConfig. */
   forecastConfig?: ForecastConfig;
+  /** Full forecast pipeline for this future-shelf item. See
+   * ForecastPipeline type and utils/forecastCalc.ts. */
+  forecastPipeline?: ForecastPipeline;
 }
 
 /** Per-item forecast adjustments applied ON TOP of the sankey-derived
@@ -104,6 +107,96 @@ export const DEFAULT_FORECAST_CONFIG: ForecastConfig = {
   rrpEffectPct: 100,
   organicGrowth: 0,
 };
+
+// ---------------------------------------------------------------
+// Forecast Lab pipeline model
+//
+// Each future-shelf item can have an optional ForecastPipeline that
+// models the full forecast derivation as a left-to-right flow:
+//
+//   [References] → [Lane modifiers] → merge → [Product modifiers]
+//                                             → [Post-launch modifiers]
+//                                             → Clean forecast / Year 1 forecast
+//
+// References are either cannibalization sources (volume the new
+// product takes from an existing SKU) or analog references (a
+// benchmark product expected to perform similarly). Each reference
+// feeds a "lane" with its own modifier chain. Lanes merge at the
+// target product via a sum. Product-level modifiers then apply
+// (e.g. "hero factor"), giving the clean/steady-state forecast.
+// Post-launch modifiers (ramp, distribution limit) give the Year 1
+// forecast. See computePipelineForecast() in utils/forecastCalc.ts.
+// ---------------------------------------------------------------
+
+export type ForecastModifierType =
+  | 'volumeCorrection'
+  | 'channelGrowth'
+  | 'rrpSensitivity'
+  | 'heroFactor'
+  | 'takeRate'
+  | 'ramp'
+  | 'distribution';
+
+export interface ForecastModifier {
+  id: string;
+  type: ForecastModifierType;
+  label: string;
+  /** The adjustment value — interpretation depends on the modifier
+   * type but all standard types are multiplicative percentages.
+   * 100 = no effect, 85 = −15%, 120 = +20%. */
+  value: number;
+}
+
+export interface ForecastReference {
+  id: string;
+  /** Catalogue product id for the reference product. */
+  productId: string;
+  type: 'cannibalization' | 'analog';
+  /** % of the reference product's volume to use as the lane's
+   * starting input. 30 = "take 30% of this product's volume". */
+  takePercent: number;
+}
+
+export interface ForecastLane {
+  /** Which ForecastReference this lane belongs to. */
+  referenceId: string;
+  /** Ordered chain of modifiers in this lane. Applied left-to-right
+   * before the lane output merges into the target. */
+  modifiers: ForecastModifier[];
+}
+
+export interface ForecastPipeline {
+  references: ForecastReference[];
+  lanes: ForecastLane[];
+  /** Modifiers that apply to the merged volume AT the target product
+   * (e.g. hero factor, category adjustment). Applied after the lane
+   * merge to give the "clean forecast". */
+  productModifiers: ForecastModifier[];
+  /** Sequential post-launch modifiers (ramp, distribution). Applied
+   * after the product modifiers to give the "Year 1 forecast". */
+  postModifiers: ForecastModifier[];
+}
+
+/** Metadata for each standard modifier type — used by the UI to
+ * populate the "add modifier" dropdown and show descriptions. */
+export interface ModifierTypeDef {
+  type: ForecastModifierType;
+  label: string;
+  description: string;
+  defaultValue: number;
+  /** Where this modifier type can be placed in the pipeline. */
+  placement: Array<'lane' | 'product' | 'post'>;
+}
+
+export const MODIFIER_TYPE_DEFS: ModifierTypeDef[] = [
+  { type: 'volumeCorrection', label: 'Volume Correction', description: 'Adjust for one-off events (e.g. a promo that won\'t repeat)', defaultValue: 100, placement: ['lane'] },
+  { type: 'channelGrowth', label: 'Channel Growth', description: 'Expected growth from increased sales distribution', defaultValue: 100, placement: ['lane', 'product'] },
+  { type: 'rrpSensitivity', label: 'RRP Sensitivity', description: 'Price effect on volume', defaultValue: 100, placement: ['lane', 'product'] },
+  { type: 'takeRate', label: 'Take Rate', description: 'Additional % adjustment on the reference take', defaultValue: 100, placement: ['lane'] },
+  { type: 'heroFactor', label: 'Hero / Category Factor', description: 'Product-level performance multiplier', defaultValue: 100, placement: ['product'] },
+  { type: 'ramp', label: 'Launch Ramp', description: 'First-period volume as % of steady state', defaultValue: 40, placement: ['post'] },
+  { type: 'distribution', label: 'Distribution Limit', description: '% of channels / customers launching in', defaultValue: 100, placement: ['post'] },
+];
 
 // A labelled section on a shelf
 export interface ShelfLabel {

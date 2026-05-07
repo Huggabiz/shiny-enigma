@@ -1,7 +1,7 @@
 import { useProjectStore } from '../store/useProjectStore';
 import './NavSidebar.css';
 
-export type ViewType = 'transform' | 'range-design' | 'multiplan';
+export type ViewType = 'transform' | 'range-design' | 'multiplan' | 'forecast-lab';
 
 interface NavSidebarProps {
   activeView: ViewType;
@@ -47,6 +47,14 @@ export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
       >
         <span className="nav-icon">⇄</span>
         <span className="nav-label">Transform</span>
+      </button>
+      <button
+        className={`nav-item ${activeView === 'forecast-lab' ? 'active' : ''}`}
+        onClick={() => onViewChange('forecast-lab')}
+        title="Forecast Lab — build SKU-level forecasts"
+      >
+        <span className="nav-icon">📊</span>
+        <span className="nav-label">Forecast</span>
       </button>
     </div>
   );

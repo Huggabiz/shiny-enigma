@@ -34,9 +34,9 @@ interface ProjectStore {
   setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean }>) => void;
 
   // Views — lifted out of App local state so the export loop can drive them
-  activeView: 'transform' | 'range-design' | 'multiplan';
+  activeView: 'transform' | 'range-design' | 'multiplan' | 'forecast-lab';
   designShelfId: 'current' | 'future';
-  setActiveView: (view: 'transform' | 'range-design' | 'multiplan') => void;
+  setActiveView: (view: 'transform' | 'range-design' | 'multiplan' | 'forecast-lab') => void;
   setDesignShelfId: (shelfId: 'current' | 'future') => void;
 
   // Slide canvas size — baseScale grows the logical canvas so more content
@@ -145,6 +145,9 @@ interface ProjectStore {
   clearLinks: () => void;
   copyCurrentToFuture: () => void;
   reorderShelfByMatrix: (shelfId: string) => void;
+
+  // Forecast pipeline (operate on active plan's future shelf)
+  setForecastPipeline: (itemId: string, pipeline: import('../types').ForecastPipeline | undefined) => void;
 
   // Matrix layout (operate on active plan)
   updateMatrixLayout: (shelfId: string, layout: Partial<import('../types').MatrixLayout>) => void;
@@ -1092,6 +1095,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }).map((item, idx) => ({ ...item, position: idx }));
 
     set({ project: updateShelf(project, shelfId, () => ({ ...shelf, items: sorted })) });
+  },
+
+  // Forecast pipeline — stored on future-shelf ShelfItems.
+  setForecastPipeline: (itemId, pipeline) => {
+    const { project } = get();
+    if (!project) return;
+    set({
+      project: updateShelf(project, 'future', (shelf) => ({
+        ...shelf,
+        items: shelf.items.map((i) =>
+          i.id === itemId ? { ...i, forecastPipeline: pipeline } : i,
+        ),
+      })),
+    });
   },
 
   // Matrix layout
