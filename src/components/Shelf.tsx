@@ -14,6 +14,9 @@ import './Shelf.css';
 
 interface ShelfProps {
   shelf: ShelfType;
+  /** Stage key ('current', 'future', or 'stage-<defId>') used to
+   * identify this shelf for store operations and UI logic. */
+  stageKey?: string;
   catalogue: Product[];
   onAddPlaceholder: () => void;
   onRailWidthChange?: (width: number) => void;
@@ -27,7 +30,13 @@ interface ShelfProps {
   flipped?: boolean;
 }
 
-export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp, editableFuturePricing, discontinuedItems, showDiscontinued, flipped }: ShelfProps) {
+export function Shelf({ shelf, stageKey, catalogue, onAddPlaceholder, onRailWidthChange, onDoubleClickItem, onViewDesign, variantIncludedIds, showGhosted: showGhostedProp, editableFuturePricing, discontinuedItems, showDiscontinued, flipped }: ShelfProps) {
+  // Resolve the effective stage key — falls back to shelf.id for
+  // backwards compat (the current and future shelves have id ===
+  // 'current'/'future' which happen to match their stage keys).
+  const effectiveKey = stageKey ?? shelf.id;
+  const isFromStage = effectiveKey === 'current' || (!effectiveKey.startsWith('stage-') && effectiveKey !== 'future');
+  const isToStage = !isFromStage;
   const {
     selectedItemId,
     setSelectedItem,
@@ -51,9 +60,9 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
       // select it as the forecast target; click a CURRENT card to
       // create/remove a sankey link FROM that current card TO the
       // selected target. linkSource stores the FUTURE item id.
-      if (shelf.id === 'future') {
+      if (isToStage) {
         setLinkSource(item.id);
-      } else if (shelf.id === 'current' && linkSource) {
+      } else if (isFromStage && linkSource) {
         const plan = useProjectStore.getState().project ? getActivePlan(useProjectStore.getState().project!) : undefined;
         const existingLink = plan?.sankeyLinks.find(
           (l) => l.sourceItemId === item.id && l.targetItemId === linkSource,
@@ -220,12 +229,12 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
             // Current items stay un-dimmed so the user can click them to
             // add sources. (The old forward direction dimmed current items
             // except the selected source — that's reversed now.)
-            const isDimmed = isSourceSelected && shelf.id === 'future' && item.id !== linkSource;
+            const isDimmed = isSourceSelected && isToStage && item.id !== linkSource;
             // The forecast target itself gets the blue highlight.
             const isLinkHighlight = isSourceSelected && item.id === linkSource;
             // Green highlight on CURRENT cards that already have a sankey
             // link feeding into the forecast target.
-            const isForecastSource = isSourceSelected && shelf.id === 'current' &&
+            const isForecastSource = isSourceSelected && isFromStage &&
               !!(useProjectStore.getState().project && getActivePlan(useProjectStore.getState().project!)?.sankeyLinks.some(
                 (l) => l.sourceItemId === item.id && l.targetItemId === linkSource,
               ));
@@ -235,7 +244,7 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
             // sankey links + forecastConfig adjustments. Passed to ProductCard
             // so it can show "Fcst: <N>" instead of the raw catalogue volume.
             let computedForecast: number | undefined;
-            if (shelf.id === 'future') {
+            if (isToStage) {
               const plan = useProjectStore.getState().project ? getActivePlan(useProjectStore.getState().project!) : undefined;
               if (plan) {
                 const inbound = plan.sankeyLinks.filter((l) => l.targetItemId === item.id);
@@ -265,10 +274,10 @@ export function Shelf({ shelf, catalogue, onAddPlaceholder, onRailWidthChange, o
                 onDoubleClick={() => {
                   if (onDoubleClickItem) onDoubleClickItem(item.id);
                 }}
-                onRemove={() => removeItemFromShelf(shelf.id, item.id)}
+                onRemove={() => removeItemFromShelf(effectiveKey, item.id)}
                 cardWidth={cardWidth}
                 computedForecast={computedForecast}
-                isFutureShelf={shelf.id === 'future'}
+                isFutureShelf={isToStage}
               />
             );
           })}

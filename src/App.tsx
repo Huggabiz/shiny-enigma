@@ -44,12 +44,10 @@ function App() {
     removeItemFromShelf,
     reorderShelfItems,
     updateShelfItem,
-    addLink,
     linkMode,
     linkSource,
     setLinkMode,
     setLinkSource,
-    assumeContinuity,
     copyCurrentToFuture,
     showPlanTree,
     activeVariantId,
@@ -443,26 +441,36 @@ function App() {
   }, [activePlan, enterForecastModeFor]);
 
   // Drag handlers
+  // Stage-aware shelf helpers for drag-and-drop. Search across all
+  // stages (current + intermediates + future) to find which stage
+  // an item belongs to, and resolve a shelf from any stage key.
   const findShelfForItem = (itemId: string): string | null => {
-    if (!activePlan) return null;
-    if (activePlan.currentShelf.items.some((i) => i.id === itemId)) return 'current';
-    if (activePlan.futureShelf.items.some((i) => i.id === itemId)) return 'future';
+    if (!activePlan || !project) return null;
+    for (const stage of stages) {
+      if (stage.shelf.items.some((i) => i.id === itemId)) return stage.key;
+    }
     return null;
   };
 
   const getTargetShelfId = (overId: string): string | null => {
-    if (!activePlan) return null;
+    if (!activePlan || !project) return null;
     if (overId.startsWith('shelf-')) return overId.replace('shelf-', '');
     if (overId === 'catalogue-drop-zone') return null;
-    if (activePlan.currentShelf.items.some((i) => i.id === overId)) return 'current';
-    if (activePlan.futureShelf.items.some((i) => i.id === overId)) return 'future';
+    for (const stage of stages) {
+      if (stage.shelf.items.some((i) => i.id === overId)) return stage.key;
+    }
     return null;
   };
 
-  const isProductOnShelf = (productId: string, shelfId: string): boolean => {
-    if (!productId || !activePlan) return false;
-    const shelf = shelfId === 'current' ? activePlan.currentShelf : activePlan.futureShelf;
-    return shelf.items.some((item) => item.productId === productId);
+  const resolveShelf = (stageKey: string): import('./types').Shelf | null => {
+    const stage = stages.find((s) => s.key === stageKey);
+    return stage?.shelf ?? null;
+  };
+
+  const isProductOnShelf = (productId: string, stageKey: string): boolean => {
+    if (!productId) return false;
+    const shelf = resolveShelf(stageKey);
+    return shelf ? shelf.items.some((item) => item.productId === productId) : false;
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -474,7 +482,7 @@ function App() {
     }
     if (!activePlan) return;
     const sourceShelf = findShelfForItem(activeId);
-    const allItems = [...activePlan.currentShelf.items, ...activePlan.futureShelf.items];
+    const allItems = stages.flatMap((s) => s.shelf.items);
     const item = allItems.find((i) => i.id === activeId);
     if (item) {
       const product = project?.catalogue.find((p) => p.id === item.productId);
@@ -509,13 +517,11 @@ function App() {
       const data = active.data.current as { product: Product };
       if (!data?.product || !targetShelfId) return;
       if (isProductOnShelf(data.product.id, targetShelfId)) { showDuplicateWarning(data.product.name); return; }
+      const targetShelf = resolveShelf(targetShelfId);
       const newItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      addItemToShelf(targetShelfId, { id: newItemId, productId: data.product.id, position: activePlan[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length, isPlaceholder: false });
-      if (targetShelfId === 'current' && assumeContinuity && !isProductOnShelf(data.product.id, 'future')) {
-        const futureItemId = `item-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-        addItemToShelf('future', { id: futureItemId, productId: data.product.id, position: activePlan.futureShelf.items.length, isPlaceholder: false });
-        addLink({ sourceItemId: newItemId, targetItemId: futureItemId, percent: 100, volume: data.product.volume || 0, type: 'transfer' });
-      }
+      addItemToShelf(targetShelfId, { id: newItemId, productId: data.product.id, position: targetShelf?.items.length ?? 0, isPlaceholder: false });
+      // Note: cascade forward is handled inside addItemToShelf — no
+      // need for the old "assume continuity" manual add-to-future.
       return;
     }
 
@@ -524,13 +530,14 @@ function App() {
       const sourceItem = draggedItem?.item;
       if (!sourceItem) return;
       if (sourceItem.productId && isProductOnShelf(sourceItem.productId, targetShelfId)) { showDuplicateWarning(draggedItem?.product?.name || 'This product'); return; }
-      addItemToShelf(targetShelfId, { id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, productId: sourceItem.productId, position: activePlan[targetShelfId === 'current' ? 'currentShelf' : 'futureShelf'].items.length, isPlaceholder: sourceItem.isPlaceholder, placeholderName: sourceItem.placeholderName });
+      const targetShelfObj = resolveShelf(targetShelfId);
+      addItemToShelf(targetShelfId, { id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, productId: sourceItem.productId, position: targetShelfObj?.items.length ?? 0, isPlaceholder: sourceItem.isPlaceholder, placeholderName: sourceItem.placeholderName });
       return;
     }
 
     if (sourceShelf && targetShelfId === sourceShelf) {
-      const shelfKey = sourceShelf === 'current' ? 'currentShelf' : 'futureShelf';
-      const items = activePlan[shelfKey].items;
+      const resolvedShelf = resolveShelf(sourceShelf);
+      const items = resolvedShelf?.items ?? [];
       const oldIndex = items.findIndex((i) => i.id === activeId);
       const newIndex = items.findIndex((i) => i.id === overId);
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
@@ -655,8 +662,8 @@ function App() {
 
                 {/* From stage — top shelf */}
                 {transformFrom && (
-                  <Shelf shelf={transformFrom.shelf} catalogue={project!.catalogue}
-                    onAddPlaceholder={() => handleAddPlaceholder(transformFrom.key === 'current' ? 'current' : 'future')}
+                  <Shelf shelf={transformFrom.shelf} stageKey={transformFrom.key} catalogue={project!.catalogue}
+                    onAddPlaceholder={() => handleAddPlaceholder(transformFrom.key)}
                     onRailWidthChange={handleRailWidthChange}
                     onDoubleClickItem={handleCurrentDoubleClick}
                     variantIncludedIds={variantCurrentIds}
@@ -674,8 +681,8 @@ function App() {
 
                 {/* To stage — bottom shelf */}
                 {transformTo && (
-                  <Shelf shelf={transformTo.shelf} catalogue={project!.catalogue}
-                    onAddPlaceholder={() => handleAddPlaceholder(transformTo.key === 'current' ? 'current' : 'future')}
+                  <Shelf shelf={transformTo.shelf} stageKey={transformTo.key} catalogue={project!.catalogue}
+                    onAddPlaceholder={() => handleAddPlaceholder(transformTo.key)}
                     onDoubleClickItem={handleFutureDoubleClick}
                     variantIncludedIds={variantFutureIds}
                     showGhosted={showGhosted}

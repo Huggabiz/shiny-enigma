@@ -211,11 +211,14 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
       else matchesCollection = true;
       // Hide Used: only applies in range-design view (designShelfId set),
       // and hides items already placed in the shelf being designed.
+      // Hide Used: for intermediate stages, check both current and
+      // future product sets (products cascade forward, so if it's in
+      // either it's likely on the intermediate stage too).
       const matchesHideUsed = !designShelfId || !hideUsed
         ? true
-        : (designShelfId === 'current'
+        : designShelfId === 'current'
             ? !currentProductIds.has(p.id)
-            : !futureProductIds.has(p.id));
+            : !currentProductIds.has(p.id) && !futureProductIds.has(p.id);
       return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource && matchesCollection && matchesHideUsed;
     });
   }, [products, search, categoryFilter, subCategoryFilter, familyFilter, showLive, showDev, showCore, showDuo, hideUsed, designShelfId, currentProductIds, futureProductIds]);

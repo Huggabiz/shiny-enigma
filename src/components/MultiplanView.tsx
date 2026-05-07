@@ -93,7 +93,20 @@ export function MultiplanView() {
         // Entry's variantId was non-null but the variant is gone →
         // drop the row instead of silently falling back to master.
         if (entry.variantId && !variant) return null;
-        const shelf: Shelf = shelfSide === 'current' ? plan.currentShelf : plan.futureShelf;
+        // Resolve the shelf for the active stage. For 'current' and
+        // 'future' use the dedicated fields; for intermediate stages
+        // look up by stageId in the plan's intermediateShelves.
+        let shelf: Shelf;
+        if (shelfSide === 'current') {
+          shelf = plan.currentShelf;
+        } else if (shelfSide === 'future') {
+          shelf = plan.futureShelf;
+        } else {
+          const stageId = shelfSide.replace('stage-', '');
+          const entry = (plan.intermediateShelves ?? []).find((s) => s.stageId === stageId);
+          if (!entry) return null;
+          shelf = entry.shelf;
+        }
         const variantIncludedKey = shelfSide === 'current' ? 'includedCurrentItemIds' : 'includedFutureItemIds';
         const includedIds = variant ? new Set(variant[variantIncludedKey]) : null;
         const rowItems: Array<{ item: ShelfItem; ghosted: boolean }> = includedIds

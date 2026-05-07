@@ -404,7 +404,8 @@ export interface MultiplanEntry {
  * `entries` is an ordered list of plan+variant tuples that each become
  * a stacked row in the view. */
 export interface MultiplanViewState {
-  shelfSide: 'current' | 'future';
+  /** Stage key: 'current', 'future', or 'stage-<defId>' for intermediates. */
+  shelfSide: string;
   entries: MultiplanEntry[];
 }
 
