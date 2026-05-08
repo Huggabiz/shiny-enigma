@@ -97,10 +97,18 @@ export function SkuDetailsPane() {
             {product.ausRrp !== undefined && <div className="sku-attr"><span className="sku-attr-label">AUS RRP</span><span>A${product.ausRrp}</span></div>}
           </div>
           {wv && (
-            <div className="sku-warehouse-row">
+            <div className="sku-warehouse-table">
+              <div className="sku-section-title">Volume by Warehouse</div>
               {WAREHOUSE_KEYS.map((k) => wv[k] ? (
-                <span key={k} className="sku-wh-chip">{WAREHOUSE_LABELS[k]}: {wv[k]!.toLocaleString()}</span>
+                <div key={k} className="sku-wh-row">
+                  <span className="sku-wh-label">{WAREHOUSE_LABELS[k]}</span>
+                  <span className="sku-wh-value">{wv[k]!.toLocaleString()}</span>
+                </div>
               ) : null)}
+              <div className="sku-wh-row total">
+                <span className="sku-wh-label">Total</span>
+                <span className="sku-wh-value">{product.volume.toLocaleString()}</span>
+              </div>
             </div>
           )}
         </div>

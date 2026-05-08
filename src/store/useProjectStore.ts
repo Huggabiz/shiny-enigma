@@ -628,7 +628,19 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const lens = (project.lenses ?? []).find((l) => l.id === lensId);
       if (!lens || lens.builtInKind) return;
     }
-    set({ project: { ...project, activeLensId: lensId } });
+    // Switching the active lens exits edit mode — prevents the user
+    // from deselecting the active lens while edit mode remains on,
+    // which would let clicks silently toggle membership with no
+    // visible tint feedback.
+    const editingLensId = project.editingLensId;
+    const shouldClearEditing = editingLensId && editingLensId !== lensId;
+    set({
+      project: {
+        ...project,
+        activeLensId: lensId,
+        editingLensId: shouldClearEditing ? null : editingLensId,
+      },
+    });
   },
 
   setEditingLens: (lensId) => {

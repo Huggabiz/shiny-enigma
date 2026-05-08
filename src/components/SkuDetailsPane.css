@@ -105,19 +105,38 @@
   min-width: 60px;
 }
 
-.sku-warehouse-row {
-  display: flex;
-  gap: 6px;
-  margin-top: 6px;
-  flex-wrap: wrap;
+.sku-warehouse-table {
+  margin-top: 8px;
 }
 
-.sku-wh-chip {
-  font-size: 9px;
-  background: #f5f5f5;
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: #555;
+.sku-wh-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 11px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.sku-wh-row:last-child {
+  border-bottom: none;
+}
+
+.sku-wh-row.total {
+  border-top: 1px solid #ddd;
+  font-weight: 700;
+  margin-top: 2px;
+  padding-top: 5px;
+}
+
+.sku-wh-label {
+  color: #666;
+}
+
+.sku-wh-value {
+  font-weight: 600;
+  color: #1a1a2e;
+  font-variant-numeric: tabular-nums;
 }
 
 .sku-plans-list {
