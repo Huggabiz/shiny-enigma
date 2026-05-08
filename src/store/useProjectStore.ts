@@ -1155,19 +1155,51 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       return;
     }
 
+    // Find the product ID so we can cascade removal to subsequent stages
+    const stageList = getStages(plan, project);
+    const sourceStage = stageList.find((s) => s.key === shelfId);
+    const removedItem = sourceStage?.shelf.items.find((i) => i.id === itemId);
+    const removedProductId = removedItem?.productId;
+
     let updated = updateShelf(project, shelfId, (shelf) => ({
       ...shelf, items: shelf.items.filter((i) => i.id !== itemId),
     }));
     updated = updatePlan(updated, plan.id, (p) => ({
       ...p,
       sankeyLinks: p.sankeyLinks.filter((l) => l.sourceItemId !== itemId && l.targetItemId !== itemId),
-      // Also remove from all variant inclusion lists
       variants: p.variants.map((v) => ({
         ...v,
         includedCurrentItemIds: v.includedCurrentItemIds.filter((id) => id !== itemId),
         includedFutureItemIds: v.includedFutureItemIds.filter((id) => id !== itemId),
       })),
     }));
+
+    // Cascade: remove the same product from all SUBSEQUENT stages
+    if (removedProductId) {
+      const sourceIdx = stageList.findIndex((s) => s.key === shelfId);
+      for (let i = sourceIdx + 1; i < stageList.length; i++) {
+        const stage = stageList[i];
+        const matchItem = stage.shelf.items.find((si) => si.productId === removedProductId);
+        if (!matchItem) continue;
+        updated = updateShelf(updated, stage.key, (shelf) => ({
+          ...shelf, items: shelf.items.filter((si) => si.id !== matchItem.id),
+        }));
+        // Also clean up sankey links + variant refs for the cascaded item
+        const updatedPlan = getActivePlan(updated);
+        if (updatedPlan) {
+          updated = updatePlan(updated, updatedPlan.id, (p) => ({
+            ...p,
+            sankeyLinks: p.sankeyLinks.filter((l) => l.sourceItemId !== matchItem.id && l.targetItemId !== matchItem.id),
+            variants: p.variants.map((v) => ({
+              ...v,
+              includedCurrentItemIds: v.includedCurrentItemIds.filter((id) => id !== matchItem.id),
+              includedFutureItemIds: v.includedFutureItemIds.filter((id) => id !== matchItem.id),
+            })),
+          }));
+        }
+      }
+    }
+
     set({ project: updated });
   },
 

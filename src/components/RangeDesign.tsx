@@ -438,7 +438,7 @@ function UnassignedDraggable({ itemId, name }: { itemId: string; name: string })
 
 export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignProps) {
   const {
-    project, addItemToShelf, updateShelfItem,
+    project, addItemToShelf, updateShelfItem, removeItemFromShelf,
     updateMatrixLayout, setMatrixAssignment,
     activeVariantId, showGhosted, setShowGhosted,
     showDiscontinued, setShowDiscontinued,
@@ -785,11 +785,39 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const addLabel = useCallback((axis: 'x' | 'y') => {
     const text = prompt(`New ${axis === 'x' ? 'column' : 'row'} label:`);
     if (!text) return;
+    // Add to this stage
     if (axis === 'x') updateMatrixLayout(shelfId, { xLabels: [...layout.xLabels, text] });
     else updateMatrixLayout(shelfId, { yLabels: [...layout.yLabels, text] });
-  }, [shelfId, layout, updateMatrixLayout]);
+    // Cascade: add the same label to all subsequent stages
+    const stageIdx = stages.findIndex((s) => s.key === shelfId);
+    for (let i = stageIdx + 1; i < stages.length; i++) {
+      const stageLayout = stages[i].shelf.matrixLayout;
+      if (!stageLayout) continue;
+      if (axis === 'x') {
+        updateMatrixLayout(stages[i].key, { xLabels: [...stageLayout.xLabels, text] });
+      } else {
+        updateMatrixLayout(stages[i].key, { yLabels: [...stageLayout.yLabels, text] });
+      }
+    }
+  }, [shelfId, layout, updateMatrixLayout, stages]);
 
   const removeLabel = useCallback((axis: 'x' | 'y', index: number) => {
+    // Find items assigned to this row/column
+    const affectedItems = layout.assignments.filter(
+      axis === 'x' ? (a) => a.col === index : (a) => a.row === index,
+    );
+
+    let removeProducts = false;
+    if (affectedItems.length > 0) {
+      const choice = confirm(
+        `This ${axis === 'x' ? 'column' : 'row'} has ${affectedItems.length} product(s).\n\n` +
+        `OK = Remove products from range (this stage and all future stages)\n` +
+        `Cancel = Keep products on shelf (unassigned from matrix)`,
+      );
+      removeProducts = choice;
+    }
+
+    // Remove the label + reassign remaining cells on THIS stage
     if (axis === 'x') {
       updateMatrixLayout(shelfId, {
         xLabels: layout.xLabels.filter((_, i) => i !== index),
@@ -801,7 +829,33 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         assignments: layout.assignments.filter((a) => a.row !== index).map((a) => a.row > index ? { ...a, row: a.row - 1 } : a),
       });
     }
-  }, [shelfId, layout, updateMatrixLayout]);
+
+    // Cascade: remove the same label from ALL subsequent stages
+    const stageIdx = stages.findIndex((s) => s.key === shelfId);
+    for (let i = stageIdx + 1; i < stages.length; i++) {
+      const stageLayout = stages[i].shelf.matrixLayout;
+      if (!stageLayout) continue;
+      if (axis === 'x' && stageLayout.xLabels.length > index) {
+        updateMatrixLayout(stages[i].key, {
+          xLabels: stageLayout.xLabels.filter((_, j) => j !== index),
+          assignments: stageLayout.assignments.filter((a) => a.col !== index).map((a) => a.col > index ? { ...a, col: a.col - 1 } : a),
+        });
+      } else if (axis === 'y' && stageLayout.yLabels.length > index) {
+        updateMatrixLayout(stages[i].key, {
+          yLabels: stageLayout.yLabels.filter((_, j) => j !== index),
+          assignments: stageLayout.assignments.filter((a) => a.row !== index).map((a) => a.row > index ? { ...a, row: a.row - 1 } : a),
+        });
+      }
+    }
+
+    // If user chose to remove products, remove them from this + subsequent stages
+    if (removeProducts && shelf) {
+      for (const a of affectedItems) {
+        const item = shelf.items.find((i) => i.id === a.itemId);
+        if (item) removeItemFromShelf(shelfId, item.id);
+      }
+    }
+  }, [shelfId, layout, updateMatrixLayout, stages, shelf, removeItemFromShelf]);
 
   const updateLabel = useCallback((axis: 'x' | 'y', index: number, text: string) => {
     if (axis === 'x') updateMatrixLayout(shelfId, { xLabels: layout.xLabels.map((l, i) => i === index ? text : l) });
