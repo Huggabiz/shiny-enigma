@@ -57,7 +57,15 @@ export function MultiplanView() {
     clearMultiplanEntries,
     showGhosted,
     setShowGhosted,
+    exclusiveLensFilter,
+    setExclusiveLensFilter,
   } = useProjectStore();
+
+  // Active lens for exclusive filter
+  const activeLensForFilter = useMemo(() => {
+    if (!project?.activeLensId) return null;
+    return project?.lenses?.find((l) => l.id === project.activeLensId) ?? null;
+  }, [project?.activeLensId, project?.lenses]);
 
   // Sensors for the row-reorder DndContext. Small activation distance
   // so a click on the drag handle (label column) registers as a click
@@ -117,15 +125,26 @@ export function MultiplanView() {
         }
         const variantIncludedKey = shelfSide === 'current' ? 'includedCurrentItemIds' : 'includedFutureItemIds';
         const includedIds = variant ? new Set(variant[variantIncludedKey]) : null;
-        const rowItems: Array<{ item: ShelfItem; ghosted: boolean }> = includedIds
+        let rowItems: Array<{ item: ShelfItem; ghosted: boolean }> = includedIds
           ? shelf.items
               .filter((i) => includedIds.has(i.id) || showGhosted)
               .map((i) => ({ item: i, ghosted: !includedIds.has(i.id) }))
           : shelf.items.map((i) => ({ item: i, ghosted: false }));
+        // Exclusive lens filter
+        if (exclusiveLensFilter && activeLensForFilter && !activeLensForFilter.builtInKind) {
+          rowItems = rowItems.filter(({ item }) => {
+            const prod = project.catalogue.find((p) => p.id === item.productId);
+            if (!prod) return true;
+            if (activeLensForFilter.scope === 'per-stage') {
+              return activeLensForFilter.stageProductIds?.[shelfSide]?.includes(prod.id) ?? false;
+            }
+            return activeLensForFilter.productIds.includes(prod.id);
+          });
+        }
         return { plan, variant, shelf, rowItems };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [entries, project, shelfSide, showGhosted]);
+  }, [entries, project, shelfSide, showGhosted, exclusiveLensFilter, activeLensForFilter]);
 
   if (!project) return null;
 
@@ -167,6 +186,12 @@ export function MultiplanView() {
           ))}
         </div>
         <div className="multiplan-toolbar-actions">
+          {activeLensForFilter && (
+            <label className="multiplan-show-excluded" title="Show only products in the active lens">
+              <input type="checkbox" checked={exclusiveLensFilter} onChange={(e) => setExclusiveLensFilter(e.target.checked)} />
+              Lens only
+            </label>
+          )}
           <label className="multiplan-show-excluded" title="Show items excluded from variants as ghost cards (global toggle — also affects the range view)">
             <input
               type="checkbox"

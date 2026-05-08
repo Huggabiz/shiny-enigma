@@ -144,9 +144,11 @@ interface ProjectStore {
   activeVariantId: string | null;
   showGhosted: boolean;
   showDiscontinued: boolean;
+  exclusiveLensFilter: boolean;
   setActiveVariant: (variantId: string | null) => void;
   setShowGhosted: (show: boolean) => void;
   setShowDiscontinued: (show: boolean) => void;
+  setExclusiveLensFilter: (on: boolean) => void;
   addVariant: (planId: string, name: string) => void;
   removeVariant: (planId: string, variantId: string) => void;
   renameVariant: (planId: string, variantId: string, name: string) => void;
@@ -208,6 +210,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   activeVariantId: null,
   showGhosted: true,
   showDiscontinued: true,
+  exclusiveLensFilter: false,
+  setExclusiveLensFilter: (on) => set({ exclusiveLensFilter: on }),
   catalogueFilters: { search: '', category: '', subCategory: '', family: '', showLive: true, showDev: true, showCore: true, showDuo: true, hideUsed: false },
   setCatalogueFilters: (f) => set((s) => ({ catalogueFilters: { ...s.catalogueFilters, ...f } })),
 

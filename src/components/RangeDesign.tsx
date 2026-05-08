@@ -138,11 +138,30 @@ function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, 
   const allItems = itemIds.map((id) => shelf.items.find((i) => i.id === id)).filter(Boolean);
   const { removeItemFromShelf, removeMatrixAssignment, activeVariantId: storeVariantId, toggleVariantItem } = useProjectStore();
 
-  // Filter items by variant
+  // Read exclusive lens filter state
+  const project = useProjectStore((s) => s.project);
+  const exclusiveLens = useProjectStore((s) => s.exclusiveLensFilter);
+  const activeLens = useMemo(() => {
+    if (!project?.activeLensId) return null;
+    return project.lenses?.find((l) => l.id === project.activeLensId) ?? null;
+  }, [project?.activeLensId, project?.lenses]);
+
+  // Filter items by variant + exclusive lens
   const filtered = allItems.filter((item): item is ShelfItem => {
     if (!item) return false;
-    if (!variantIncludedIds) return true;
-    return variantIncludedIds.has(item.id) || showGhostedProp;
+    if (!variantIncludedIds) { /* master — show all */ }
+    else if (!variantIncludedIds.has(item.id) && !showGhostedProp) return false;
+    // Exclusive lens filter
+    if (exclusiveLens && activeLens && !activeLens.builtInKind) {
+      const prod = catalogue.find((p) => p.id === item.productId);
+      if (prod) {
+        const inLens = activeLens.scope === 'per-stage'
+          ? activeLens.stageProductIds?.[stageKey]?.includes(prod.id) ?? false
+          : activeLens.productIds.includes(prod.id);
+        if (!inLens) return false;
+      }
+    }
+    return true;
   });
   // Sort by the chosen key — 'manual' preserves the original matrix order.
   const items = sortShelfItems(filtered, catalogue, sortBy, sortDir, isFutureShelf);
@@ -423,11 +442,18 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     updateMatrixLayout, setMatrixAssignment,
     activeVariantId, showGhosted, setShowGhosted,
     showDiscontinued, setShowDiscontinued,
+    exclusiveLensFilter, setExclusiveLensFilter,
     slideBaseScale,
     slideBaseScaleMode,
     setSlideBaseScale,
     cardFormat,
   } = useProjectStore();
+
+  // Active lens for the exclusive filter checkbox
+  const activeLensForFilter = useMemo(() => {
+    if (!project?.activeLensId) return null;
+    return project.lenses?.find((l) => l.id === project.activeLensId) ?? null;
+  }, [project?.activeLensId, project?.lenses]);
 
   // Scale the chrome dimensions (row/column headers, gaps) with the
   // slide resolution tier so the labels keep their visual proportions
@@ -523,6 +549,19 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
         counts[row].push(layout.assignments.filter((a) => {
           if (a.row !== row || a.col !== col) return false;
           if (variantIncludedIds && !showGhosted) return variantIncludedIds.has(a.itemId);
+          // Exclusive lens filter: only count items whose product is in the active lens
+          if (exclusiveLensFilter && activeLensForFilter && shelf) {
+            const item = shelf.items.find((i) => i.id === a.itemId);
+            if (item) {
+              const prod = catalogue.find((p) => p.id === item.productId);
+              if (prod) {
+                const inLens = activeLensForFilter.scope === 'per-stage'
+                  ? activeLensForFilter.stageProductIds?.[shelfId]?.includes(prod.id) ?? false
+                  : activeLensForFilter.productIds.includes(prod.id);
+                if (!inLens) return false;
+              }
+            }
+          }
           return true;
         }).length);
       }
@@ -550,7 +589,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     }
     return counts;
   }, [layout.xLabels, layout.yLabels, layout.assignments, variantIncludedIds, showGhosted,
-      shelfId, showDiscontinued, activePlan]);
+      shelfId, showDiscontinued, activePlan, exclusiveLensFilter, activeLensForFilter]);
 
   // Available area inside the matrix wrapper at the current uiScale.
   // Memoised separately so the auto-tier useEffect can reuse it without
@@ -862,6 +901,12 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                 <input type="checkbox" checked={showDiscontinued} onChange={(e) => setShowDiscontinued(e.target.checked)} />
                 <span>Show discontinued</span>
               </label>
+              {activeLensForFilter && (
+                <label className="ghost-toggle" title="Show only products in the active lens">
+                  <input type="checkbox" checked={exclusiveLensFilter} onChange={(e) => setExclusiveLensFilter(e.target.checked)} />
+                  <span>Lens only</span>
+                </label>
+              )}
               <div className="slide-size-control" title="Sort cards within each matrix cell">
                 <span>Sort</span>
                 <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)}>

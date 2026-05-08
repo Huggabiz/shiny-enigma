@@ -110,8 +110,28 @@ export function computeImportPlan(master: Project, imported: Project): ImportPla
   }
 
   // ------------------------------------------------------------
+  // Stage definitions — merge by name like folders. Build a map
+  // from imported stage def id → resolved master stage def id.
+  // ------------------------------------------------------------
+  const masterStagesByName = new Map<string, { id: string }>();
+  for (const d of master.stageDefinitions ?? []) masterStagesByName.set(d.name, d);
+  const importedStageIdToResolved = new Map<string, string>();
+  const addedStageDefs: import('../types').StageDefinition[] = [];
+  const stageDefIdFactory = makeIdFactory('stagedef');
+  for (const d of imported.stageDefinitions ?? []) {
+    const existing = masterStagesByName.get(d.name);
+    if (existing) {
+      importedStageIdToResolved.set(d.id, existing.id);
+    } else {
+      const newId = stageDefIdFactory();
+      addedStageDefs.push({ id: newId, name: d.name });
+      importedStageIdToResolved.set(d.id, newId);
+    }
+  }
+
+  // ------------------------------------------------------------
   // Plan import — fresh ids everywhere, remap shelf items, variants,
-  // matrix assignments, and sankey links. Rename on name collision.
+  // matrix assignments, sankey links, AND intermediate shelves.
   // ------------------------------------------------------------
   const existingPlanNames = new Set(master.plans.map((p) => p.name));
   const renamedPlans: ImportPlanSummary['renamedPlans'] = [];
@@ -206,11 +226,29 @@ export function computeImportPlan(master: Project, imported: Project): ImportPla
       ? importedFolderIdToResolved.get(plan.folderId)
       : undefined;
 
+    // Remap intermediate shelves — each references a stage def id
+    // that must be resolved to the master's id, and items need the
+    // same SKU→master remapping as current/future shelves.
+    const newIntermediateShelves = (plan.intermediateShelves ?? []).map((entry) => {
+      const resolvedStageId = importedStageIdToResolved.get(entry.stageId);
+      if (!resolvedStageId) return null;
+      const stageItems = entry.shelf.items.map(remapItem);
+      return {
+        stageId: resolvedStageId,
+        shelf: {
+          ...entry.shelf,
+          items: stageItems,
+          matrixLayout: remapMatrix(entry.shelf.matrixLayout),
+        },
+      };
+    }).filter((e): e is NonNullable<typeof e> => e !== null);
+
     newPlans.push({
       ...plan,
       id: planIdFactory(),
       name: finalName,
       folderId: resolvedFolderId,
+      intermediateShelves: newIntermediateShelves.length > 0 ? newIntermediateShelves : undefined,
       currentShelf: {
         ...plan.currentShelf,
         items: newCurrentItems,
@@ -283,11 +321,42 @@ export function computeImportPlan(master: Project, imported: Project): ImportPla
     orphanSkus: Array.from(orphanSkus),
   };
 
+  // Stage labels — keep master's if set, otherwise adopt imported's.
+  const nextCurrentLabel = master.currentStageLabel || imported.currentStageLabel;
+  const nextFutureLabel = master.futureStageLabel || imported.futureStageLabel;
+
+  // Forecast pipelines — merge by SKU (imported overwrites if master
+  // doesn't already have one for that SKU).
+  const nextForecasts = { ...(master.forecastPipelines ?? {}) };
+  for (const [sku, pipeline] of Object.entries(imported.forecastPipelines ?? {})) {
+    if (!nextForecasts[sku]) nextForecasts[sku] = pipeline;
+  }
+
+  // Default plan mapping — imported SKUs' default plans need to be
+  // remapped to the new plan ids.
+  const nextDefaults = { ...(master.defaultPlanBySku ?? {}) };
+  // Build old-plan-id → new-plan-id map
+  const oldPlanIdToNew = new Map<string, string>();
+  for (let i = 0; i < imported.plans.length; i++) {
+    oldPlanIdToNew.set(imported.plans[i].id, newPlans[i].id);
+  }
+  for (const [sku, oldPlanId] of Object.entries(imported.defaultPlanBySku ?? {})) {
+    if (!nextDefaults[sku]) {
+      const newPlanId = oldPlanIdToNew.get(oldPlanId);
+      if (newPlanId) nextDefaults[sku] = newPlanId;
+    }
+  }
+
   const nextProject: Project = {
     ...master,
     folders: [...(master.folders ?? []), ...addedFolders],
+    stageDefinitions: [...(master.stageDefinitions ?? []), ...addedStageDefs],
+    currentStageLabel: nextCurrentLabel,
+    futureStageLabel: nextFutureLabel,
     plans: [...master.plans, ...newPlans],
     lenses: nextLenses,
+    forecastPipelines: Object.keys(nextForecasts).length > 0 ? nextForecasts : undefined,
+    defaultPlanBySku: Object.keys(nextDefaults).length > 0 ? nextDefaults : undefined,
     updatedAt: new Date().toISOString(),
   };
 
