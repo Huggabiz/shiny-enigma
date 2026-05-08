@@ -158,9 +158,8 @@ export function LensSidebar() {
               value={newName}
               autoFocus
               onChange={(e) => setNewName(e.target.value)}
-              onBlur={commitNew}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                if (e.key === 'Enter') commitNew();
                 if (e.key === 'Escape') { setAdding(false); setNewName(''); setNewScope('global'); }
               }}
             />
@@ -174,6 +173,8 @@ export function LensSidebar() {
               <option value="global">Global</option>
               <option value="per-stage">Per-stage</option>
             </select>
+            <button className="lens-add-confirm" onClick={commitNew} disabled={!newName.trim()} title="Create lens">✓</button>
+            <button className="lens-add-cancel" onClick={() => { setAdding(false); setNewName(''); setNewScope('global'); }} title="Cancel">×</button>
           </div>
         )}
       </div>
