@@ -1,0 +1,200 @@
+/* SKU Details Pane — collapsible bottom panel showing details for
+   the currently selected SKU card. */
+.sku-details-pane {
+  position: fixed;
+  bottom: 0;
+  left: 56px; /* accounts for nav sidebar width */
+  right: 0;
+  max-height: 280px;
+  background: #fff;
+  border-top: 2px solid #7b1fa2;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.15s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sku-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+}
+
+.sku-details-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sku-details-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.sku-details-sku {
+  font-size: 11px;
+  color: #888;
+  font-family: ui-monospace, monospace;
+}
+
+.sku-details-dev {
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  background: #1565c0;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.sku-details-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+.sku-details-close:hover { background: #f0f0f0; }
+
+.sku-details-body {
+  display: flex;
+  gap: 20px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  flex: 1;
+}
+
+.sku-details-section {
+  min-width: 200px;
+  flex: 1;
+}
+
+.sku-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.sku-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 4px 16px;
+}
+
+.sku-attr {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  color: #333;
+}
+
+.sku-attr-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  min-width: 60px;
+}
+
+.sku-warehouse-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.sku-wh-chip {
+  font-size: 9px;
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #555;
+}
+
+.sku-plans-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sku-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.sku-plan-row.default {
+  background: #f3e5f5;
+}
+
+.sku-plan-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.sku-plan-stage {
+  color: #888;
+  font-size: 10px;
+}
+
+.sku-plan-default-badge {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #7b1fa2;
+  background: #f3e5f5;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.sku-plan-set-default {
+  font-size: 9px;
+  font-weight: 600;
+  color: #1976d2;
+  background: transparent;
+  border: 1px solid #bbdefb;
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: pointer;
+}
+.sku-plan-set-default:hover { background: #e3f2fd; }
+
+.sku-details-empty {
+  font-size: 11px;
+  color: #bbb;
+  font-style: italic;
+}
+
+.sku-forecast-summary {
+  font-size: 11px;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.sku-forecast-enter {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #f3e5f5;
+  color: #7b1fa2;
+  border: 1px solid #ce93d8;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.sku-forecast-enter:hover { background: #e1bee7; }

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
-import { getActivePlan } from '../types';
+import { getActivePlan, getStages } from '../types';
 import type { Product, ShelfItem, ForecastPipeline, ForecastReference, ForecastModifier } from '../types';
 import { MODIFIER_TYPE_DEFS } from '../types';
 import { computePipelineForecast, EMPTY_PIPELINE } from '../utils/forecastCalc';
@@ -38,19 +38,42 @@ export function ForecastLab() {
   const selectedProduct = selectedItem
     ? catalogue.find((p) => p.id === selectedItem.productId)
     : undefined;
-  const pipeline: ForecastPipeline = selectedItem?.forecastPipeline ?? EMPTY_PIPELINE;
+  const selectedSku = selectedProduct?.sku ?? '';
+  // Forecast pipelines are now stored per-SKU at the project level.
+  const pipeline: ForecastPipeline = (selectedSku ? project?.forecastPipelines?.[selectedSku] : undefined) ?? EMPTY_PIPELINE;
 
   const forecast = useMemo(
     () => computePipelineForecast(pipeline, catalogue),
     [pipeline, catalogue],
   );
 
+  // Launch stage: first stage where this SKU appears in its default range plan.
+  const launchStageName = useMemo(() => {
+    if (!selectedSku || !project) return null;
+    const defaultPlanId = project.defaultPlanBySku?.[selectedSku];
+    if (!defaultPlanId) return null;
+    const plan = project.plans.find((p) => p.id === defaultPlanId);
+    if (!plan) return null;
+    const stages = getStages(plan, project);
+    // Find the first non-current stage that has this product
+    for (const stage of stages) {
+      if (stage.position === 'current') continue;
+      if (stage.shelf.items.some((i) => {
+        const p = catalogue.find((c) => c.id === i.productId);
+        return p?.sku === selectedSku;
+      })) {
+        return stage.name;
+      }
+    }
+    return null;
+  }, [selectedSku, project, catalogue]);
+
   const savePipeline = useCallback(
     (next: ForecastPipeline) => {
-      if (!selectedItemId) return;
-      setForecastPipeline(selectedItemId, next);
+      if (!selectedSku) return;
+      setForecastPipeline(selectedSku, next);
     },
-    [selectedItemId, setForecastPipeline],
+    [selectedSku, setForecastPipeline],
   );
 
   // ---- Reference management ----
@@ -175,6 +198,11 @@ export function ForecastLab() {
           <div className="flab-canvas-header">
             <h2>{selectedProduct?.name || selectedItem.placeholderName || 'Unknown'}</h2>
             <span className="flab-canvas-sku">{selectedProduct?.sku || ''}</span>
+            {launchStageName && (
+              <span className="flab-launch-badge" title="Launch stage (from default range plan)">
+                🧪 Launch: {launchStageName}
+              </span>
+            )}
           </div>
 
           <div className="flab-pipeline">
@@ -254,6 +282,7 @@ export function ForecastLab() {
                 onAdd={(type, label, defVal) => addProductMod({ id: freshId('mod'), type, label, value: defVal })} />
               <div className="flab-forecast-badge clean">
                 Clean forecast: <strong>{forecast.cleanForecast.toLocaleString()}</strong>
+                <WarehouseBreakdown wh={forecast.cleanForecastWh} />
               </div>
             </div>
 
@@ -269,6 +298,7 @@ export function ForecastLab() {
                 onAdd={(type, label, defVal) => addPostMod({ id: freshId('mod'), type, label, value: defVal })} />
               <div className="flab-forecast-badge year1">
                 Year 1 forecast: <strong>{forecast.year1Forecast.toLocaleString()}</strong>
+                <WarehouseBreakdown wh={forecast.year1ForecastWh} />
               </div>
             </div>
           </div>
@@ -280,14 +310,44 @@ export function ForecastLab() {
 
 // ---- Sub-components ----
 
+function WarehouseBreakdown({ wh }: { wh: { uk: number; eu: number; aus: number; us: number; cn: number } }) {
+  const hasData = wh.uk || wh.eu || wh.aus || wh.us || wh.cn;
+  if (!hasData) return null;
+  return (
+    <div className="flab-wh-breakdown">
+      {wh.uk > 0 && <span>UK: {wh.uk.toLocaleString()}</span>}
+      {wh.eu > 0 && <span>EU: {wh.eu.toLocaleString()}</span>}
+      {wh.aus > 0 && <span>AUS: {wh.aus.toLocaleString()}</span>}
+      {wh.us > 0 && <span>US: {wh.us.toLocaleString()}</span>}
+      {wh.cn > 0 && <span>CN: {wh.cn.toLocaleString()}</span>}
+    </div>
+  );
+}
+
 function ModifierBlock({ mod, onUpdate, onRemove }: {
   mod: ForecastModifier;
   onUpdate: (patch: Partial<ForecastModifier>) => void;
   onRemove: () => void;
 }) {
+  const scope = mod.warehouseScope ?? 'all';
   return (
     <div className="flab-mod-block">
-      <div className="flab-mod-label">{mod.label}</div>
+      <div className="flab-mod-header">
+        <span className="flab-mod-label">{mod.label}</span>
+        <select
+          className="flab-mod-scope"
+          value={scope}
+          onChange={(e) => onUpdate({ warehouseScope: e.target.value as ForecastModifier['warehouseScope'] })}
+          title="Warehouse scope"
+        >
+          <option value="all">All</option>
+          <option value="uk">UK</option>
+          <option value="eu">EU</option>
+          <option value="aus">AUS</option>
+          <option value="us">US</option>
+          <option value="cn">CN</option>
+        </select>
+      </div>
       <div className="flab-mod-controls">
         <input
           type="number"

@@ -178,6 +178,11 @@ export interface ForecastModifier {
    * type but all standard types are multiplicative percentages.
    * 100 = no effect, 85 = −15%, 120 = +20%. */
   value: number;
+  /** Which warehouse(s) this modifier applies to. 'all' means the
+   * modifier multiplies the total volume (all warehouses equally).
+   * A specific warehouse key means only that warehouse's volume is
+   * modified. Default 'all'. */
+  warehouseScope?: 'all' | WarehouseKey;
 }
 
 export interface ForecastReference {
@@ -440,6 +445,16 @@ export interface Project {
   currentStageLabel?: string;
   /** Label for the "future" goal stage, e.g. "Goal Range". */
   futureStageLabel?: string;
+  /** Per-SKU forecast pipelines. Keyed by SKU string so the pipeline
+   * is global (not tied to a specific shelf placement) and survives
+   * catalogue reimports. See ForecastPipeline. */
+  forecastPipelines?: Record<string, ForecastPipeline>;
+  /** SKU → default plan id mapping. Stored by SKU string (not product
+   * id) so the mapping survives catalogue reimports. Auto-assigned
+   * when a SKU is first added to any range plan; changeable by the
+   * user via the SKU details pane. The forecast lab reads launch
+   * timing from the default plan. */
+  defaultPlanBySku?: Record<string, string>;
   /** Multiplan view state — which plan+variant pairs to show stacked,
    * and which side of the range (current / future) to render. Optional
    * for backwards-compat; the store action lazily initialises it. */

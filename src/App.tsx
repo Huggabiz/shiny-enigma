@@ -24,6 +24,7 @@ import { ForecastPanel } from './components/ForecastPanel';
 import { RangeDesign } from './components/RangeDesign';
 import { MultiplanView } from './components/MultiplanView';
 import { ForecastLab } from './components/ForecastLab';
+import { SkuDetailsPane } from './components/SkuDetailsPane';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PlaceholderDialog } from './components/PlaceholderDialog';
 import { EditableTitle } from './components/EditableTitle';
@@ -733,6 +734,10 @@ function App() {
           <ForecastLab />
         ) : null}
       </div>
+
+      {/* SKU details pane — shows at the bottom when a card is selected
+          in normal mode (not forecast/link mode). */}
+      {!linkMode && <SkuDetailsPane />}
 
       {showImport && <ImportDialog onImport={handleImport} onClose={() => setShowImport(false)} />}
       {placeholderDialog && (

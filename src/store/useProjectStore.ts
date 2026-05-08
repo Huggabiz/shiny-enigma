@@ -176,8 +176,11 @@ interface ProjectStore {
   copyCurrentToFuture: () => void;
   reorderShelfByMatrix: (shelfId: string) => void;
 
-  // Forecast pipeline (operate on active plan's future shelf)
-  setForecastPipeline: (itemId: string, pipeline: import('../types').ForecastPipeline | undefined) => void;
+  // Default range assignment (SKU → plan)
+  setDefaultPlan: (sku: string, planId: string) => void;
+
+  // Forecast pipeline — now stored per-SKU at project level
+  setForecastPipeline: (sku: string, pipeline: import('../types').ForecastPipeline | undefined) => void;
 
   // Matrix layout (operate on active plan)
   updateMatrixLayout: (shelfId: string, layout: Partial<import('../types').MatrixLayout>) => void;
@@ -1043,6 +1046,24 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       ...shelf, items: [...shelf.items, item],
     }));
 
+    // Auto-assign default plan: when a product is first placed in any
+    // range, tag it as belonging to this plan so the forecast lab
+    // knows where to read launch timing from. Keyed by SKU so the
+    // mapping survives catalogue reimports.
+    if (item.productId) {
+      const product = project.catalogue.find((p) => p.id === item.productId);
+      const plan = getActivePlan(updated);
+      if (product?.sku && plan) {
+        const existing = updated.defaultPlanBySku?.[product.sku];
+        if (!existing) {
+          updated = {
+            ...updated,
+            defaultPlanBySku: { ...(updated.defaultPlanBySku ?? {}), [product.sku]: plan.id },
+          };
+        }
+      }
+    }
+
     // Cascade forward: when adding a product to a stage, also add it
     // to all SUBSEQUENT stages (including future) so products carry
     // forward through the timeline. Skip if the product is already on
@@ -1271,17 +1292,36 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ project: updateShelf(project, shelfId, () => ({ ...shelf, items: sorted })) });
   },
 
-  // Forecast pipeline — stored on future-shelf ShelfItems.
-  setForecastPipeline: (itemId, pipeline) => {
+  // Default range assignment
+  setDefaultPlan: (sku, planId) => {
     const { project } = get();
     if (!project) return;
     set({
-      project: updateShelf(project, 'future', (shelf) => ({
-        ...shelf,
-        items: shelf.items.map((i) =>
-          i.id === itemId ? { ...i, forecastPipeline: pipeline } : i,
-        ),
-      })),
+      project: {
+        ...project,
+        defaultPlanBySku: { ...(project.defaultPlanBySku ?? {}), [sku]: planId },
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  // Forecast pipeline — stored per-SKU at project level so the
+  // forecast is global (not tied to a specific shelf placement).
+  setForecastPipeline: (sku, pipeline) => {
+    const { project } = get();
+    if (!project) return;
+    const pipelines = { ...(project.forecastPipelines ?? {}) };
+    if (pipeline) {
+      pipelines[sku] = pipeline;
+    } else {
+      delete pipelines[sku];
+    }
+    set({
+      project: {
+        ...project,
+        forecastPipelines: pipelines,
+        updatedAt: new Date().toISOString(),
+      },
     });
   },
 
