@@ -681,6 +681,18 @@
   opacity: 0.3;
 }
 
+.unassigned-remove {
+  border: none;
+  background: transparent;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 4px;
+  padding: 0 2px;
+  line-height: 1;
+}
+.unassigned-remove:hover { color: #c62828; }
+
 /* Discontinued tray — reuses .unassigned-tray skeleton but with a red
    tint so it's clearly distinct from the "not placed in matrix" tray. */
 .unassigned-tray.discontinued-tray {

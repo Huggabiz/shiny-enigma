@@ -424,7 +424,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   );
 }
 
-function UnassignedDraggable({ itemId, name }: { itemId: string; name: string }) {
+function UnassignedDraggable({ itemId, name, onRemove }: { itemId: string; name: string; onRemove?: () => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `matrix-item-${itemId}`, data: { itemId },
   });
@@ -432,6 +432,11 @@ function UnassignedDraggable({ itemId, name }: { itemId: string; name: string })
     <span ref={setNodeRef} className={`unassigned-item draggable ${isDragging ? 'dragging' : ''}`}
       {...attributes} {...listeners}>
       {name}
+      {onRemove && (
+        <button className="unassigned-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }} title="Remove from range">
+          ×
+        </button>
+      )}
     </span>
   );
 }
@@ -1071,7 +1076,8 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                   const product = catalogue.find((p) => p.id === item.productId);
                   return (
                     <UnassignedDraggable key={item.id} itemId={item.id}
-                      name={item.isPlaceholder ? (item.placeholderName || 'New SKU') : (product?.name || item.productId)} />
+                      name={item.isPlaceholder ? (item.placeholderName || 'New SKU') : (product?.name || item.productId)}
+                      onRemove={() => removeItemFromShelf(shelfId, item.id)} />
                   );
                 })}
               </div>
