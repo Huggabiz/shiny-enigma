@@ -233,6 +233,7 @@ export function MultiplanView() {
                   shelf={shelf}
                   rowItems={rowItems}
                   catalogue={project.catalogue}
+                  stageKey={shelfSide}
                   railWidth={railWidth.width}
                   firstRow={rowIdx === 0}
                   onRailRef={rowIdx === 0 ? railWidth.attachRef : undefined}
@@ -289,6 +290,8 @@ interface MultiplanRowProps {
   shelf: Shelf;
   rowItems: MultiplanRowItem[];
   catalogue: Product[];
+  /** Stage key for per-stage lens tinting. */
+  stageKey: string;
   railWidth: number;
   firstRow: boolean;
   onRailRef?: (el: HTMLDivElement | null) => void;
@@ -303,6 +306,7 @@ function MultiplanRow({
   shelf,
   rowItems,
   catalogue,
+  stageKey,
   railWidth,
   firstRow,
   onRailRef,
@@ -430,6 +434,7 @@ function MultiplanRow({
                       overlay
                       cardWidth={cardWidth}
                       isGhosted={ghosted}
+                      stageKey={stageKey}
                     />
                   </div>
                 );
