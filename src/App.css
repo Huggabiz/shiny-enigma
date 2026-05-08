@@ -12,6 +12,20 @@
   overflow: hidden;
 }
 
+/* Right column — contains the SKU details pane (when a card is
+   selected) above the Catalogue. Flex column so both stack vertically
+   and the catalogue takes the remaining space. */
+.right-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-left: 1px solid #e0e0e0;
+}
+
+.right-column > .catalogue-panel {
+  border-left: none; /* handled by .right-column */
+}
+
 .shelves-area {
   flex: 1;
   padding: 16px 16px 0 16px;

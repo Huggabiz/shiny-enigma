@@ -161,7 +161,11 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   const setCategoryFilter = (v: string) => setCatalogueFilters({ category: v, subCategory: '', family: '' });
   const setSubCategoryFilter = (v: string) => setCatalogueFilters({ subCategory: v, family: '' });
   const setFamilyFilter = (v: string) => setCatalogueFilters({ family: v });
-  const [expanded, setExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<'collapsed' | 'normal' | 'expanded'>('normal');
+
+  const cycleViewMode = () => {
+    setViewMode((m) => m === 'collapsed' ? 'normal' : m === 'normal' ? 'expanded' : 'collapsed');
+  };
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [collapsedSubCats, setCollapsedSubCats] = useState<Set<string>>(new Set());
 
@@ -244,7 +248,14 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   };
 
   return (
-    <div ref={setDropRef} className={`catalogue-panel ${expanded ? 'expanded' : ''} ${isDropTarget && isDropOver ? 'drop-active' : ''}`}>
+    <div ref={setDropRef} className={`catalogue-panel ${viewMode} ${isDropTarget && isDropOver ? 'drop-active' : ''}`}>
+      {viewMode === 'collapsed' ? (
+        <div className="catalogue-collapsed" onClick={() => setViewMode('normal')} title="Expand catalogue">
+          <span className="catalogue-collapsed-icon">📦</span>
+          <span className="catalogue-collapsed-label">Catalogue</span>
+        </div>
+      ) : (
+        <>
       <div className="catalogue-header">
         <h3>Catalogue</h3>
         <div className="catalogue-header-actions">
@@ -267,11 +278,18 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
             }
           }} title={collapsedCategories.size > 0 ? "Expand all" : "Collapse all"}>↕</button>
           <button
-            className={`catalogue-expand-btn ${expanded ? 'active' : ''}`}
-            onClick={() => setExpanded(!expanded)}
-            title={expanded ? 'Compact view' : 'Expanded view with larger images'}
+            className="catalogue-expand-btn"
+            onClick={cycleViewMode}
+            title={viewMode === 'expanded' ? 'Compact view' : viewMode === 'normal' ? 'Expand' : 'Collapse'}
           >
-            {expanded ? '▶' : '◀'}
+            {viewMode === 'expanded' ? '▶' : viewMode === 'normal' ? '◀' : '▶'}
+          </button>
+          <button
+            className="catalogue-collapse-btn"
+            onClick={() => setViewMode('collapsed')}
+            title="Collapse catalogue to icon strip"
+          >
+            ▷
           </button>
           <button className="import-btn" onClick={onImport}>
             Import Data
@@ -405,12 +423,12 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
                     )}
 
                     {!isSubCollapsed && (
-                      <div className={expanded ? 'catalogue-items-expanded' : ''}>
+                      <div className={viewMode === 'expanded' ? 'catalogue-items-expanded' : ''}>
                         {subGroup.products.map((product) => (
                           <CatalogueItem
                             key={product.id}
                             product={product}
-                            expanded={expanded}
+                            expanded={viewMode === 'expanded'}
                             currentProductIds={currentProductIds}
                             futureProductIds={futureProductIds}
                             otherCurrentIds={otherCurrentIds}
@@ -434,6 +452,8 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

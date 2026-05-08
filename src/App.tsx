@@ -712,11 +712,14 @@ function App() {
               {duplicateWarning && <div className="duplicate-warning">{duplicateWarning}</div>}
             </div>
 
-            <Catalogue products={project?.catalogue || []} onImport={() => setShowImport(true)}
-              currentProductIds={currentPlanProductIds} futureProductIds={futurePlanProductIds}
-              otherCurrentIds={otherPlansCurrentIds} otherFutureIds={otherPlansFutureIds}
-              isDropTarget={!!activeItem?.sourceShelf}
-              dropZoneId="catalogue-drop-zone" />
+            <div className="right-column">
+              {!linkMode && <SkuDetailsPane />}
+              <Catalogue products={project?.catalogue || []} onImport={() => setShowImport(true)}
+                currentProductIds={currentPlanProductIds} futureProductIds={futurePlanProductIds}
+                otherCurrentIds={otherPlansCurrentIds} otherFutureIds={otherPlansFutureIds}
+                isDropTarget={!!activeItem?.sourceShelf}
+                dropZoneId="catalogue-drop-zone" />
+            </div>
 
             <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
               {activeItem && <ProductCard item={activeItem.item} product={activeItem.product} overlay />}
@@ -734,10 +737,6 @@ function App() {
           <ForecastLab />
         ) : null}
       </div>
-
-      {/* SKU details pane — shows at the bottom when a card is selected
-          in normal mode (not forecast/link mode). */}
-      {!linkMode && <SkuDetailsPane />}
 
       {showImport && <ImportDialog onImport={handleImport} onClose={() => setShowImport(false)} />}
       {placeholderDialog && (
