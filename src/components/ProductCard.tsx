@@ -31,6 +31,9 @@ interface ProductCardProps {
    * rules: future cards show the computed forecast, not raw volume;
    * current cards show volume, not catalogue forecastVolume. */
   isFutureShelf?: boolean;
+  /** Stage key for per-stage lens checks ('current', 'future',
+   * 'stage-<id>'). Passed from the Shelf or MultiplanRow. */
+  stageKey?: string;
 }
 
 type RrpRegion = 'ukRrp' | 'usRrp' | 'euRrp' | 'ausRrp';
@@ -149,6 +152,7 @@ export function ProductCard({
   editableFuturePricing,
   computedForecast,
   isFutureShelf,
+  stageKey: stageKeyProp,
 }: ProductCardProps) {
   const cardFormat = useProjectStore((s) => s.cardFormat);
   // Lens tinting + edit mode — if there's an active custom lens that
@@ -169,11 +173,12 @@ export function ProductCard({
   }, [project?.editingLensId, project?.lenses]);
   const productInActiveLens = useMemo(() => {
     if (!activeLens || !product) return false;
-    // Built-in lenses (Dev) own their styling via existing CSS classes
-    // and aren't part of the lens-tint selectable set.
     if (activeLens.builtInKind) return false;
+    if (activeLens.scope === 'per-stage') {
+      return stageKeyProp ? (activeLens.stageProductIds?.[stageKeyProp]?.includes(product.id) ?? false) : false;
+    }
     return activeLens.productIds.includes(product.id);
-  }, [activeLens, product]);
+  }, [activeLens, product, stageKeyProp]);
 
   const {
     attributes,
@@ -242,7 +247,7 @@ export function ProductCard({
     if (editingLens && product && !item.isPlaceholder) {
       e.stopPropagation();
       e.preventDefault();
-      toggleLensProduct(editingLens.id, product.id);
+      toggleLensProduct(editingLens.id, product.id, stageKeyProp);
       return;
     }
     onClick?.();

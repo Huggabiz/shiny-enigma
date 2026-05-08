@@ -165,6 +165,7 @@ function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, 
             isPlaceholder={item.isPlaceholder} placeholderName={item.placeholderName}
             placeholderData={item.placeholderData}
             orphanSku={item.orphanSku}
+            stageKey={stageKey}
             isGhosted={isGhosted}
             isFutureShelf={isFutureShelf}
             onEdit={item.isPlaceholder && onEditPlaceholder ? () => onEditPlaceholder(item.id) : undefined}
@@ -186,6 +187,7 @@ function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, 
           <MatrixProductCard key={`disc-${item.id}`} itemId={item.id} product={product}
             isPlaceholder={false}
             orphanSku={item.orphanSku}
+            stageKey={stageKey}
             isDiscontinued={true}
             isFutureShelf={true}
             onRemove={() => { /* discontinued cards are read-only */ }} />
@@ -196,12 +198,12 @@ function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, 
   );
 }
 
-function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, placeholderData, orphanSku, isGhosted, isDiscontinued, isFutureShelf, onRemove, onEdit }: {
+function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, placeholderData, orphanSku, stageKey, isGhosted, isDiscontinued, isFutureShelf, onRemove, onEdit }: {
   itemId: string; product?: Product; isPlaceholder: boolean;
   placeholderName?: string; placeholderData?: import('../types').PlaceholderData;
-  /** When set and `product` is undefined, the card renders as
-   * "(Not in catalogue)" + SKU — see ShelfItem.orphanSku. */
   orphanSku?: string;
+  /** Stage key for per-stage lens checks and edit-mode toggles. */
+  stageKey: string;
   isGhosted?: boolean;
   isDiscontinued?: boolean;
   isFutureShelf?: boolean;
@@ -220,15 +222,16 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
     if (!project?.editingLensId) return null;
     return project.lenses?.find((l) => l.id === project.editingLensId) ?? null;
   }, [project?.editingLensId, project?.lenses]);
+  // The stageKey for per-stage lens checks comes from the MatrixCell's
+  // stageKey prop, which traces back to RangeDesign's shelfId.
   const productInActiveLens = useMemo(() => {
     if (!activeLens || !product) return false;
-    // Built-in lenses (Dev) are owned by their existing always-on CSS
-    // (`.matrix-card.dev-product`) and aren't part of the lens-tint
-    // selectable set — ignore them here even if activeLensId somehow
-    // points at one.
     if (activeLens.builtInKind) return false;
+    if (activeLens.scope === 'per-stage') {
+      return activeLens.stageProductIds?.[stageKey]?.includes(product.id) ?? false;
+    }
     return activeLens.productIds.includes(product.id);
-  }, [activeLens, product]);
+  }, [activeLens, product, stageKey]);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `matrix-item-${itemId}`, data: { itemId },
@@ -298,13 +301,19 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
     ? { backgroundColor: hexToRgba(activeLens.color, 0.22), borderColor: activeLens.color }
     : undefined;
 
-  // Click handler used when a custom lens is in edit mode — clicking
-  // the card toggles the product's membership in that lens.
-  const handleLensEditClick = (e: React.MouseEvent) => {
-    if (!editingLens || !product || isPlaceholder) return;
-    e.stopPropagation();
-    e.preventDefault();
-    toggleLensProduct(editingLens.id, product.id);
+  const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
+
+  // Click: in lens edit mode → toggle membership. Otherwise → select
+  // the card (which opens the SKU details pane).
+  const handleClick = (e: React.MouseEvent) => {
+    if (editingLens && product && !isPlaceholder) {
+      e.stopPropagation();
+      e.preventDefault();
+      toggleLensProduct(editingLens.id, product.id, stageKey);
+      return;
+    }
+    // Normal selection — triggers the SKU details pane
+    setSelectedItem(itemId);
   };
 
   // Reusable delta chip renderer — matches the transform view's
@@ -345,7 +354,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
       // In lens edit mode a click toggles membership instead of doing
       // any normal interaction; outside edit mode the double-click
       // still opens the placeholder editor.
-      onClick={editingLens ? handleLensEditClick : undefined}
+      onClick={handleClick}
       onDoubleClick={(e) => { if (isPlaceholder && onEdit) { e.stopPropagation(); onEdit(); } }}
       {...(editingLens ? {} : attributes)}
       {...(editingLens ? {} : listeners)}>

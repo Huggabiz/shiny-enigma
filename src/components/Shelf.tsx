@@ -278,6 +278,7 @@ export function Shelf({ shelf, stageKey, catalogue, onAddPlaceholder, onRailWidt
                 cardWidth={cardWidth}
                 computedForecast={computedForecast}
                 isFutureShelf={isToStage}
+                stageKey={effectiveKey}
               />
             );
           })}

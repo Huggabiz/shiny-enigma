@@ -180,6 +180,29 @@
 
 .lens-item.adding {
   padding: 4px 8px;
+  flex-wrap: wrap;
+}
+
+.lens-scope-tag {
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #e65100;
+  background: #fff3e0;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.lens-scope-select {
+  font-size: 9px;
+  padding: 2px 4px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+  margin-left: auto;
 }
 
 /* Built-in lens (Dev) — visible in the list as a label only.

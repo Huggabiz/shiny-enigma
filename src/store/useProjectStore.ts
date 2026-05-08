@@ -122,12 +122,12 @@ interface ProjectStore {
   clearMultiplanEntries: () => void;
 
   // Lens management — see types/Lens for the data model.
-  createLens: (name: string) => void;
+  createLens: (name: string, scope?: 'global' | 'per-stage') => void;
   removeLens: (lensId: string) => void;
   renameLens: (lensId: string, name: string) => void;
   setActiveLens: (lensId: string | null) => void;
   setEditingLens: (lensId: string | null) => void;
-  toggleLensProduct: (lensId: string, productId: string) => void;
+  toggleLensProduct: (lensId: string, productId: string, stageKey?: string) => void;
   /** Cycle a custom lens's colour to the next palette entry that
    * isn't already in use by another lens. No-op for built-in lenses. */
   cycleLensColor: (lensId: string) => void;
@@ -569,12 +569,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   // Lens management — Lens is project-level state. The built-in Dev
   // lens is guaranteed by ensureLenses() at load time and can't be
   // deleted or renamed.
-  createLens: (name) => {
+  createLens: (name, scope) => {
     const { project } = get();
     if (!project) return;
     const lenses = project.lenses ?? [];
-    // Skip the dev lens when picking a colour from the palette so the
-    // first custom lens doesn't accidentally clash with the dev blue.
     const customCount = lenses.filter((l) => !l.builtInKind).length;
     const color = LENS_PALETTE[customCount % LENS_PALETTE.length];
     const newLens: Lens = {
@@ -582,6 +580,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       name,
       color,
       productIds: [],
+      ...(scope === 'per-stage' ? { scope: 'per-stage' as const, stageProductIds: {} } : {}),
     };
     set({
       project: {
@@ -651,13 +650,26 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     });
   },
 
-  toggleLensProduct: (lensId, productId) => {
+  toggleLensProduct: (lensId, productId, stageKey) => {
     const { project } = get();
     if (!project) return;
     const lens = (project.lenses ?? []).find((l) => l.id === lensId);
-    if (!lens || lens.builtInKind) return; // can't toggle built-in membership
+    if (!lens || lens.builtInKind) return;
     const lenses = (project.lenses ?? []).map((l) => {
       if (l.id !== lensId) return l;
+      // Per-stage lens: toggle in stageProductIds[stageKey]
+      if (l.scope === 'per-stage' && stageKey) {
+        const current = l.stageProductIds?.[stageKey] ?? [];
+        const has = current.includes(productId);
+        return {
+          ...l,
+          stageProductIds: {
+            ...(l.stageProductIds ?? {}),
+            [stageKey]: has ? current.filter((id) => id !== productId) : [...current, productId],
+          },
+        };
+      }
+      // Global lens: toggle in productIds (existing behaviour)
       const has = l.productIds.includes(productId);
       return {
         ...l,

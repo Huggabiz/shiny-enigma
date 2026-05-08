@@ -30,6 +30,7 @@ export function LensSidebar() {
   } = useProjectStore();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newScope, setNewScope] = useState<'global' | 'per-stage'>('global');
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   if (!project) return null;
@@ -39,8 +40,9 @@ export function LensSidebar() {
 
   const commitNew = () => {
     const trimmed = newName.trim();
-    if (trimmed) createLens(trimmed);
+    if (trimmed) createLens(trimmed, newScope);
     setNewName('');
+    setNewScope('global');
     setAdding(false);
   };
 
@@ -61,7 +63,21 @@ export function LensSidebar() {
           const isActive = activeLensId === lens.id;
           const isEditing = editingLensId === lens.id;
           const isBuiltIn = !!lens.builtInKind;
-          const memberCount = isBuiltIn ? null : lens.productIds.length;
+          const isPerStage = lens.scope === 'per-stage';
+          // For global lenses show productIds count; for per-stage show
+          // unique SKU count across all stages.
+          let memberCount: number | null = null;
+          if (!isBuiltIn) {
+            if (isPerStage && lens.stageProductIds) {
+              const unique = new Set<string>();
+              for (const ids of Object.values(lens.stageProductIds)) {
+                for (const id of ids) unique.add(id);
+              }
+              memberCount = unique.size;
+            } else {
+              memberCount = lens.productIds.length;
+            }
+          }
           // Built-in lenses (currently just Dev) are always-on and not
           // selectable — clicking the row is a no-op so the lens entry
           // is just a label in the list.
@@ -103,6 +119,7 @@ export function LensSidebar() {
                   title={isBuiltIn ? 'Built-in lens' : 'Double-click to rename'}
                 >
                   {lens.name}
+                  {isPerStage && <span className="lens-scope-tag">per-stage</span>}
                   {memberCount !== null && <span className="lens-member-count"> · {memberCount}</span>}
                 </span>
               )}
@@ -144,9 +161,19 @@ export function LensSidebar() {
               onBlur={commitNew}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                if (e.key === 'Escape') { setAdding(false); setNewName(''); }
+                if (e.key === 'Escape') { setAdding(false); setNewName(''); setNewScope('global'); }
               }}
             />
+            <select
+              className="lens-scope-select"
+              value={newScope}
+              onChange={(e) => setNewScope(e.target.value as 'global' | 'per-stage')}
+              onClick={(e) => e.stopPropagation()}
+              title="Scope: global applies everywhere; per-stage applies independently per stage"
+            >
+              <option value="global">Global</option>
+              <option value="per-stage">Per-stage</option>
+            </select>
           </div>
         )}
       </div>

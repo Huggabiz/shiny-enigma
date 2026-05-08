@@ -344,10 +344,18 @@ export interface Lens {
   name: string;
   /** Hex colour used for both the swatch and the card-background tint. */
   color: string;
-  /** Catalogue product IDs in this lens. Ignored for the built-in 'dev'
-   * lens — its membership is implicit (any catalogue product whose
-   * `source === 'dev'`). */
+  /** Lens scope: 'global' means productIds apply everywhere.
+   * 'per-stage' means membership is tracked per-stage in
+   * stageProductIds — each stage has its own set of product IDs.
+   * Default (undefined) = 'global'. */
+  scope?: 'global' | 'per-stage';
+  /** Global product IDs — used when scope is 'global' (or undefined).
+   * Ignored for the built-in 'dev' lens (implicit membership). */
   productIds: string[];
+  /** Per-stage product IDs — used when scope is 'per-stage'. Keyed by
+   * stage key ('current', 'future', 'stage-<defId>'). Each stage has
+   * its own independent membership set. */
+  stageProductIds?: Record<string, string[]>;
   /** Identifies a built-in lens. Built-ins can't be deleted or renamed
    * and may have implicit membership rules. */
   builtInKind?: 'dev';
@@ -380,8 +388,19 @@ export const LENS_PALETTE: string[] = [
 
 /** True if a product is "in" a lens. Built-in 'dev' uses implicit
  * membership; custom lenses use explicit productIds. */
-export function isProductInLens(lens: Lens, product: Pick<Product, 'id' | 'source'>): boolean {
+/** True if a product is "in" a lens. For global lenses, checks
+ * productIds. For per-stage lenses, checks stageProductIds[stageKey].
+ * Built-in 'dev' uses implicit membership regardless of scope. */
+export function isProductInLens(
+  lens: Lens,
+  product: Pick<Product, 'id' | 'source'>,
+  stageKey?: string,
+): boolean {
   if (lens.builtInKind === 'dev') return product.source === 'dev';
+  if (lens.scope === 'per-stage') {
+    if (!stageKey || !lens.stageProductIds) return false;
+    return lens.stageProductIds[stageKey]?.includes(product.id) ?? false;
+  }
   return lens.productIds.includes(product.id);
 }
 
