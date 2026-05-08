@@ -15,6 +15,7 @@ import { Catalogue } from './Catalogue';
 import { useProjectStore } from '../store/useProjectStore';
 import { CloseIcon } from './Icons';
 import { PlaceholderDialog } from './PlaceholderDialog';
+import { SkuDetailsPane } from './SkuDetailsPane';
 import { EditableTitle } from './EditableTitle';
 import { SlideCanvasControls } from './SlideCanvasControls';
 import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem } from '../types';
@@ -982,11 +983,14 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
         </div>
 
-        <Catalogue products={catalogue} onImport={onImport}
-          currentProductIds={currentProductIds} futureProductIds={futureProductIds}
-          otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds}
-          designShelfId={shelfId}
-          dropZoneId="catalogue-drop-zone-design" />
+        <div className="right-column">
+          <SkuDetailsPane />
+          <Catalogue products={catalogue} onImport={onImport}
+            currentProductIds={currentProductIds} futureProductIds={futureProductIds}
+            otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds}
+            designShelfId={shelfId}
+            dropZoneId="catalogue-drop-zone-design" />
+        </div>
 
         <DragOverlay>
           {activeProduct && (

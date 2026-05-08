@@ -56,21 +56,7 @@
   letter-spacing: 0.5px;
 }
 
-.catalogue-collapse-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: none;
-  color: #999;
-  cursor: pointer;
-  font-size: 10px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-}
-.catalogue-collapse-btn:hover { background: #f0f0f0; color: #333; }
+/* (catalogue-collapse-btn removed — single cycle button handles all states) */
 
 .catalogue-header {
   display: flex;

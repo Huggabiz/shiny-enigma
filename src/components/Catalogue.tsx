@@ -164,7 +164,7 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   const [viewMode, setViewMode] = useState<'collapsed' | 'normal' | 'expanded'>('normal');
 
   const cycleViewMode = () => {
-    setViewMode((m) => m === 'collapsed' ? 'normal' : m === 'normal' ? 'expanded' : 'collapsed');
+    setViewMode((m) => m === 'normal' ? 'expanded' : m === 'expanded' ? 'collapsed' : 'normal');
   };
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [collapsedSubCats, setCollapsedSubCats] = useState<Set<string>>(new Set());
@@ -280,16 +280,9 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
           <button
             className="catalogue-expand-btn"
             onClick={cycleViewMode}
-            title={viewMode === 'expanded' ? 'Compact view' : viewMode === 'normal' ? 'Expand' : 'Collapse'}
+            title={viewMode === 'expanded' ? 'Collapse' : viewMode === 'normal' ? 'Expand' : 'Normal'}
           >
-            {viewMode === 'expanded' ? '▶' : viewMode === 'normal' ? '◀' : '▶'}
-          </button>
-          <button
-            className="catalogue-collapse-btn"
-            onClick={() => setViewMode('collapsed')}
-            title="Collapse catalogue to icon strip"
-          >
-            ▷
+            {viewMode === 'expanded' ? '▶▶' : viewMode === 'normal' ? '◀◀' : '◀'}
           </button>
           <button className="import-btn" onClick={onImport}>
             Import Data
