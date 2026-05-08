@@ -806,21 +806,29 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     }
   }, [shelfId, layout, updateMatrixLayout, stages]);
 
+  const [removeLabelDialog, setRemoveLabelDialog] = useState<{
+    axis: 'x' | 'y';
+    index: number;
+    label: string;
+    itemCount: number;
+  } | null>(null);
+
   const removeLabel = useCallback((axis: 'x' | 'y', index: number) => {
-    // Find items assigned to this row/column
     const affectedItems = layout.assignments.filter(
       axis === 'x' ? (a) => a.col === index : (a) => a.row === index,
     );
-
-    let removeProducts = false;
+    const label = axis === 'x' ? layout.xLabels[index] : layout.yLabels[index];
     if (affectedItems.length > 0) {
-      const choice = confirm(
-        `This ${axis === 'x' ? 'column' : 'row'} has ${affectedItems.length} product(s).\n\n` +
-        `OK = Remove products from range (this stage and all future stages)\n` +
-        `Cancel = Keep products on shelf (unassigned from matrix)`,
-      );
-      removeProducts = choice;
+      setRemoveLabelDialog({ axis, index, label: label || '', itemCount: affectedItems.length });
+      return;
     }
+    executeRemoveLabel(axis, index, false);
+  }, [layout]);
+
+  const executeRemoveLabel = useCallback((axis: 'x' | 'y', index: number, removeProducts: boolean) => {
+    const affectedItems = layout.assignments.filter(
+      axis === 'x' ? (a) => a.col === index : (a) => a.row === index,
+    );
 
     // Remove the label + reassign remaining cells on THIS stage
     if (axis === 'x') {
@@ -861,6 +869,16 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
       }
     }
   }, [shelfId, layout, updateMatrixLayout, stages, shelf, removeItemFromShelf]);
+
+  const handleRemoveLabelChoice = useCallback((choice: 'remove' | 'keep' | 'cancel') => {
+    if (!removeLabelDialog) return;
+    if (choice === 'cancel') {
+      setRemoveLabelDialog(null);
+      return;
+    }
+    executeRemoveLabel(removeLabelDialog.axis, removeLabelDialog.index, choice === 'remove');
+    setRemoveLabelDialog(null);
+  }, [removeLabelDialog, executeRemoveLabel]);
 
   const updateLabel = useCallback((axis: 'x' | 'y', index: number, text: string) => {
     if (axis === 'x') updateMatrixLayout(shelfId, { xLabels: layout.xLabels.map((l, i) => i === index ? text : l) });
@@ -1102,6 +1120,30 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
             <div className="matrix-drag-preview">{activeProduct.name}</div>
           )}
         </DragOverlay>
+
+        {/* Remove section dialog — three-choice popup */}
+        {removeLabelDialog && (
+          <div className="remove-label-overlay" onClick={() => setRemoveLabelDialog(null)}>
+            <div className="remove-label-dialog" onClick={(e) => e.stopPropagation()}>
+              <h3>Remove "{removeLabelDialog.label}" {removeLabelDialog.axis === 'x' ? 'column' : 'row'}</h3>
+              <p>
+                This section has <strong>{removeLabelDialog.itemCount}</strong> product{removeLabelDialog.itemCount === 1 ? '' : 's'}.
+                What would you like to do?
+              </p>
+              <div className="remove-label-actions">
+                <button className="remove-label-btn danger" onClick={() => handleRemoveLabelChoice('remove')}>
+                  Remove products from range
+                </button>
+                <button className="remove-label-btn keep" onClick={() => handleRemoveLabelChoice('keep')}>
+                  Keep products on shelf
+                </button>
+                <button className="remove-label-btn cancel" onClick={() => handleRemoveLabelChoice('cancel')}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </DndContext>
       {placeholderDialog && (
         <PlaceholderDialog

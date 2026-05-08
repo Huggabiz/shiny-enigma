@@ -681,6 +681,76 @@
   opacity: 0.3;
 }
 
+/* Remove-section dialog — three-choice popup */
+.remove-label-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.remove-label-dialog {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+  padding: 24px 28px;
+  max-width: 400px;
+  width: calc(100vw - 32px);
+}
+
+.remove-label-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.remove-label-dialog p {
+  margin: 0 0 18px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+}
+
+.remove-label-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.remove-label-btn {
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.remove-label-btn.danger {
+  background: #c62828;
+  color: #fff;
+}
+.remove-label-btn.danger:hover { background: #b71c1c; }
+
+.remove-label-btn.keep {
+  background: #fff3e0;
+  color: #e65100;
+  border-color: #ffe0b2;
+}
+.remove-label-btn.keep:hover { background: #ffe0b2; }
+
+.remove-label-btn.cancel {
+  background: #f5f5f5;
+  color: #666;
+  border-color: #e0e0e0;
+}
+.remove-label-btn.cancel:hover { background: #eee; }
+
 .unassigned-remove {
   border: none;
   background: transparent;
