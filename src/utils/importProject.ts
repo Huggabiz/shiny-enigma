@@ -289,12 +289,55 @@ export function computeImportPlan(master: Project, imported: Project): ImportPla
       if (resolution?.masterId) remappedProductIds.push(resolution.masterId);
     }
 
+    // Remap stageProductIds: both the product IDs AND the stage keys
+    // need resolving (stage def IDs were remapped earlier).
+    let remappedStageProductIds: Record<string, string[]> | undefined;
+    if (impLens.scope === 'per-stage' && impLens.stageProductIds) {
+      remappedStageProductIds = {};
+      for (const [oldStageId, pids] of Object.entries(impLens.stageProductIds)) {
+        // Stage keys are 'current', 'future', or 'stage-<defId>'.
+        // 'current' and 'future' pass through; 'stage-<defId>' needs
+        // the def ID resolved to the master's equivalent.
+        let resolvedKey = oldStageId;
+        if (oldStageId.startsWith('stage-')) {
+          const oldDefId = oldStageId.replace('stage-', '');
+          const newDefId = importedStageIdToResolved.get(oldDefId);
+          if (newDefId) resolvedKey = `stage-${newDefId}`;
+          else continue; // stage was dropped during merge — skip
+        }
+        const remapped: string[] = [];
+        for (const pid of pids) {
+          const resolution = importedProductResolution.get(pid);
+          if (resolution?.masterId) remapped.push(resolution.masterId);
+        }
+        if (remapped.length > 0) remappedStageProductIds[resolvedKey] = remapped;
+      }
+    }
+
     const existing = masterLensesByName.get(impLens.name);
     if (existing) {
-      // Merge — union the two productId lists.
+      // Merge — union the two productId lists + stageProductIds.
       const merged = Array.from(new Set([...existing.productIds, ...remappedProductIds]));
+      let mergedStageIds = existing.stageProductIds ? { ...existing.stageProductIds } : undefined;
+      if (remappedStageProductIds) {
+        mergedStageIds = mergedStageIds ?? {};
+        for (const [key, ids] of Object.entries(remappedStageProductIds)) {
+          const existingIds = mergedStageIds[key] ?? [];
+          mergedStageIds[key] = Array.from(new Set([...existingIds, ...ids]));
+        }
+      }
+      // If the imported lens is per-stage and the master isn't, upgrade
+      // the master to per-stage (the global productIds stay as fallback).
+      const mergedScope = impLens.scope === 'per-stage' ? 'per-stage' : existing.scope;
       const idx = nextLenses.findIndex((l) => l.id === existing.id);
-      if (idx >= 0) nextLenses[idx] = { ...existing, productIds: merged };
+      if (idx >= 0) {
+        nextLenses[idx] = {
+          ...existing,
+          productIds: merged,
+          ...(mergedScope === 'per-stage' ? { scope: 'per-stage' as const } : {}),
+          ...(mergedStageIds ? { stageProductIds: mergedStageIds } : {}),
+        };
+      }
       mergedLensNames.push(impLens.name);
     } else {
       const color = LENS_PALETTE[customLensCount % LENS_PALETTE.length];
@@ -304,6 +347,8 @@ export function computeImportPlan(master: Project, imported: Project): ImportPla
         name: impLens.name,
         color,
         productIds: remappedProductIds,
+        ...(impLens.scope === 'per-stage' ? { scope: 'per-stage' as const } : {}),
+        ...(remappedStageProductIds ? { stageProductIds: remappedStageProductIds } : {}),
       });
       newLensNames.push(impLens.name);
     }
