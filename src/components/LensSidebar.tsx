@@ -35,7 +35,7 @@ export function LensSidebar() {
 
   if (!project) return null;
   const lenses = project.lenses ?? [];
-  const activeLensId = project.activeLensId ?? null;
+  const activeLensIds = project.activeLensIds ?? [];
   const editingLensId = project.editingLensId ?? null;
 
   const commitNew = () => {
@@ -60,7 +60,7 @@ export function LensSidebar() {
       </div>
       <div className="lens-list">
         {lenses.map((lens) => {
-          const isActive = activeLensId === lens.id;
+          const isActive = activeLensIds.includes(lens.id);
           const isEditing = editingLensId === lens.id;
           const isBuiltIn = !!lens.builtInKind;
           const isPerStage = lens.scope === 'per-stage';

@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Product, ShelfItem, FuturePricing } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
-import { hexToRgba } from '../utils/color';
+import { computeLensTintBackground } from '../utils/lensTint';
 import { CloseIcon } from './Icons';
 import './ProductCard.css';
 
@@ -163,22 +163,20 @@ export function ProductCard({
   // view picks it up too since ProductCard is shared).
   const project = useProjectStore((s) => s.project);
   const toggleLensProduct = useProjectStore((s) => s.toggleLensProduct);
-  const activeLens = useMemo(() => {
-    if (!project?.activeLensId) return null;
-    return project.lenses?.find((l) => l.id === project.activeLensId) ?? null;
-  }, [project?.activeLensId, project?.lenses]);
+  const activeLenses = useMemo(() => {
+    const ids = project?.activeLensIds ?? [];
+    if (ids.length === 0) return [];
+    return ids.map((id) => (project?.lenses ?? []).find((l) => l.id === id)).filter((l): l is import('../types').Lens => !!l);
+  }, [project?.activeLensIds, project?.lenses]);
   const editingLens = useMemo(() => {
     if (!project?.editingLensId) return null;
     return project.lenses?.find((l) => l.id === project.editingLensId) ?? null;
   }, [project?.editingLensId, project?.lenses]);
-  const productInActiveLens = useMemo(() => {
-    if (!activeLens || !product) return false;
-    if (activeLens.builtInKind) return false;
-    if (activeLens.scope === 'per-stage') {
-      return stageKeyProp ? (activeLens.stageProductIds?.[stageKeyProp]?.includes(product.id) ?? false) : false;
-    }
-    return activeLens.productIds.includes(product.id);
-  }, [activeLens, product, stageKeyProp]);
+  const lensTintStyle = useMemo(
+    () => computeLensTintBackground(activeLenses, product?.id, stageKeyProp),
+    [activeLenses, product?.id, stageKeyProp],
+  );
+  const productInActiveLens = !!lensTintStyle;
 
   const {
     attributes,
@@ -194,9 +192,7 @@ export function ProductCard({
     transition,
     opacity: isDragging ? 0.4 : 1,
     ...(cardWidth ? { width: `${cardWidth}px`, minWidth: `${cardWidth}px` } : {}),
-    ...(productInActiveLens && activeLens
-      ? { backgroundColor: hexToRgba(activeLens.color, 0.22), borderColor: activeLens.color }
-      : {}),
+    ...(lensTintStyle ?? {}),
   };
 
   // Orphan state: shelf item has a productId but the product isn't

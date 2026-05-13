@@ -61,11 +61,12 @@ export function MultiplanView() {
     setExclusiveLensFilter,
   } = useProjectStore();
 
-  // Active lens for exclusive filter
-  const activeLensForFilter = useMemo(() => {
-    if (!project?.activeLensId) return null;
-    return project?.lenses?.find((l) => l.id === project.activeLensId) ?? null;
-  }, [project?.activeLensId, project?.lenses]);
+  // Active lenses for exclusive filter
+  const activeLensesForFilter = useMemo(() => {
+    const ids = project?.activeLensIds ?? [];
+    if (ids.length === 0) return [];
+    return ids.map((id) => (project?.lenses ?? []).find((l) => l.id === id)).filter((l): l is import('../types').Lens => !!l);
+  }, [project?.activeLensIds, project?.lenses]);
 
   // Sensors for the row-reorder DndContext. Small activation distance
   // so a click on the drag handle (label column) registers as a click
@@ -131,20 +132,21 @@ export function MultiplanView() {
               .map((i) => ({ item: i, ghosted: !includedIds.has(i.id) }))
           : shelf.items.map((i) => ({ item: i, ghosted: false }));
         // Exclusive lens filter
-        if (exclusiveLensFilter && activeLensForFilter && !activeLensForFilter.builtInKind) {
+        if (exclusiveLensFilter && activeLensesForFilter.length > 0) {
           rowItems = rowItems.filter(({ item }) => {
             const prod = project.catalogue.find((p) => p.id === item.productId);
             if (!prod) return true;
-            if (activeLensForFilter.scope === 'per-stage') {
-              return activeLensForFilter.stageProductIds?.[shelfSide]?.includes(prod.id) ?? false;
-            }
-            return activeLensForFilter.productIds.includes(prod.id);
+            return activeLensesForFilter.some((lens) => {
+              if (lens.builtInKind) return false;
+              if (lens.scope === 'per-stage') return lens.stageProductIds?.[shelfSide]?.includes(prod.id) ?? false;
+              return lens.productIds.includes(prod.id);
+            });
           });
         }
         return { plan, variant, shelf, rowItems };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
-  }, [entries, project, shelfSide, showGhosted, exclusiveLensFilter, activeLensForFilter]);
+  }, [entries, project, shelfSide, showGhosted, exclusiveLensFilter, activeLensesForFilter]);
 
   if (!project) return null;
 
@@ -186,7 +188,7 @@ export function MultiplanView() {
           ))}
         </div>
         <div className="multiplan-toolbar-actions">
-          {activeLensForFilter && (
+          {activeLensesForFilter.length > 0 && (
             <label className="multiplan-show-excluded" title="Show only products in the active lens">
               <input type="checkbox" checked={exclusiveLensFilter} onChange={(e) => setExclusiveLensFilter(e.target.checked)} />
               Lens only
