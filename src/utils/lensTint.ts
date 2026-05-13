@@ -93,11 +93,13 @@ export function computeLensTintBackground(
     };
   }
 
-  // Diagonal split with BOTH fill and border gradients that preserve
-  // border-radius. Uses the double-background trick: a transparent
-  // border lets two layered backgrounds show through — the fill
-  // gradient at 22% alpha in the padding-box, and the full-colour
-  // gradient in the border-box (visible only in the 2px border area).
+  // Three layered backgrounds (top to bottom in CSS stacking):
+  //   1. Semi-transparent diagonal tint (padding-box) — the visible fill
+  //   2. Solid white (padding-box) — blocks the border gradient from
+  //      bleeding through the semi-transparent fill
+  //   3. Full-colour diagonal gradient (border-box) — only visible in
+  //      the 2px transparent border area
+  // border-radius works normally since we're not using border-image.
   const fillStops: string[] = [];
   const borderStops: string[] = [];
   const step = 100 / matchingColours.length;
@@ -109,7 +111,11 @@ export function computeLensTintBackground(
   }
 
   return {
-    background: `linear-gradient(135deg, ${fillStops.join(', ')}) padding-box, linear-gradient(135deg, ${borderStops.join(', ')}) border-box`,
+    background: [
+      `linear-gradient(135deg, ${fillStops.join(', ')}) padding-box`,
+      `linear-gradient(#fff, #fff) padding-box`,
+      `linear-gradient(135deg, ${borderStops.join(', ')}) border-box`,
+    ].join(', '),
     border: '2px solid transparent',
   };
 }
