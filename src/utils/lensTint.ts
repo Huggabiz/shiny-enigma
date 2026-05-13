@@ -93,11 +93,11 @@ export function computeLensTintBackground(
     };
   }
 
-  // Diagonal split: 135° gradient with hard stops for both the
-  // background fill (at 22% alpha) and the border (at full colour).
-  // border-image applies the gradient to the border itself so the
-  // split matches the fill. Note: border-image disables border-radius
-  // in CSS — multi-lens cards have sharp corners.
+  // Diagonal split with BOTH fill and border gradients that preserve
+  // border-radius. Uses the double-background trick: a transparent
+  // border lets two layered backgrounds show through — the fill
+  // gradient at 22% alpha in the padding-box, and the full-colour
+  // gradient in the border-box (visible only in the 2px border area).
   const fillStops: string[] = [];
   const borderStops: string[] = [];
   const step = 100 / matchingColours.length;
@@ -109,9 +109,7 @@ export function computeLensTintBackground(
   }
 
   return {
-    background: `linear-gradient(135deg, ${fillStops.join(', ')})`,
-    borderImage: `linear-gradient(135deg, ${borderStops.join(', ')}) 1`,
-    borderStyle: 'solid' as const,
-    borderWidth: '2px',
+    background: `linear-gradient(135deg, ${fillStops.join(', ')}) padding-box, linear-gradient(135deg, ${borderStops.join(', ')}) border-box`,
+    border: '2px solid transparent',
   };
 }
