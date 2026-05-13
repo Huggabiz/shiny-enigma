@@ -21,7 +21,7 @@ import { SlideCanvasControls } from './SlideCanvasControls';
 import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem } from '../types';
 import { getActivePlan, getStages } from '../types';
 import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH } from '../utils/matrixLayout';
-import { hexToRgba } from '../utils/color';
+import { computeLensTintBackground } from '../utils/lensTint';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
@@ -141,24 +141,27 @@ function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, 
   // Read exclusive lens filter state
   const project = useProjectStore((s) => s.project);
   const exclusiveLens = useProjectStore((s) => s.exclusiveLensFilter);
-  const activeLens = useMemo(() => {
-    if (!project?.activeLensId) return null;
-    return project.lenses?.find((l) => l.id === project.activeLensId) ?? null;
-  }, [project?.activeLensId, project?.lenses]);
+  const activeCellLenses = useMemo(() => {
+    const ids = project?.activeLensIds ?? [];
+    if (ids.length === 0) return [];
+    return ids.map((id) => (project?.lenses ?? []).find((l) => l.id === id)).filter((l): l is import('../types').Lens => !!l);
+  }, [project?.activeLensIds, project?.lenses]);
 
   // Filter items by variant + exclusive lens
   const filtered = allItems.filter((item): item is ShelfItem => {
     if (!item) return false;
     if (!variantIncludedIds) { /* master — show all */ }
     else if (!variantIncludedIds.has(item.id) && !showGhostedProp) return false;
-    // Exclusive lens filter
-    if (exclusiveLens && activeLens && !activeLens.builtInKind) {
+    // Exclusive lens filter — show only items in ANY active lens
+    if (exclusiveLens && activeCellLenses.length > 0) {
       const prod = catalogue.find((p) => p.id === item.productId);
       if (prod) {
-        const inLens = activeLens.scope === 'per-stage'
-          ? activeLens.stageProductIds?.[stageKey]?.includes(prod.id) ?? false
-          : activeLens.productIds.includes(prod.id);
-        if (!inLens) return false;
+        const inAny = activeCellLenses.some((lens) => {
+          if (lens.builtInKind) return false;
+          if (lens.scope === 'per-stage') return lens.stageProductIds?.[stageKey]?.includes(prod.id) ?? false;
+          return lens.productIds.includes(prod.id);
+        });
+        if (!inAny) return false;
       }
     }
     return true;
@@ -234,24 +237,20 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   // edit-mode click-to-toggle membership.
   const project = useProjectStore((s) => s.project);
   const toggleLensProduct = useProjectStore((s) => s.toggleLensProduct);
-  const activeLens = useMemo(() => {
-    if (!project?.activeLensId) return null;
-    return project.lenses?.find((l) => l.id === project.activeLensId) ?? null;
-  }, [project?.activeLensId, project?.lenses]);
+  const activeLenses = useMemo(() => {
+    const ids = project?.activeLensIds ?? [];
+    if (ids.length === 0) return [];
+    return ids.map((id) => (project?.lenses ?? []).find((l) => l.id === id)).filter((l): l is import('../types').Lens => !!l);
+  }, [project?.activeLensIds, project?.lenses]);
   const editingLens = useMemo(() => {
     if (!project?.editingLensId) return null;
     return project.lenses?.find((l) => l.id === project.editingLensId) ?? null;
   }, [project?.editingLensId, project?.lenses]);
-  // The stageKey for per-stage lens checks comes from the MatrixCell's
-  // stageKey prop, which traces back to RangeDesign's shelfId.
-  const productInActiveLens = useMemo(() => {
-    if (!activeLens || !product) return false;
-    if (activeLens.builtInKind) return false;
-    if (activeLens.scope === 'per-stage') {
-      return activeLens.stageProductIds?.[stageKey]?.includes(product.id) ?? false;
-    }
-    return activeLens.productIds.includes(product.id);
-  }, [activeLens, product, stageKey]);
+  const lensTintStyle = useMemo(
+    () => computeLensTintBackground(activeLenses, product?.id, stageKey),
+    [activeLenses, product?.id, stageKey],
+  );
+  const productInActiveLens = !!lensTintStyle;
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `matrix-item-${itemId}`, data: { itemId },
@@ -314,12 +313,8 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
     editingLens ? 'lens-edit-mode' : '',
   ].filter(Boolean).join(' ');
 
-  // When the active lens has the product, paint the card background
-  // with a translucent version of the lens colour (alpha ~22%) so the
-  // tint reads clearly without obscuring the card content.
-  const lensTintStyle = productInActiveLens && activeLens
-    ? { backgroundColor: hexToRgba(activeLens.color, 0.22), borderColor: activeLens.color }
-    : undefined;
+  // lensTintStyle is now computed above via computeLensTintBackground,
+  // which handles single and multi-lens diagonal-split gradients.
 
   const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
 
@@ -454,11 +449,12 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     cardFormat,
   } = useProjectStore();
 
-  // Active lens for the exclusive filter checkbox
-  const activeLensForFilter = useMemo(() => {
-    if (!project?.activeLensId) return null;
-    return project.lenses?.find((l) => l.id === project.activeLensId) ?? null;
-  }, [project?.activeLensId, project?.lenses]);
+  // Active lenses for the exclusive filter checkbox
+  const activeLensesForFilter = useMemo(() => {
+    const ids = project?.activeLensIds ?? [];
+    if (ids.length === 0) return [];
+    return ids.map((id) => (project?.lenses ?? []).find((l) => l.id === id)).filter((l): l is import('../types').Lens => !!l);
+  }, [project?.activeLensIds, project?.lenses]);
 
   // Scale the chrome dimensions (row/column headers, gaps) with the
   // slide resolution tier so the labels keep their visual proportions
@@ -555,15 +551,17 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
           if (a.row !== row || a.col !== col) return false;
           if (variantIncludedIds && !showGhosted) return variantIncludedIds.has(a.itemId);
           // Exclusive lens filter: only count items whose product is in the active lens
-          if (exclusiveLensFilter && activeLensForFilter && shelf) {
+          if (exclusiveLensFilter && activeLensesForFilter.length > 0 && shelf) {
             const item = shelf.items.find((i) => i.id === a.itemId);
             if (item) {
               const prod = catalogue.find((p) => p.id === item.productId);
               if (prod) {
-                const inLens = activeLensForFilter.scope === 'per-stage'
-                  ? activeLensForFilter.stageProductIds?.[shelfId]?.includes(prod.id) ?? false
-                  : activeLensForFilter.productIds.includes(prod.id);
-                if (!inLens) return false;
+                const inAny = activeLensesForFilter.some((lens) => {
+                  if (lens.builtInKind) return false;
+                  if (lens.scope === 'per-stage') return lens.stageProductIds?.[shelfId]?.includes(prod.id) ?? false;
+                  return lens.productIds.includes(prod.id);
+                });
+                if (!inAny) return false;
               }
             }
           }
@@ -594,7 +592,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
     }
     return counts;
   }, [layout.xLabels, layout.yLabels, layout.assignments, variantIncludedIds, showGhosted,
-      shelfId, showDiscontinued, activePlan, exclusiveLensFilter, activeLensForFilter]);
+      shelfId, showDiscontinued, activePlan, exclusiveLensFilter, activeLensesForFilter]);
 
   // Available area inside the matrix wrapper at the current uiScale.
   // Memoised separately so the auto-tier useEffect can reuse it without
@@ -978,7 +976,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                 <input type="checkbox" checked={showDiscontinued} onChange={(e) => setShowDiscontinued(e.target.checked)} />
                 <span>Show discontinued</span>
               </label>
-              {activeLensForFilter && (
+              {activeLensesForFilter.length > 0 && (
                 <label className="ghost-toggle" title="Show only products in the active lens">
                   <input type="checkbox" checked={exclusiveLensFilter} onChange={(e) => setExclusiveLensFilter(e.target.checked)} />
                   <span>Lens only</span>

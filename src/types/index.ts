@@ -449,7 +449,10 @@ export interface Project {
   /** Currently active lens ID (null = no lens applied → cards render
    * with no tint). Project-level so the active lens persists across
    * plan switches. */
-  activeLensId?: string | null;
+  /** Currently active lens IDs. Multiple lenses can be active at once;
+   * cards in any active lens get a diagonal-split tint showing each
+   * lens's colour. Empty array = no lens applied. */
+  activeLensIds?: string[];
   /** Lens currently in "edit mode" — clicking a SKU card toggles its
    * membership in this lens. Null = no edit mode. Only one lens can be
    * editable at a time. Built-in 'dev' lens can never be in edit mode

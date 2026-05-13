@@ -125,6 +125,7 @@ interface ProjectStore {
   createLens: (name: string, scope?: 'global' | 'per-stage') => void;
   removeLens: (lensId: string) => void;
   renameLens: (lensId: string, name: string) => void;
+  /** Toggle a lens in/out of the active set. Pass null to clear all. */
   setActiveLens: (lensId: string | null) => void;
   setEditingLens: (lensId: string | null) => void;
   toggleLensProduct: (lensId: string, productId: string, stageKey?: string) => void;
@@ -295,7 +296,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         activePlanId: firstPlan.id,
         catalogue,
         lenses: [{ ...DEFAULT_DEV_LENS }],
-        activeLensId: null,
+        activeLensIds: [],
         editingLensId: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -605,7 +606,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       project: {
         ...project,
         lenses,
-        activeLensId: project.activeLensId === lensId ? null : project.activeLensId,
+        activeLensIds: (project.activeLensIds ?? []).filter((id) => id !== lensId),
         editingLensId: project.editingLensId === lensId ? null : project.editingLensId,
         updatedAt: new Date().toISOString(),
       },
@@ -624,24 +625,24 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setActiveLens: (lensId) => {
     const { project } = get();
     if (!project) return;
-    // The built-in Dev lens is always-on (its own existing CSS class
-    // owns the styling) and not a member of the activatable lens set —
-    // refuse to set it as the active lens so callers can blindly pass
-    // any lens id without leaking the Dev lens into the tint logic.
-    if (lensId) {
-      const lens = (project.lenses ?? []).find((l) => l.id === lensId);
-      if (!lens || lens.builtInKind) return;
+    const current = project.activeLensIds ?? [];
+    if (lensId === null) {
+      // Clear all
+      set({ project: { ...project, activeLensIds: [], editingLensId: null } });
+      return;
     }
-    // Switching the active lens exits edit mode — prevents the user
-    // from deselecting the active lens while edit mode remains on,
-    // which would let clicks silently toggle membership with no
-    // visible tint feedback.
+    const lens = (project.lenses ?? []).find((l) => l.id === lensId);
+    if (!lens || lens.builtInKind) return;
+    // Toggle in/out of the active set
+    const isActive = current.includes(lensId);
+    const next = isActive ? current.filter((id) => id !== lensId) : [...current, lensId];
+    // If the lens being edited was toggled off, exit edit mode
     const editingLensId = project.editingLensId;
-    const shouldClearEditing = editingLensId && editingLensId !== lensId;
+    const shouldClearEditing = editingLensId && !next.includes(editingLensId);
     set({
       project: {
         ...project,
-        activeLensId: lensId,
+        activeLensIds: next,
         editingLensId: shouldClearEditing ? null : editingLensId,
       },
     });
@@ -661,7 +662,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       project: {
         ...project,
         editingLensId: lensId,
-        activeLensId: lensId ?? project.activeLensId,
+        activeLensIds: lensId ? Array.from(new Set([...(project.activeLensIds ?? []), lensId])) : project.activeLensIds,
       },
     });
   },
@@ -1486,7 +1487,7 @@ function ensureLenses(project: Project): Project {
   return {
     ...project,
     lenses: [{ ...DEFAULT_DEV_LENS }, ...lenses],
-    activeLensId: project.activeLensId ?? null,
+    activeLensIds: project.activeLensIds ?? [],
     editingLensId: project.editingLensId ?? null,
   };
 }
