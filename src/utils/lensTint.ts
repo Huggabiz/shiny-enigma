@@ -93,18 +93,25 @@ export function computeLensTintBackground(
     };
   }
 
-  // Diagonal split: 135° gradient with hard stops
-  const stops: string[] = [];
+  // Diagonal split: 135° gradient with hard stops for both the
+  // background fill (at 22% alpha) and the border (at full colour).
+  // border-image applies the gradient to the border itself so the
+  // split matches the fill. Note: border-image disables border-radius
+  // in CSS — multi-lens cards have sharp corners.
+  const fillStops: string[] = [];
+  const borderStops: string[] = [];
   const step = 100 / matchingColours.length;
   for (let i = 0; i < matchingColours.length; i++) {
     const start = Math.round(step * i);
     const end = Math.round(step * (i + 1));
-    const rgba = hexToRgba(matchingColours[i], 0.22);
-    stops.push(`${rgba} ${start}%`, `${rgba} ${end}%`);
+    fillStops.push(`${hexToRgba(matchingColours[i], 0.22)} ${start}%`, `${hexToRgba(matchingColours[i], 0.22)} ${end}%`);
+    borderStops.push(`${matchingColours[i]} ${start}%`, `${matchingColours[i]} ${end}%`);
   }
 
   return {
-    background: `linear-gradient(135deg, ${stops.join(', ')})`,
-    borderColor: firstBorderColor,
+    background: `linear-gradient(135deg, ${fillStops.join(', ')})`,
+    borderImage: `linear-gradient(135deg, ${borderStops.join(', ')}) 1`,
+    borderStyle: 'solid' as const,
+    borderWidth: '2px',
   };
 }
