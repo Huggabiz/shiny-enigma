@@ -16,6 +16,11 @@ async function captureElement(selector: string): Promise<string | null> {
   const el = document.querySelector(selector) as HTMLElement | null;
   if (!el) return null;
 
+  // Add a capture-mode class to the root so CSS can hide UI-only
+  // elements (add buttons) and fix text orientation issues that
+  // html2canvas doesn't handle (writing-mode + rotate).
+  document.documentElement.classList.add('pptx-capture');
+
   // Temporarily remove CSS transforms (zoom/scale) that confuse
   // html2canvas, then restore after capture.
   const ancestors: Array<{ el: HTMLElement; transform: string }> = [];
@@ -44,6 +49,7 @@ async function captureElement(selector: string): Promise<string | null> {
     return null;
   } finally {
     for (const a of ancestors) a.el.style.transform = a.transform;
+    document.documentElement.classList.remove('pptx-capture');
   }
 }
 
