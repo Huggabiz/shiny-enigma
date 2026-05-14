@@ -49,6 +49,32 @@ export function ExportDialog({ onClose }: ExportDialogProps) {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
 
+  // All stage keys across any plan (they're project-level so all the same)
+  const allStages = selections[0]?.stages ?? [];
+
+  // Global toggles — apply to all plans at once
+  const toggleGlobalRangeStage = (stageKey: string) => {
+    setSelections((prev) => {
+      // If ALL plans have this stage, remove it from all; otherwise add to all
+      const allHave = prev.every((s) => s.rangeStageKeys.includes(stageKey));
+      return prev.map((s) => ({
+        ...s,
+        rangeStageKeys: allHave
+          ? s.rangeStageKeys.filter((k) => k !== stageKey)
+          : s.rangeStageKeys.includes(stageKey) ? s.rangeStageKeys : [...s.rangeStageKeys, stageKey],
+      }));
+    });
+  };
+  const setGlobalTransform = (fromKey: string, toKey: string) => {
+    setSelections((prev) => prev.map((s) => ({ ...s, transformFromKey: fromKey, transformToKey: toKey })));
+  };
+  const setAllRange = (on: boolean) => {
+    setSelections((prev) => prev.map((s) => ({ ...s, includeRange: on })));
+  };
+  const setAllTransform = (on: boolean) => {
+    setSelections((prev) => prev.map((s) => ({ ...s, includeTransform: on })));
+  };
+
   if (!project) return null;
 
   const updatePlan = (planId: string, patch: Partial<PlanSelection>) => {
@@ -103,8 +129,62 @@ export function ExportDialog({ onClose }: ExportDialogProps) {
         </div>
 
         <div className="export-dialog-body">
+          {/* Global defaults — apply to all plans */}
           <div className="export-section">
-            <div className="export-section-title">Plans & views</div>
+            <div className="export-section-title">Global defaults (applies to all plans)</div>
+            <div className="export-global-row">
+              <span className="export-stage-label">Views:</span>
+              <label className="export-stage-check">
+                <input type="checkbox"
+                  checked={selections.every((s) => s.includeRange)}
+                  onChange={(e) => setAllRange(e.target.checked)} />
+                All Range
+              </label>
+              <label className="export-stage-check">
+                <input type="checkbox"
+                  checked={selections.every((s) => s.includeTransform)}
+                  onChange={(e) => setAllTransform(e.target.checked)} />
+                All Transform
+              </label>
+            </div>
+            <div className="export-global-row">
+              <span className="export-stage-label">Range stages:</span>
+              <div className="export-stage-checks">
+                {allStages.map((s) => {
+                  const allHave = selections.every((sel) => sel.rangeStageKeys.includes(s.key));
+                  return (
+                    <label key={s.key} className="export-stage-check">
+                      <input type="checkbox" checked={allHave}
+                        onChange={() => toggleGlobalRangeStage(s.key)} />
+                      {s.name}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="export-global-row">
+              <span className="export-stage-label">Transform:</span>
+              <select className="export-stage-select"
+                value={selections[0]?.transformFromKey ?? 'current'}
+                onChange={(e) => setGlobalTransform(e.target.value, selections[0]?.transformToKey ?? 'future')}>
+                {allStages.slice(0, -1).map((s) => (
+                  <option key={s.key} value={s.key}>{s.name}</option>
+                ))}
+              </select>
+              <span className="export-stage-arrow">→</span>
+              <select className="export-stage-select"
+                value={selections[0]?.transformToKey ?? 'future'}
+                onChange={(e) => setGlobalTransform(selections[0]?.transformFromKey ?? 'current', e.target.value)}>
+                {allStages.slice(1).map((s) => (
+                  <option key={s.key} value={s.key}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Per-plan overrides */}
+          <div className="export-section">
+            <div className="export-section-title">Per-plan overrides</div>
             <div className="export-plan-header-row">
               <span className="export-plan-col-name">Plan</span>
               <span className="export-plan-col-check">Range</span>
