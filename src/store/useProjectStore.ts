@@ -333,6 +333,25 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!project) return;
     const newPlan = createEmptyPlan(name);
     if (folderId) newPlan.folderId = folderId;
+
+    // Inherit intermediate shelves for any existing project-level
+    // stage definitions. Each gets an empty shelf (the user can
+    // populate it via the range view). Without this, a new plan in
+    // a project that already has stages would be missing shelves
+    // for those stages.
+    const defs = project.stageDefinitions ?? [];
+    if (defs.length > 0) {
+      newPlan.intermediateShelves = defs.map((def) => ({
+        stageId: def.id,
+        shelf: {
+          id: `shelf-${def.id}-${newPlan.id}`,
+          name: def.name,
+          items: [],
+          labels: [],
+        },
+      }));
+    }
+
     set({
       project: {
         ...project,

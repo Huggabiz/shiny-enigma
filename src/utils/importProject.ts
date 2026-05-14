@@ -243,6 +243,20 @@ export function computeImportPlan(master: Project, imported: Project): ImportPla
       };
     }).filter((e): e is NonNullable<typeof e> => e !== null);
 
+    // Ensure the imported plan has shelves for ALL master stage defs,
+    // not just those that came from the import. Master-only stages get
+    // empty shelves so getStages() can resolve them.
+    const allMasterStageDefs = [...(master.stageDefinitions ?? []), ...addedStageDefs];
+    const existingStageIds = new Set(newIntermediateShelves.map((s) => s.stageId));
+    for (const def of allMasterStageDefs) {
+      if (!existingStageIds.has(def.id)) {
+        newIntermediateShelves.push({
+          stageId: def.id,
+          shelf: { id: `shelf-${def.id}-imp-${Date.now()}`, name: def.name, items: [] as import('../types').ShelfItem[], labels: [] as import('../types').ShelfLabel[], matrixLayout: undefined },
+        });
+      }
+    }
+
     newPlans.push({
       ...plan,
       id: planIdFactory(),
