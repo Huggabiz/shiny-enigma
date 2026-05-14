@@ -66,12 +66,27 @@ export function exportToExcelEnriched(project: Project): void {
         if (product.source === 'dev') lensNames.push('Dev');
         continue;
       }
-      if (lens.scope === 'per-stage') {
-        // Check if in any stage
-        const inAnyStage = lens.stageProductIds
-          ? Object.values(lens.stageProductIds).some((ids) => ids.includes(product.id))
-          : false;
-        if (inAnyStage) lensNames.push(`${lens.name} (per-stage)`);
+      if (lens.scope === 'per-stage' && lens.stageProductIds) {
+        // List which specific stages this product is in for this lens
+        const stageNames: string[] = [];
+        for (const [stageKey, ids] of Object.entries(lens.stageProductIds)) {
+          if (!ids.includes(product.id)) continue;
+          // Resolve the stage key to a human-readable name
+          let stageName = stageKey;
+          if (stageKey === 'current') {
+            stageName = project.currentStageLabel ? `${project.currentStageLabel} (Current)` : 'Current';
+          } else if (stageKey === 'future') {
+            stageName = project.futureStageLabel || 'Future';
+          } else {
+            const defId = stageKey.replace('stage-', '');
+            const def = (project.stageDefinitions ?? []).find((d) => d.id === defId);
+            if (def) stageName = def.name;
+          }
+          stageNames.push(stageName);
+        }
+        if (stageNames.length > 0) {
+          lensNames.push(`${lens.name} [${stageNames.join(', ')}]`);
+        }
       } else {
         if (lens.productIds.includes(product.id)) lensNames.push(lens.name);
       }
