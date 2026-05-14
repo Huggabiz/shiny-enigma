@@ -104,9 +104,6 @@ export async function exportToPptx(
               data: dataUrl, x: 0, y: 0, w: SLIDE_W, h: SLIDE_H,
               sizing: { type: 'contain', w: SLIDE_W, h: SLIDE_H },
             });
-            slide.addText(`${plan.name} — ${stage.name}`, {
-              x: 0.2, y: 0.1, fontSize: 10, color: '888888',
-            });
           }
         }
       }
@@ -126,9 +123,6 @@ export async function exportToPptx(
             slide.addImage({
               data: dataUrl, x: 0, y: 0, w: SLIDE_W, h: SLIDE_H,
               sizing: { type: 'contain', w: SLIDE_W, h: SLIDE_H },
-            });
-            slide.addText(`${plan.name} — ${from.name} → ${to.name}`, {
-              x: 0.2, y: 0.1, fontSize: 10, color: '888888',
             });
           }
         }

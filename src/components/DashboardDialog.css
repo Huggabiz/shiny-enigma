@@ -1,0 +1,168 @@
+.dashboard-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dashboard-dialog {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 600px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.dashboard-header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.dashboard-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+.dashboard-close:hover { background: #f0f0f0; }
+
+.dashboard-body {
+  padding: 16px 24px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.dashboard-section {
+  margin-bottom: 20px;
+}
+.dashboard-section:last-child { margin-bottom: 0; }
+
+.dashboard-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 10px;
+}
+
+/* Stat cards */
+.dashboard-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dashboard-stat {
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.dashboard-stat-value {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.dashboard-stat-value.highlight { color: #1976d2; }
+.dashboard-stat-value.muted { color: #bbb; }
+.dashboard-stat-value.dev { color: #1565c0; }
+
+.dashboard-stat-label {
+  font-size: 10px;
+  color: #888;
+  margin-top: 2px;
+}
+
+/* Usage bar */
+.dashboard-usage-bar {
+  height: 6px;
+  background: #eee;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dashboard-usage-fill {
+  height: 100%;
+  background: #1976d2;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Tables */
+.dashboard-table {
+  font-size: 12px;
+}
+
+.dashboard-table-header {
+  display: grid;
+  grid-template-columns: 1fr repeat(3, 70px);
+  gap: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #999;
+  padding: 4px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.dashboard-table-row {
+  display: grid;
+  grid-template-columns: 1fr repeat(3, 70px);
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid #f5f5f5;
+  align-items: center;
+  color: #333;
+}
+
+.dashboard-table-row.total {
+  border-top: 1px solid #ddd;
+  font-weight: 700;
+}
+
+/* 2-column variant for warehouse volumes */
+.dashboard-table-header:has(span:nth-child(2):last-child),
+.dashboard-table-row:has(span:nth-child(2):last-child) {
+  grid-template-columns: 1fr 100px;
+}
+
+.dashboard-table-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dev { color: #1565c0; }
+
+.dashboard-scope-tag {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #888;
+}
