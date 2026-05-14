@@ -1,7 +1,5 @@
 // Simplified PowerPoint export — captures the canvas as a full-page
-// screenshot via html2canvas and places it on a 16:9 slide. No
-// card-by-card rendering, no shape building — just a pixel-perfect
-// image of what the user sees on screen.
+// screenshot via html2canvas and places it on a 16:9 slide.
 
 import html2canvas from 'html2canvas';
 import PptxGenJS from 'pptxgenjs';
@@ -11,6 +9,8 @@ import { getStages } from '../types';
 
 const SLIDE_W = 13.333; // 16:9 at 96dpi
 const SLIDE_H = 7.5;
+// Scale 4 ≈ 3840×2160 for a 960px-wide canvas — matches 4K/UHD.
+const CAPTURE_SCALE = 4;
 
 async function captureElement(selector: string): Promise<string | null> {
   const el = document.querySelector(selector) as HTMLElement | null;
@@ -21,7 +21,6 @@ async function captureElement(selector: string): Promise<string | null> {
   const ancestors: Array<{ el: HTMLElement; transform: string }> = [];
   let parent = el.closest('.slide-canvas-wrapper') as HTMLElement | null;
   if (!parent) parent = el;
-  // Walk up and strip transforms
   let walk: HTMLElement | null = parent;
   while (walk && walk !== document.body) {
     const t = walk.style.transform;
@@ -35,7 +34,7 @@ async function captureElement(selector: string): Promise<string | null> {
   try {
     const canvas = await html2canvas(el, {
       backgroundColor: '#ffffff',
-      scale: 2,
+      scale: CAPTURE_SCALE,
       useCORS: true,
       logging: false,
     });
@@ -44,21 +43,25 @@ async function captureElement(selector: string): Promise<string | null> {
     console.error('html2canvas capture failed:', err);
     return null;
   } finally {
-    // Restore transforms
     for (const a of ancestors) a.el.style.transform = a.transform;
   }
 }
 
-export interface ExportOptions {
+export interface PlanExportConfig {
+  planId: string;
   includeRange: boolean;
   includeTransform: boolean;
-  planIds: string[];
+  /** Which stage keys to export in range view. */
+  rangeStageKeys: string[];
+  /** Transform from/to stage keys. */
+  transformFromKey: string;
+  transformToKey: string;
 }
 
 export async function exportToPptx(
   project: Project,
-  options: ExportOptions,
-  onProgress?: (msg: string) => void,
+  configs: PlanExportConfig[],
+  onProgress?: (msg: string | null) => void,
 ): Promise<void> {
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
@@ -72,34 +75,41 @@ export async function exportToPptx(
   const originalTransformTo = store.transformToKey;
 
   try {
-    for (const planId of options.planIds) {
-      const plan = project.plans.find((p) => p.id === planId);
+    for (const config of configs) {
+      const plan = project.plans.find((p) => p.id === config.planId);
       if (!plan) continue;
-      store.setActivePlan(planId);
+      store.setActivePlan(config.planId);
 
       const stages = getStages(plan, project);
 
-      if (options.includeRange) {
-        for (const stage of stages) {
+      // Range view slides — one per selected stage
+      if (config.includeRange) {
+        for (const stageKey of config.rangeStageKeys) {
+          const stage = stages.find((s) => s.key === stageKey);
+          if (!stage) continue;
           onProgress?.(`Capturing ${plan.name} — ${stage.name} (Range)…`);
           store.setActiveView('range-design');
           store.setDesignShelfId(stage.key);
-          // Wait for React to render + layout to settle
           await waitForRender();
           const dataUrl = await captureElement('.matrix-16-9');
           if (dataUrl) {
             const slide = pptx.addSlide();
-            slide.addImage({ data: dataUrl, x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, sizing: { type: 'contain', w: SLIDE_W, h: SLIDE_H } });
-            slide.addText(`${plan.name} — ${stage.name}`, { x: 0.2, y: 0.1, fontSize: 10, color: '888888' });
+            slide.addImage({
+              data: dataUrl, x: 0, y: 0, w: SLIDE_W, h: SLIDE_H,
+              sizing: { type: 'contain', w: SLIDE_W, h: SLIDE_H },
+            });
+            slide.addText(`${plan.name} — ${stage.name}`, {
+              x: 0.2, y: 0.1, fontSize: 10, color: '888888',
+            });
           }
         }
       }
 
-      if (options.includeTransform) {
-        // Capture transform view for each adjacent stage pair
-        for (let i = 0; i < stages.length - 1; i++) {
-          const from = stages[i];
-          const to = stages[i + 1];
+      // Transform view slide — single capture for the selected from→to
+      if (config.includeTransform) {
+        const from = stages.find((s) => s.key === config.transformFromKey);
+        const to = stages.find((s) => s.key === config.transformToKey);
+        if (from && to) {
           onProgress?.(`Capturing ${plan.name} — ${from.name} → ${to.name} (Transform)…`);
           store.setActiveView('transform');
           store.setTransformStages(from.key, to.key);
@@ -107,14 +117,18 @@ export async function exportToPptx(
           const dataUrl = await captureElement('.transform-16-9');
           if (dataUrl) {
             const slide = pptx.addSlide();
-            slide.addImage({ data: dataUrl, x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, sizing: { type: 'contain', w: SLIDE_W, h: SLIDE_H } });
-            slide.addText(`${plan.name} — ${from.name} → ${to.name}`, { x: 0.2, y: 0.1, fontSize: 10, color: '888888' });
+            slide.addImage({
+              data: dataUrl, x: 0, y: 0, w: SLIDE_W, h: SLIDE_H,
+              sizing: { type: 'contain', w: SLIDE_W, h: SLIDE_H },
+            });
+            slide.addText(`${plan.name} — ${from.name} → ${to.name}`, {
+              x: 0.2, y: 0.1, fontSize: 10, color: '888888',
+            });
           }
         }
       }
     }
   } finally {
-    // Restore original state
     store.setActivePlan(originalActivePlan);
     store.setActiveView(originalActiveView);
     store.setDesignShelfId(originalDesignShelfId);
@@ -124,14 +138,14 @@ export async function exportToPptx(
   onProgress?.('Writing PowerPoint file…');
   const fileName = `${project.name.replace(/\s+/g, '_')}_export.pptx`;
   await pptx.writeFile({ fileName });
-  onProgress?.(null as unknown as string);
+  onProgress?.(null);
 }
 
 function waitForRender(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        setTimeout(resolve, 120);
+        setTimeout(resolve, 150);
       });
     });
   });
