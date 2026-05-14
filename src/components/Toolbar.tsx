@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { saveProject, saveRangeStructure, loadProjectFile } from '../utils/projectFile';
 import { computeImportPlan, type ImportPlanPreview } from '../utils/importProject';
-import { exportToPptx } from '../utils/exportPptx';
-import { exportToExcel } from '../utils/exportExcel';
+import { exportToExcelEnriched } from '../utils/exportExcelEnriched';
 import { APP_VERSION } from '../version';
 import { ImportProjectDialog } from './ImportProjectDialog';
+import { ExportDialog } from './ExportDialog';
 import { StageManagerDialog } from './StageManagerDialog';
 import './Toolbar.css';
 
@@ -36,7 +36,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
     if (trimmed && project && trimmed !== project.name) updateProjectName(trimmed);
     setEditingName(false);
   };
-  const [exportProgress, setExportProgress] = useState<string | null>(null);
+  
 
   // Resolve the scope the current format edits apply to — helps the user
   // know whether they're editing the plan default or the active variant.
@@ -54,6 +54,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
   const [openMenu, setOpenMenu] = useState<'save' | 'manage' | 'format' | null>(null);
   const [appendPreview, setAppendPreview] = useState<{ fileName: string; preview: ImportPlanPreview } | null>(null);
   const [showStageManager, setShowStageManager] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   const closeMenus = () => setOpenMenu(null);
 
@@ -195,24 +196,8 @@ export function Toolbar({ activeView }: ToolbarProps) {
                     catch (err) { console.error(err); alert('Failed to save range structure.'); }
                   }}>Save Range Structure</button>
                   <hr />
-                  <button
-                    onClick={async () => {
-                      if (!project) return;
-                      closeMenus();
-                      setExportProgress('Preparing export\u2026');
-                      try {
-                        await exportToPptx(project, setExportProgress);
-                      } catch (err) {
-                        console.error(err);
-                        alert('PowerPoint export failed. See browser console for details.');
-                      } finally {
-                        setExportProgress(null);
-                      }
-                    }}
-                  >
-                    Export PowerPoint
-                  </button>
-                  <button onClick={() => { if (project) exportToExcel(project); closeMenus(); }}>Export Excel</button>
+                  <button onClick={() => { closeMenus(); setShowExportDialog(true); }}>Export PowerPoint</button>
+                  <button onClick={() => { if (project) exportToExcelEnriched(project); closeMenus(); }}>Export Excel (SKU List)</button>
                 </div>
               )}
             </div>
@@ -252,16 +237,6 @@ export function Toolbar({ activeView }: ToolbarProps) {
           Append
         </button>
       </div>
-      {exportProgress && (
-        <div className="export-progress-overlay" role="status" aria-live="polite">
-          <div className="export-progress-card">
-            <div className="export-progress-spinner" aria-hidden="true" />
-            <div className="export-progress-title">Exporting PowerPoint</div>
-            <div className="export-progress-message">{exportProgress}</div>
-            <div className="export-progress-hint">Leave this tab visible while the capture runs.</div>
-          </div>
-        </div>
-      )}
       {appendPreview && (
         <ImportProjectDialog
           preview={appendPreview.preview}
@@ -271,6 +246,9 @@ export function Toolbar({ activeView }: ToolbarProps) {
       )}
       {showStageManager && (
         <StageManagerDialog onClose={() => setShowStageManager(false)} />
+      )}
+      {showExportDialog && (
+        <ExportDialog onClose={() => setShowExportDialog(false)} />
       )}
     </div>
   );
