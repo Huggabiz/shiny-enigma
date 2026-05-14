@@ -18,6 +18,27 @@
 /* Title */
 /* Stage selector — multi-step tab row replacing the old Current/Future
    pill toggle. Each tab represents a stage from getStages(). */
+/* ---- PPT capture mode ----
+   When .pptx-capture is on the <html> element, hide UI-only controls
+   and fix the row header text orientation that html2canvas can't
+   render (writing-mode: vertical-lr + transform: rotate(180deg)). */
+.pptx-capture .matrix-add-btn,
+.pptx-capture .matrix-add-btn.wide,
+.pptx-capture .matrix-cell-add-ph,
+.pptx-capture .matrix-label-remove {
+  display: none !important;
+}
+
+/* html2canvas doesn't support writing-mode + rotate. During capture,
+   switch the row header to a simple horizontal layout so the text
+   reads correctly (left-to-right, right-side-up). */
+.pptx-capture .matrix-row-header {
+  writing-mode: horizontal-tb !important;
+  text-orientation: initial !important;
+  transform: none !important;
+  font-size: calc(9px * var(--ui-scale, 1)) !important;
+}
+
 .range-stage-selector {
   display: inline-flex;
   background: #f0f0f0;
