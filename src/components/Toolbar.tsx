@@ -6,6 +6,7 @@ import { exportToExcelEnriched } from '../utils/exportExcelEnriched';
 import { APP_VERSION } from '../version';
 import { ImportProjectDialog } from './ImportProjectDialog';
 import { ExportDialog } from './ExportDialog';
+import { DashboardDialog } from './DashboardDialog';
 import { StageManagerDialog } from './StageManagerDialog';
 import './Toolbar.css';
 
@@ -51,10 +52,11 @@ export function Toolbar({ activeView }: ToolbarProps) {
       : 'Saving to default';
   const loadRef = useRef<HTMLInputElement>(null);
   const appendRef = useRef<HTMLInputElement>(null);
-  const [openMenu, setOpenMenu] = useState<'save' | 'manage' | 'format' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'save' | 'manage' | 'format' | 'tools' | null>(null);
   const [appendPreview, setAppendPreview] = useState<{ fileName: string; preview: ImportPlanPreview } | null>(null);
   const [showStageManager, setShowStageManager] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   const closeMenus = () => setOpenMenu(null);
 
@@ -202,6 +204,18 @@ export function Toolbar({ activeView }: ToolbarProps) {
               )}
             </div>
 
+            {/* Tools dropdown */}
+            <div className="toolbar-dropdown-wrapper">
+              <button className="toolbar-btn" onClick={() => setOpenMenu(openMenu === 'tools' ? null : 'tools')}>
+                Tools ▾
+              </button>
+              {openMenu === 'tools' && (
+                <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
+                  <button onClick={() => { closeMenus(); setShowDashboard(true); }}>Dashboard</button>
+                </div>
+              )}
+            </div>
+
             {/* Manage dropdown */}
             <div className="toolbar-dropdown-wrapper">
               <button className="toolbar-btn" onClick={() => setOpenMenu(openMenu === 'manage' ? null : 'manage')}>
@@ -249,6 +263,9 @@ export function Toolbar({ activeView }: ToolbarProps) {
       )}
       {showExportDialog && (
         <ExportDialog onClose={() => setShowExportDialog(false)} />
+      )}
+      {showDashboard && (
+        <DashboardDialog onClose={() => setShowDashboard(false)} />
       )}
     </div>
   );
