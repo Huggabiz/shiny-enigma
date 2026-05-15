@@ -52,6 +52,7 @@ export function MultiplanView() {
     setActiveVariant,
     setActiveView,
     setMultiplanShelfSide,
+    setDesignShelfId,
     toggleMultiplanEntry,
     reorderMultiplanEntries,
     clearMultiplanEntries,
@@ -150,10 +151,11 @@ export function MultiplanView() {
 
   if (!project) return null;
 
-  const handleOpenInTransform = (plan: RangePlan, variantId: string | null) => {
+  const handleOpenInRangeDesign = (plan: RangePlan, variantId: string | null) => {
     setActivePlan(plan.id);
     setActiveVariant(variantId);
-    setActiveView('transform');
+    setDesignShelfId(shelfSide);
+    setActiveView('range-design');
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -240,7 +242,7 @@ export function MultiplanView() {
                   firstRow={rowIdx === 0}
                   onRailRef={rowIdx === 0 ? railWidth.attachRef : undefined}
                   onRemove={() => toggleMultiplanEntry(plan.id, variant?.id ?? null)}
-                  onDoubleClick={() => handleOpenInTransform(plan, variant?.id ?? null)}
+                  onDoubleClick={() => handleOpenInRangeDesign(plan, variant?.id ?? null)}
                 />
               ))}
             </div>
@@ -361,7 +363,7 @@ function MultiplanRow({
       className={`multiplan-row ${isDragging ? 'dragging' : ''}`}
       style={rowStyle}
       onDoubleClick={onDoubleClick}
-      title="Drag the label column to reorder — double-click to open in Transform view"
+      title="Drag the label column to reorder — double-click to open in Range view"
     >
       <div
         className="multiplan-row-label"
