@@ -8,6 +8,11 @@ async function hashPassword(password: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+function editLocked(get: () => ProjectStore): boolean {
+  const { project, isUnlocked } = get();
+  return !!project?.lockHash && !isUnlocked;
+}
+
 // Helper: update a specific plan in the plans array
 function updatePlan(project: Project, planId: string, updater: (plan: RangePlan) => RangePlan): Project {
   return {
@@ -359,6 +364,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   appendImport: (nextProject) => {
+    if (editLocked(get)) return;
     // Caller has already produced the fully-merged state via
     // computeImportPlan; just swap it in. selectedItemId / linkMode
     // get reset since the plan/item ids all changed in the merge.
@@ -366,6 +372,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updateProjectName: (name) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: { ...project, name, updatedAt: new Date().toISOString() } });
@@ -373,6 +380,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Plan management
   addPlan: (name, folderId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const newPlan = createEmptyPlan(name);
@@ -409,6 +417,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   duplicatePlan: (planId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const source = project.plans.find((p) => p.id === planId);
@@ -504,6 +513,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   setPlanFolder: (planId, folderId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({
@@ -518,6 +528,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   // Folder management — pure organisational constructs, never referenced
   // by plan internals so changes are localised to Project.folders.
   addFolder: (name) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const folders = project.folders || [];
@@ -533,6 +544,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   removeFolder: (folderId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const folders = (project.folders || []).filter((f) => f.id !== folderId);
@@ -544,6 +556,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   renameFolder: (folderId, name) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const folders = (project.folders || []).map((f) => f.id === folderId ? { ...f, name } : f);
@@ -551,6 +564,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   reorderFolders: (orderedFolderIds) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const folders = project.folders || [];
@@ -638,6 +652,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   // lens is guaranteed by ensureLenses() at load time and can't be
   // deleted or renamed.
   createLens: (name, scope) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const lenses = project.lenses ?? [];
@@ -660,6 +675,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   removeLens: (lensId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const lens = (project.lenses ?? []).find((l) => l.id === lensId);
@@ -677,6 +693,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   renameLens: (lensId, name) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const lenses = (project.lenses ?? []).map((l) =>
@@ -712,6 +729,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   setEditingLens: (lensId) => {
+    if (lensId && editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     // Built-in lenses can't be in edit mode (implicit membership rules).
@@ -731,6 +749,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   toggleLensProduct: (lensId, productId, stageKey) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const lens = (project.lenses ?? []).find((l) => l.id === lensId);
@@ -762,6 +781,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   cycleLensColor: (lensId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const lenses = project.lenses ?? [];
@@ -794,6 +814,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   removePlan: (planId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project || project.plans.length <= 1) return;
     const remaining = project.plans.filter((p) => p.id !== planId);
@@ -822,6 +843,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   renamePlan: (planId, name) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({
@@ -844,18 +866,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   // is added, every plan in the project gets a shelf for it, seeded from
   // each plan's current shelf (items + matrix layout carried forward).
   setCurrentStageLabel: (label) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: { ...project, currentStageLabel: label || undefined, updatedAt: new Date().toISOString() } });
   },
 
   setFutureStageLabel: (label) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: { ...project, futureStageLabel: label || undefined, updatedAt: new Date().toISOString() } });
   },
 
   addIntermediateStage: (name) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const stageId = `stage-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -916,6 +941,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   removeIntermediateStage: (stageId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({
@@ -932,6 +958,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   renameIntermediateStage: (stageId, name) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({
@@ -958,6 +985,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setShowDiscontinued: (show) => set({ showDiscontinued: show }),
 
   addVariant: (planId, name) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const plan = project.plans.find((p) => p.id === planId);
@@ -978,6 +1006,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   removeVariant: (planId, variantId) => {
+    if (editLocked(get)) return;
     const { project, activeVariantId } = get();
     if (!project) return;
     set({
@@ -990,6 +1019,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   renameVariant: (planId, variantId, name) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({
@@ -1001,6 +1031,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   toggleVariantItem: (variantId, shelfId, itemId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const plan = getActivePlan(project);
@@ -1023,6 +1054,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Catalogue
   setCatalogue: (newProducts) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const newBySku = new Map(newProducts.map((p) => [p.sku, p]));
@@ -1096,6 +1128,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   clearCatalogue: () => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: { ...project, catalogue: [], updatedAt: new Date().toISOString() } });
@@ -1103,6 +1136,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Set/clear a future pricing override on the catalogue product (default horizon)
   setFuturePricing: (productId, region, value) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const newCatalogue = project.catalogue.map((p) => {
@@ -1132,6 +1166,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Shelf actions — operate on active plan
   addItemToShelf: (shelfId, item) => {
+    if (editLocked(get)) return;
     const { project, activeVariantId } = get();
     if (!project) return;
     let updated = updateShelf(project, shelfId, (shelf) => ({
@@ -1198,6 +1233,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   removeItemFromShelf: (shelfId, itemId) => {
+    if (editLocked(get)) return;
     const { project, activeVariantId } = get();
     if (!project) return;
     const plan = getActivePlan(project);
@@ -1268,12 +1304,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   reorderShelfItems: (shelfId, items) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: updateShelf(project, shelfId, (shelf) => ({ ...shelf, items })) });
   },
 
   updateShelfItem: (shelfId, itemId, updates) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: updateShelf(project, shelfId, (shelf) => ({
@@ -1283,6 +1321,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Labels
   addLabel: (shelfId, label) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: updateShelf(project, shelfId, (shelf) => ({
@@ -1291,6 +1330,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updateLabel: (shelfId, labelId, updates) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: updateShelf(project, shelfId, (shelf) => ({
@@ -1299,6 +1339,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   removeLabel: (shelfId, labelId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: updateShelf(project, shelfId, (shelf) => ({
@@ -1308,6 +1349,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Sankey
   addLink: (link) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const plan = getActivePlan(project);
@@ -1319,6 +1361,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   removeLink: (sourceId, targetId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const plan = getActivePlan(project);
@@ -1329,6 +1372,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updateLink: (sourceId, targetId, updates) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const plan = getActivePlan(project);
@@ -1341,6 +1385,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   clearLinks: () => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const plan = getActivePlan(project);
@@ -1349,6 +1394,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   copyCurrentToFuture: () => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const plan = getActivePlan(project);
@@ -1390,6 +1436,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   reorderShelfByMatrix: (shelfId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const plan = getActivePlan(project);
@@ -1418,6 +1465,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Default range assignment
   setDefaultPlan: (sku, planId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({
@@ -1432,6 +1480,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   // Forecast pipeline — stored per-SKU at project level so the
   // forecast is global (not tied to a specific shelf placement).
   setForecastPipeline: (sku, pipeline) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const pipelines = { ...(project.forecastPipelines ?? {}) };
@@ -1451,6 +1500,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Matrix layout
   updateMatrixLayout: (shelfId, layoutUpdates) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     let updated = updateShelf(project, shelfId, (shelf) => {
@@ -1468,6 +1518,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   setMatrixAssignment: (shelfId, itemId, row, col) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     let updated = updateShelf(project, shelfId, (shelf) => {
@@ -1504,6 +1555,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   removeMatrixAssignment: (shelfId, itemId) => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     set({ project: updateShelf(project, shelfId, (shelf) => {
@@ -1520,6 +1572,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setAssumeContinuity: (enabled) => set({ assumeContinuity: enabled }),
 
   clearRanges: () => {
+    if (editLocked(get)) return;
     const { project } = get();
     if (!project) return;
     const plan = getActivePlan(project);
