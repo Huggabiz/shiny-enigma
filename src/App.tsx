@@ -69,7 +69,6 @@ function App() {
     setSlideBaseScale,
     slideZoom,
     catalogueViewMode,
-    isUnlocked,
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
@@ -572,10 +571,8 @@ function App() {
     );
   }
 
-  const projectLocked = !!project?.lockHash && !isUnlocked;
-
   return (
-    <div className={`app ${projectLocked ? 'project-locked' : ''}`}>
+    <div className="app">
       <Toolbar activeView={activeView} />
       <div className="workspace">
         <NavSidebar activeView={activeView} onViewChange={setActiveView} />
