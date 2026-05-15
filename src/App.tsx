@@ -68,6 +68,8 @@ function App() {
     slideBaseScaleMode,
     setSlideBaseScale,
     slideZoom,
+    catalogueViewMode,
+    isUnlocked,
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
@@ -184,7 +186,7 @@ function App() {
       cancelAnimationFrame(id);
       window.clearTimeout(t);
     };
-  }, [activeView, slideBaseScale, project?.activePlanId]);
+  }, [activeView, slideBaseScale, project?.activePlanId, showPlanTree, catalogueViewMode]);
 
   // Ctrl + scroll zooms the slide, anchored to the cursor position so the
   // point under the mouse stays put (PowerPoint-style). Attached at the
@@ -570,8 +572,10 @@ function App() {
     );
   }
 
+  const projectLocked = !!project?.lockHash && !isUnlocked;
+
   return (
-    <div className="app">
+    <div className={`app ${projectLocked ? 'project-locked' : ''}`}>
       <Toolbar activeView={activeView} />
       <div className="workspace">
         <NavSidebar activeView={activeView} onViewChange={setActiveView} />

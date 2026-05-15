@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat, SlideViewSize, PlanFolder, Lens } from '../types';
 import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan, getStages, DEFAULT_DEV_LENS, LENS_PALETTE } from '../types';
 
+async function hashPassword(password: string): Promise<string> {
+  const encoded = new TextEncoder().encode(password);
+  const buf = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Helper: update a specific plan in the plans array
 function updatePlan(project: Project, planId: string, updater: (plan: RangePlan) => RangePlan): Project {
   return {
@@ -85,6 +91,18 @@ interface ProjectStore {
 
   // Plan tree
   setShowPlanTree: (show: boolean) => void;
+
+  // Catalogue panel view mode — persisted in store so it survives view
+  // switches (was previously local useState inside Catalogue.tsx).
+  catalogueViewMode: 'collapsed' | 'normal' | 'expanded';
+  setCatalogueViewMode: (mode: 'collapsed' | 'normal' | 'expanded') => void;
+
+  // Plan lock — password-based edit protection. The project stores a
+  // SHA-256 hash; the runtime flag `isUnlocked` is ephemeral (not saved).
+  isUnlocked: boolean;
+  lockProject: (password: string) => Promise<void>;
+  unlockProject: (password: string) => Promise<boolean>;
+  removeLock: () => void;
 
   // Project actions
   createProject: (name: string, catalogue: Product[]) => void;
@@ -286,6 +304,32 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ project: updatedProject, cardFormat: nextMirror });
   },
   setShowPlanTree: (show) => set({ showPlanTree: show }),
+  catalogueViewMode: 'normal',
+  setCatalogueViewMode: (mode) => set({ catalogueViewMode: mode }),
+
+  isUnlocked: true,
+  lockProject: async (password) => {
+    const { project } = get();
+    if (!project) return;
+    const hash = await hashPassword(password);
+    set({ project: { ...project, lockHash: hash, updatedAt: new Date().toISOString() }, isUnlocked: false });
+  },
+  unlockProject: async (password) => {
+    const { project } = get();
+    if (!project?.lockHash) return true;
+    const hash = await hashPassword(password);
+    if (hash === project.lockHash) {
+      set({ isUnlocked: true });
+      return true;
+    }
+    return false;
+  },
+  removeLock: () => {
+    const { project } = get();
+    if (!project) return;
+    const { lockHash: _, ...rest } = project;
+    set({ project: { ...rest, updatedAt: new Date().toISOString() } as Project, isUnlocked: true });
+  },
 
   createProject: (name, catalogue) => {
     const firstPlan = createEmptyPlan('Range Plan 1');
@@ -311,7 +355,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // ensure the built-in Dev lens always exists at index 0 so the UI
     // never has to special-case its presence.
     const ensured = ensureLenses(migrated);
-    set({ project: { ...ensured, editingLensId: null }, selectedItemId: null, linkMode: false, linkSource: null });
+    set({ project: { ...ensured, editingLensId: null }, selectedItemId: null, linkMode: false, linkSource: null, isUnlocked: !ensured.lockHash });
   },
 
   appendImport: (nextProject) => {

@@ -149,7 +149,7 @@ function groupByCategory(products: Product[]): GroupedProducts[] {
 
 export function Catalogue({ products, onImport, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds, isDropTarget, dropZoneId, designShelfId }: CatalogueProps) {
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({ id: dropZoneId || 'catalogue-drop-zone' });
-  const { catalogueFilters, setCatalogueFilters } = useProjectStore();
+  const { catalogueFilters, setCatalogueFilters, catalogueViewMode: viewMode, setCatalogueViewMode: setViewMode } = useProjectStore();
   const search = catalogueFilters.search;
   const categoryFilter = catalogueFilters.category;
   const subCategoryFilter = catalogueFilters.subCategory;
@@ -161,10 +161,9 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   const setCategoryFilter = (v: string) => setCatalogueFilters({ category: v, subCategory: '', family: '' });
   const setSubCategoryFilter = (v: string) => setCatalogueFilters({ subCategory: v, family: '' });
   const setFamilyFilter = (v: string) => setCatalogueFilters({ family: v });
-  const [viewMode, setViewMode] = useState<'collapsed' | 'normal' | 'expanded'>('normal');
 
   const cycleViewMode = () => {
-    setViewMode((m) => m === 'normal' ? 'expanded' : m === 'expanded' ? 'collapsed' : 'normal');
+    setViewMode(viewMode === 'normal' ? 'expanded' : viewMode === 'expanded' ? 'collapsed' : 'normal');
   };
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [collapsedSubCats, setCollapsedSubCats] = useState<Set<string>>(new Set());

@@ -8,6 +8,7 @@ import { ImportProjectDialog } from './ImportProjectDialog';
 import { ExportDialog } from './ExportDialog';
 import { DashboardDialog } from './DashboardDialog';
 import { StageManagerDialog } from './StageManagerDialog';
+import { LockDialog } from './LockDialog';
 import './Toolbar.css';
 
 interface ToolbarProps {
@@ -23,6 +24,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
     cardFormat, setCardFormat,
     activeVariantId,
     updateProjectName,
+    isUnlocked, removeLock,
   } = useProjectStore();
   const [editingName, setEditingName] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +59,8 @@ export function Toolbar({ activeView }: ToolbarProps) {
   const [showStageManager, setShowStageManager] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [lockDialog, setLockDialog] = useState<'set' | 'unlock' | null>(null);
+  const isLocked = !!project?.lockHash && !isUnlocked;
 
   const closeMenus = () => setOpenMenu(null);
 
@@ -118,6 +122,11 @@ export function Toolbar({ activeView }: ToolbarProps) {
               {project.name}
             </span>
           )
+        )}
+        {isLocked && (
+          <span className="toolbar-lock-badge" onClick={() => setLockDialog('unlock')} title="Project is locked — click to unlock">
+            🔒 Locked
+          </span>
         )}
       </div>
 
@@ -212,13 +221,23 @@ export function Toolbar({ activeView }: ToolbarProps) {
               {openMenu === 'tools' && (
                 <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
                   <button onClick={() => { closeMenus(); setShowDashboard(true); }}>Dashboard</button>
+                  <hr />
+                  {!project?.lockHash ? (
+                    <button onClick={() => { closeMenus(); setLockDialog('set'); }}>Lock Project</button>
+                  ) : isLocked ? (
+                    <button onClick={() => { closeMenus(); setLockDialog('unlock'); }}>Unlock Project</button>
+                  ) : (
+                    <>
+                      <button onClick={() => { closeMenus(); removeLock(); }}>Remove Lock</button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Manage dropdown */}
             <div className="toolbar-dropdown-wrapper">
-              <button className="toolbar-btn" onClick={() => setOpenMenu(openMenu === 'manage' ? null : 'manage')}>
+              <button className="toolbar-btn" disabled={isLocked} onClick={() => setOpenMenu(openMenu === 'manage' ? null : 'manage')}>
                 Manage ▾
               </button>
               {openMenu === 'manage' && (
@@ -246,7 +265,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
           className="toolbar-btn"
           onClick={() => appendRef.current?.click()}
           title="Append plans and lenses from another project file into this one"
-          disabled={!project}
+          disabled={!project || isLocked}
         >
           Append
         </button>
@@ -266,6 +285,9 @@ export function Toolbar({ activeView }: ToolbarProps) {
       )}
       {showDashboard && (
         <DashboardDialog onClose={() => setShowDashboard(false)} />
+      )}
+      {lockDialog && (
+        <LockDialog mode={lockDialog} onClose={() => setLockDialog(null)} />
       )}
     </div>
   );

@@ -406,3 +406,22 @@
   from { opacity: 0; transform: translateX(-50%) translateY(8px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+/* Project-locked mode: disable editing surfaces while keeping
+   navigation (view switching, scrolling, zoom) active. The toolbar,
+   nav sidebar, and plan tree stay interactive for navigation; only
+   the editing areas (shelves, catalogue drag, matrix cells, manage
+   controls) are locked out. */
+.project-locked .catalogue-panel {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.project-locked .shelf-rail,
+.project-locked .matrix-cell,
+.project-locked .range-view-add-btn,
+.project-locked .plan-tree-item-actions,
+.project-locked .plan-tree-item-add-variant,
+.project-locked .plan-tree-add-variant {
+  pointer-events: none;
+  opacity: 0.5;
+}
