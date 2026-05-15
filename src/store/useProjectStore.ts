@@ -311,7 +311,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // ensure the built-in Dev lens always exists at index 0 so the UI
     // never has to special-case its presence.
     const ensured = ensureLenses(migrated);
-    set({ project: ensured, selectedItemId: null, linkMode: false, linkSource: null });
+    set({ project: { ...ensured, editingLensId: null }, selectedItemId: null, linkMode: false, linkSource: null });
   },
 
   appendImport: (nextProject) => {
