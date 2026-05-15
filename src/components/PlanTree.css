@@ -329,27 +329,25 @@
   opacity: 1;
 }
 
-.plan-tree-add-variant {
+.plan-tree-item-add-variant {
+  width: 16px;
   height: 16px;
-  padding: 0 7px;
-  font-size: 9px;
-  font-weight: 600;
-  background: #4caf50;
-  color: #fff;
   border: none;
-  border-radius: 8px;
+  background: #e8f5e9;
+  color: #388e3c;
+  border-radius: 3px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  line-height: 1;
-  white-space: nowrap;
-  margin-left: auto;
+  padding: 0;
+  font-size: 11px;
+  opacity: 0;
 }
 
-.plan-tree-add-variant:hover {
-  background: #388e3c;
+.plan-tree-item-add-variant:hover {
+  background: #c8e6c9;
 }
 
 .plan-tree-item-delete {
@@ -389,6 +387,7 @@
   background: #bbdefb;
 }
 
+.plan-tree-item:hover .plan-tree-item-add-variant,
 .plan-tree-item:hover .plan-tree-item-duplicate,
 .plan-tree-item:hover .plan-tree-item-delete {
   opacity: 1;
