@@ -16,7 +16,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useProjectStore } from '../store/useProjectStore';
 import { ProductCard } from './ProductCard';
-import { computeShelfLayout } from '../utils/layout';
+import { computeShelfLayout, RAIL_PADDING } from '../utils/layout';
 import { deriveLabelsFromMatrix, packLabelsIntoRows } from '../utils/shelfLabels';
 import { getActivePlan, getStages } from '../types';
 import type { Product, RangePlan, Shelf, ShelfItem } from '../types';
@@ -342,7 +342,8 @@ function MultiplanRow({
     () => computeShelfLayout(rowItems.length, railWidth),
     [rowItems.length, railWidth],
   );
-  const { cardWidth, slotWidth, offsetLeft } = layout;
+  const { cardWidth, slotWidth } = layout;
+  const offsetLeft = RAIL_PADDING;
 
   // Matrix-derived labels — same "matrix title format" the transform
   // view shows above each shelf rail. Uses the shared shelfLabels
