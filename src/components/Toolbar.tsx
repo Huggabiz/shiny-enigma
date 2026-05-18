@@ -116,8 +116,8 @@ export function Toolbar({ activeView }: ToolbarProps) {
           ) : (
             <span
               className="toolbar-project-name"
-              onClick={() => setEditingName(true)}
-              title="Click to rename project"
+              onClick={isLocked ? undefined : () => setEditingName(true)}
+              title={isLocked ? undefined : "Click to rename project"}
             >
               {project.name}
             </span>

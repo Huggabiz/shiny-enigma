@@ -8,6 +8,8 @@ interface EditableTitleProps {
   className?: string;
   /** Element rendered to the right of the title inside the <h2>, e.g. a variant badge. */
   trailing?: ReactNode;
+  /** When true the title is read-only — no pencil, no click-to-edit. */
+  disabled?: boolean;
 }
 
 /**
@@ -15,7 +17,7 @@ interface EditableTitleProps {
  * pencil to switch to an inline <input>; pressing Enter or blurring saves.
  * Empty input reverts to the original value.
  */
-export function EditableTitle({ value, onSave, className, trailing }: EditableTitleProps) {
+export function EditableTitle({ value, onSave, className, trailing, disabled }: EditableTitleProps) {
   const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -55,20 +57,22 @@ export function EditableTitle({ value, onSave, className, trailing }: EditableTi
     <h2 className={className || ''}>
       <span
         className="editable-title-row"
-        onClick={() => setEditing(true)}
-        title="Click to edit"
+        onClick={disabled ? undefined : () => setEditing(true)}
+        title={disabled ? undefined : "Click to edit"}
       >
         <span className="editable-title-text">{value}</span>
         {trailing}
-        <button
-          type="button"
-          className="editable-title-pencil"
-          onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-          aria-label="Edit title"
-          title="Edit title"
-        >
-          <PencilIcon size={12} color="currentColor" />
-        </button>
+        {!disabled && (
+          <button
+            type="button"
+            className="editable-title-pencil"
+            onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+            aria-label="Edit title"
+            title="Edit title"
+          >
+            <PencilIcon size={12} color="currentColor" />
+          </button>
+        )}
       </span>
     </h2>
   );
