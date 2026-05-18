@@ -5,6 +5,7 @@
 import * as XLSX from 'xlsx';
 import type { Project } from '../types';
 import { getStages, WAREHOUSE_KEYS, WAREHOUSE_LABELS } from '../types';
+import { anonDisplay } from './anonymise';
 
 export function exportToExcelEnriched(project: Project): void {
   const workbook = XLSX.utils.book_new();
@@ -14,8 +15,9 @@ export function exportToExcelEnriched(project: Project): void {
     const row: Record<string, unknown> = {};
 
     // Core catalogue fields
+    const anon = anonDisplay(product, catalogue);
     row['SKU'] = product.sku;
-    row['Name'] = product.name;
+    row['Name'] = anon.name;
     row['Category'] = product.category;
     row['Sub-Category'] = product.subCategory;
     row['Product Family'] = product.productFamily;

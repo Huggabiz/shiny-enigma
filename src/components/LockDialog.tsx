@@ -9,9 +9,10 @@ interface LockDialogProps {
 }
 
 export function LockDialog({ mode, onClose }: LockDialogProps) {
-  const { lockProject, unlockProject } = useProjectStore();
+  const { lockProject, unlockProject, project } = useProjectStore();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [anonymise, setAnonymise] = useState(project?.anonymiseDev ?? false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -21,7 +22,7 @@ export function LockDialog({ mode, onClose }: LockDialogProps) {
       if (password.length < 1) { setError('Password required'); return; }
       if (password !== confirm) { setError('Passwords do not match'); return; }
       setBusy(true);
-      await lockProject(password);
+      await lockProject(password, anonymise);
       onClose();
     } else {
       setBusy(true);
@@ -61,6 +62,15 @@ export function LockDialog({ mode, onClose }: LockDialogProps) {
                 onChange={(e) => setConfirm(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               />
+              <label className="lock-anon-toggle">
+                <input
+                  type="checkbox"
+                  checked={anonymise}
+                  onChange={(e) => setAnonymise(e.target.checked)}
+                />
+                <span>Anonymise Dev products</span>
+              </label>
+              <p className="lock-anon-hint">Replaces names and hides images for Dev-sourced products while locked. Category, price, and range position are preserved.</p>
             </>
           )}
           {error && <div className="lock-error">{error}</div>}
