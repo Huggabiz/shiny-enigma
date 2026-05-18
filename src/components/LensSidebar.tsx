@@ -33,10 +33,12 @@ export function LensSidebar() {
   const [newScope, setNewScope] = useState<'global' | 'per-stage'>('global');
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
+  const isUnlocked = useProjectStore((s) => s.isUnlocked);
   if (!project) return null;
   const lenses = project.lenses ?? [];
   const activeLensIds = project.activeLensIds ?? [];
   const editingLensId = project.editingLensId ?? null;
+  const isLocked = !!project.lockHash && !isUnlocked;
 
   const commitNew = () => {
     const trimmed = newName.trim();
@@ -56,7 +58,7 @@ export function LensSidebar() {
     <div className="lens-sidebar">
       <div className="lens-sidebar-header">
         <h3><span className="lens-icon" aria-hidden>⌕</span> Lenses</h3>
-        <button className="lens-add-btn" onClick={() => setAdding(true)} title="New lens">+ New</button>
+        {!isLocked && <button className="lens-add-btn" onClick={() => setAdding(true)} title="New lens">+ New</button>}
       </div>
       <div className="lens-list">
         {lenses.map((lens) => {
@@ -128,22 +130,26 @@ export function LensSidebar() {
               )}
               {!isBuiltIn && (
                 <>
-                  <button
-                    className={`lens-edit ${isEditing ? 'on' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingLens(isEditing ? null : lens.id);
-                    }}
-                    title={isEditing ? 'Stop editing membership' : 'Click cards to add/remove from this lens'}
-                  >✎</button>
-                  <button
-                    className="lens-delete"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Delete lens "${lens.name}"?`)) removeLens(lens.id);
-                    }}
-                    title="Delete lens"
-                  >×</button>
+                  {!isLocked && (
+                    <button
+                      className={`lens-edit ${isEditing ? 'on' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingLens(isEditing ? null : lens.id);
+                      }}
+                      title={isEditing ? 'Stop editing membership' : 'Click cards to add/remove from this lens'}
+                    >✎</button>
+                  )}
+                  {!isLocked && (
+                    <button
+                      className="lens-delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete lens "${lens.name}"?`)) removeLens(lens.id);
+                      }}
+                      title="Delete lens"
+                    >×</button>
+                  )}
                 </>
               )}
             </div>

@@ -486,6 +486,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const shelf = activeStage?.shelf;
   const isFutureShelf = activeStage?.position === 'future';
   const catalogue = project?.catalogue || [];
+  const isLocked = !!project?.lockHash && !useProjectStore.getState().isUnlocked;
   const layout: MatrixLayout = useMemo(() =>
     shelf?.matrixLayout || { title: shelf?.name || '', xLabels: [], yLabels: [], assignments: [] },
     [shelf?.matrixLayout, shelf?.name]
@@ -755,12 +756,12 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   };
 
   const handleAddPlaceholder = useCallback((row: number, col: number) => {
-    if (!shelf) return;
+    if (!shelf || isLocked) return;
     setPlaceholderDialog({ mode: 'create', row, col });
-  }, [shelf]);
+  }, [shelf, isLocked]);
 
   const handleEditPlaceholder = useCallback((itemId: string) => {
-    if (!shelf) return;
+    if (!shelf || isLocked) return;
     const item = shelf.items.find((i) => i.id === itemId);
     if (!item || !item.isPlaceholder) return;
     const data: PlaceholderData = item.placeholderData || {
@@ -789,6 +790,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   }, [placeholderDialog, shelf, shelfId, addItemToShelf, setMatrixAssignment, updateShelfItem]);
 
   const addLabel = useCallback((axis: 'x' | 'y') => {
+    if (isLocked) return;
     const text = prompt(`New ${axis === 'x' ? 'column' : 'row'} label:`);
     if (!text) return;
     // Add to this stage
@@ -815,6 +817,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   } | null>(null);
 
   const removeLabel = useCallback((axis: 'x' | 'y', index: number) => {
+    if (isLocked) return;
     const affectedItems = layout.assignments.filter(
       axis === 'x' ? (a) => a.col === index : (a) => a.row === index,
     );
@@ -882,10 +885,11 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   }, [removeLabelDialog, executeRemoveLabel]);
 
   const updateLabel = useCallback((axis: 'x' | 'y', index: number, text: string) => {
+    if (isLocked) return;
     if (axis === 'x') updateMatrixLayout(shelfId, { xLabels: layout.xLabels.map((l, i) => i === index ? text : l) });
     else updateMatrixLayout(shelfId, { yLabels: layout.yLabels.map((l, i) => i === index ? text : l) });
     setEditingAxis(null);
-  }, [shelfId, layout, updateMatrixLayout]);
+  }, [shelfId, layout, updateMatrixLayout, isLocked]);
 
   const updateTitle = useCallback((text: string) => {
     const newTitle = text || activePlan?.name || '';
