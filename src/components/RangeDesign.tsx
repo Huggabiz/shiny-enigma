@@ -102,7 +102,7 @@ function sortShelfItems<T extends ShelfItem>(
   });
 }
 
-function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, cardHeight, cellHeight, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir }: {
+function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, cardHeight, cellHeight, onAddPlaceholder, onEditPlaceholder, variantIncludedIds, showGhostedProp, discontinuedItems, isFutureShelf, sortBy, sortDir, isLocked }: {
   row: number; col: number; itemIds: string[];
   shelf: Shelf;
   /** Stage key ('current', 'future', or 'stage-<id>') used by store
@@ -131,6 +131,7 @@ function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, 
    * rendered when this cell is in the future matrix. */
   discontinuedItems?: ShelfItem[];
   isFutureShelf: boolean;
+  isLocked?: boolean;
   sortBy: SortKey;
   sortDir: 'asc' | 'desc';
 }) {
@@ -217,7 +218,7 @@ function MatrixCell({ row, col, itemIds, shelf, stageKey, catalogue, cardWidth, 
             onRemove={() => { /* discontinued cards are read-only */ }} />
         );
       })}
-      <button className="matrix-cell-add-ph" onClick={() => onAddPlaceholder(row, col)} title="Add placeholder SKU">+</button>
+      {!isLocked && <button className="matrix-cell-add-ph" onClick={() => onAddPlaceholder(row, col)} title="Add placeholder SKU">+</button>}
     </div>
   );
 }
@@ -1039,28 +1040,28 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
               <div className="matrix-header-row" style={{ gridTemplateColumns: gridCols }}>
                 <div />
                 {layout.xLabels.map((label, i) => (
-                  <div key={i} className="matrix-col-header" onDoubleClick={() => setEditingAxis({ axis: 'x', index: i })}>
+                  <div key={i} className="matrix-col-header" onDoubleClick={isLocked ? undefined : () => setEditingAxis({ axis: 'x', index: i })}>
                     {editingAxis?.axis === 'x' && editingAxis.index === i ? (
                       <input className="matrix-label-input" defaultValue={label} autoFocus
                         onBlur={(e) => updateLabel('x', i, e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && updateLabel('x', i, (e.target as HTMLInputElement).value)} />
                     ) : <span>{label}</span>}
-                    <button className="matrix-label-remove" onClick={() => removeLabel('x', i)}><CloseIcon size={7} color="#fff" /></button>
+                    {!isLocked && <button className="matrix-label-remove" onClick={() => removeLabel('x', i)}><CloseIcon size={7} color="#fff" /></button>}
                   </div>
                 ))}
-                <button className="matrix-add-btn" onClick={() => addLabel('x')}>+</button>
+                {!isLocked && <button className="matrix-add-btn" onClick={() => addLabel('x')}>+</button>}
               </div>
 
               {layout.yLabels.map((yLabel, row) => (
                 <div key={row} className="matrix-row"
                   style={{ gridTemplateColumns: gridCols, height: `${rowHeights[row] || 80}px` }}>
-                  <div className="matrix-row-header" onDoubleClick={() => setEditingAxis({ axis: 'y', index: row })}>
+                  <div className="matrix-row-header" onDoubleClick={isLocked ? undefined : () => setEditingAxis({ axis: 'y', index: row })}>
                     {editingAxis?.axis === 'y' && editingAxis.index === row ? (
                       <input className="matrix-label-input" defaultValue={yLabel} autoFocus
                         onBlur={(e) => updateLabel('y', row, e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && updateLabel('y', row, (e.target as HTMLInputElement).value)} />
                     ) : <span>{yLabel}</span>}
-                    <button className="matrix-label-remove" onClick={() => removeLabel('y', row)}><CloseIcon size={7} color="#fff" /></button>
+                    {!isLocked && <button className="matrix-label-remove" onClick={() => removeLabel('y', row)}><CloseIcon size={7} color="#fff" /></button>}
                   </div>
                   {layout.xLabels.map((_, col) => (
                     <MatrixCell key={`${row}-${col}`} row={row} col={col}
@@ -1075,6 +1076,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                       showGhostedProp={showGhosted}
                       discontinuedItems={discontinuedByCell.get(`${row}-${col}`)}
                       isFutureShelf={isFutureShelf}
+                      isLocked={isLocked}
                       sortBy={sortBy}
                       sortDir={sortDir} />
                   ))}
@@ -1082,9 +1084,11 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                 </div>
               ))}
 
-              <div className="matrix-add-row">
-                <button className="matrix-add-btn wide" onClick={() => addLabel('y')}>+ Row</button>
-              </div>
+              {!isLocked && (
+                <div className="matrix-add-row">
+                  <button className="matrix-add-btn wide" onClick={() => addLabel('y')}>+ Row</button>
+                </div>
+              )}
             </div>
               </div>
               </div>
