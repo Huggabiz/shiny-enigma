@@ -9,8 +9,9 @@ import { getStages } from '../types';
 
 const SLIDE_W = 13.333; // 16:9 at 96dpi
 const SLIDE_H = 7.5;
-// Scale 4 ≈ 3840×2160 for a 960px-wide canvas — matches 4K/UHD.
-const CAPTURE_SCALE = 4;
+// Scale 6 ≈ 5760×3240 for a 960px-wide canvas — high enough to
+// zoom into details during presentations without visible pixelation.
+const CAPTURE_SCALE = 6;
 
 async function captureElement(selector: string): Promise<string | null> {
   const el = document.querySelector(selector) as HTMLElement | null;
@@ -22,16 +23,23 @@ async function captureElement(selector: string): Promise<string | null> {
   document.documentElement.classList.add('pptx-capture');
 
   // Temporarily remove CSS transforms (zoom/scale) that confuse
-  // html2canvas, then restore after capture.
-  const ancestors: Array<{ el: HTMLElement; transform: string }> = [];
+  // html2canvas, and remove overflow clipping from ancestor scroll
+  // areas so the full canvas is captured even if it's wider than
+  // the viewport.
+  const saved: Array<{ el: HTMLElement; prop: string; value: string }> = [];
   let parent = el.closest('.slide-canvas-wrapper') as HTMLElement | null;
   if (!parent) parent = el;
   let walk: HTMLElement | null = parent;
   while (walk && walk !== document.body) {
     const t = walk.style.transform;
     if (t) {
-      ancestors.push({ el: walk, transform: t });
+      saved.push({ el: walk, prop: 'transform', value: t });
       walk.style.transform = 'none';
+    }
+    const computed = getComputedStyle(walk);
+    if (computed.overflow !== 'visible') {
+      saved.push({ el: walk, prop: 'overflow', value: walk.style.overflow });
+      walk.style.overflow = 'visible';
     }
     walk = walk.parentElement;
   }
@@ -42,13 +50,15 @@ async function captureElement(selector: string): Promise<string | null> {
       scale: CAPTURE_SCALE,
       useCORS: true,
       logging: false,
+      width: el.scrollWidth,
+      height: el.scrollHeight,
     });
     return canvas.toDataURL('image/png');
   } catch (err) {
     console.error('html2canvas capture failed:', err);
     return null;
   } finally {
-    for (const a of ancestors) a.el.style.transform = a.transform;
+    for (const s of saved) s.el.style.setProperty(s.prop, s.value);
     document.documentElement.classList.remove('pptx-capture');
   }
 }

@@ -84,6 +84,13 @@ export function SkuDetailsPane() {
       </div>
 
       <div className="sku-details-body">
+        {/* Product image */}
+        {product.imageUrl && (
+          <div className="sku-details-image">
+            <img src={product.imageUrl} alt={product.name} />
+          </div>
+        )}
+
         {/* Attributes */}
         <div className="sku-details-section">
           <div className="sku-details-grid">
