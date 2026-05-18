@@ -174,13 +174,13 @@ function App() {
     if (activeView === 'multiplan' || activeView === 'forecast-lab') return;
     const selector = activeView === 'transform' ? '.transform-view-scroll' : '.range-view-scroll';
     // Wait for the new view's DOM to mount and CSS vars to commit. Two
-    // RAFs is enough for the initial render; on a fresh project we add a
-    // small fallback timeout so RangeDesign's own measure-and-layout has
-    // a chance to finish before we read clientWidth.
+    // RAFs is enough for the initial render; the fallback timeout also
+    // covers catalogue panel CSS transitions (250ms ease) when the
+    // catalogue view mode changes.
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => fitSlideToWidth(selector));
     });
-    const t = window.setTimeout(() => fitSlideToWidth(selector), 80);
+    const t = window.setTimeout(() => fitSlideToWidth(selector), 300);
     return () => {
       cancelAnimationFrame(id);
       window.clearTimeout(t);

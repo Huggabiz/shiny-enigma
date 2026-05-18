@@ -18,7 +18,9 @@ export function PlanTree() {
     activeVariantId, setActiveVariant, addVariant, removeVariant,
     addFolder, removeFolder, renameFolder, setPlanFolder,
     activeView, toggleMultiplanEntry,
+    isUnlocked,
   } = useProjectStore();
+  const isLocked = !!project?.lockHash && !isUnlocked;
   const isMultiplan = activeView === 'multiplan';
   // Fast lookup so each row can tell if its (planId, variantId|null)
   // pair is already in the multiplan view entries list.
@@ -172,19 +174,21 @@ export function PlanTree() {
               <div className="plan-tree-item-meta">{itemCount} products</div>
             </div>
           </div>
-          <div className="plan-tree-item-actions">
-            <button className="plan-tree-item-add-variant" onClick={(e) => { e.stopPropagation(); handleNewVariant(plan.id); }} title="Add variant">⊕</button>
-            <button className="plan-tree-item-duplicate" onClick={(e) => {
-              e.stopPropagation();
-              duplicatePlan(plan.id);
-            }} title="Duplicate plan">⧉</button>
-            {!isActive && project.plans.length > 1 && (
-              <button className="plan-tree-item-delete" onClick={(e) => {
+          {!isLocked && (
+            <div className="plan-tree-item-actions">
+              <button className="plan-tree-item-add-variant" onClick={(e) => { e.stopPropagation(); handleNewVariant(plan.id); }} title="Add variant">⊕</button>
+              <button className="plan-tree-item-duplicate" onClick={(e) => {
                 e.stopPropagation();
-                if (confirm(`Delete "${plan.name}"?`)) removePlan(plan.id);
-              }}><CloseIcon size={8} color="#fff" /></button>
-            )}
-          </div>
+                duplicatePlan(plan.id);
+              }} title="Duplicate plan">⧉</button>
+              {!isActive && project.plans.length > 1 && (
+                <button className="plan-tree-item-delete" onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Delete "${plan.name}"?`)) removePlan(plan.id);
+                }}><CloseIcon size={8} color="#fff" /></button>
+              )}
+            </div>
+          )}
         </div>
 
         {isExpanded && hasVariants && plan.variants.map((variant) => {
@@ -212,10 +216,12 @@ export function PlanTree() {
                 <div className="plan-tree-item-name">{variant.name}</div>
                 <div className="plan-tree-item-meta">{varCount} included</div>
               </div>
-              <button className="plan-tree-item-delete" onClick={(e) => {
-                e.stopPropagation();
-                if (confirm(`Delete variant "${variant.name}"?`)) removeVariant(plan.id, variant.id);
-              }}><CloseIcon size={7} color="#fff" /></button>
+              {!isLocked && (
+                <button className="plan-tree-item-delete" onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Delete variant "${variant.name}"?`)) removeVariant(plan.id, variant.id);
+                }}><CloseIcon size={7} color="#fff" /></button>
+              )}
             </div>
           );
         })}
@@ -277,12 +283,14 @@ export function PlanTree() {
             </span>
           )}
           <span className="plan-tree-folder-count">{plans.length}</span>
-          <button
-            className="plan-tree-folder-add"
-            onClick={() => handleNewInFolder(folderKey === UNFILED_KEY ? '' : folderKey)}
-            title="New plan in this folder"
-          >+</button>
-          {deletable && (
+          {!isLocked && (
+            <button
+              className="plan-tree-folder-add"
+              onClick={() => handleNewInFolder(folderKey === UNFILED_KEY ? '' : folderKey)}
+              title="New plan in this folder"
+            >+</button>
+          )}
+          {deletable && !isLocked && (
             <button
               className="plan-tree-folder-delete"
               onClick={() => {
@@ -314,8 +322,8 @@ export function PlanTree() {
       <div className="plan-tree-header">
         <h3>Range Plans</h3>
         <div className="plan-tree-header-actions">
-          <button className="plan-tree-new-folder" onClick={handleNewFolder} title="New folder">+ Folder</button>
-          <button className="plan-tree-new" onClick={handleNew}>+ New</button>
+          {!isLocked && <button className="plan-tree-new-folder" onClick={handleNewFolder} title="New folder">+ Folder</button>}
+          {!isLocked && <button className="plan-tree-new" onClick={handleNew}>+ New</button>}
           <button className="plan-tree-close" onClick={() => setShowPlanTree(false)}><CloseIcon size={10} color="#999" /></button>
         </div>
       </div>
