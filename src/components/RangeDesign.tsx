@@ -1034,6 +1034,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                   {activeStage && <span className="stage-badge">{activeStage.name}</span>}
                   {activeVariant && <span className="variant-badge">{activeVariant.name}</span>}
                 </>}
+                disabled={isLocked}
               />
             </div>
             <div className="matrix-wrapper" ref={wrapperRef}>

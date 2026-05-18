@@ -69,6 +69,7 @@ function App() {
     setSlideBaseScale,
     slideZoom,
     catalogueViewMode,
+    isUnlocked,
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
@@ -659,6 +660,7 @@ function App() {
                         value={activePlan.name}
                         onSave={(next) => renamePlan(activePlan.id, next)}
                         trailing={activeVariant ? <span className="variant-badge">{activeVariant.name}</span> : null}
+                        disabled={!!project?.lockHash && !isUnlocked}
                       />
                 </div>
 
