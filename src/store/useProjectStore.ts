@@ -105,7 +105,7 @@ interface ProjectStore {
   // Plan lock — password-based edit protection. The project stores a
   // SHA-256 hash; the runtime flag `isUnlocked` is ephemeral (not saved).
   isUnlocked: boolean;
-  lockProject: (password: string) => Promise<void>;
+  lockProject: (password: string, anonymiseDev?: boolean) => Promise<void>;
   unlockProject: (password: string) => Promise<boolean>;
   removeLock: () => void;
 
@@ -313,11 +313,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setCatalogueViewMode: (mode) => set({ catalogueViewMode: mode }),
 
   isUnlocked: true,
-  lockProject: async (password) => {
+  lockProject: async (password, anonymiseDev) => {
     const { project } = get();
     if (!project) return;
     const hash = await hashPassword(password);
-    set({ project: { ...project, lockHash: hash, updatedAt: new Date().toISOString() }, isUnlocked: false });
+    set({ project: { ...project, lockHash: hash, anonymiseDev: !!anonymiseDev, updatedAt: new Date().toISOString() }, isUnlocked: false });
   },
   unlockProject: async (password) => {
     const { project } = get();
@@ -332,7 +332,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   removeLock: () => {
     const { project } = get();
     if (!project) return;
-    const { lockHash: _, ...rest } = project;
+    const { lockHash: _, anonymiseDev: _a, ...rest } = project;
     set({ project: { ...rest, updatedAt: new Date().toISOString() } as Project, isUnlocked: true });
   },
 

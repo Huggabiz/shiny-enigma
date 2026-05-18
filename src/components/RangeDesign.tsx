@@ -22,6 +22,7 @@ import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem } from '.
 import { getActivePlan, getStages } from '../types';
 import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH } from '../utils/matrixLayout';
 import { computeLensTintBackground } from '../utils/lensTint';
+import { anonDisplay } from '../utils/anonymise';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
@@ -255,11 +256,13 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `matrix-item-${itemId}`, data: { itemId },
   });
+  const catalogue = project?.catalogue ?? [];
+  const anon = product ? anonDisplay(product, catalogue) : null;
   const displayName = isPlaceholder
     ? (placeholderData?.name || placeholderName || 'New SKU')
-    : (product?.name || 'Unknown');
+    : (anon?.name || 'Unknown');
   const displaySku = isPlaceholder ? (placeholderData?.sku || '') : (product?.sku || '');
-  const displayImageUrl = isPlaceholder ? placeholderData?.imageUrl : product?.imageUrl;
+  const displayImageUrl = isPlaceholder ? placeholderData?.imageUrl : anon?.imageUrl;
   const displayVolume = isPlaceholder ? placeholderData?.volume : product?.volume;
   const displayForecast = isPlaceholder ? placeholderData?.forecastVolume : product?.forecastVolume;
   // Future-shelf cards read the future-pricing override when present so
@@ -1092,7 +1095,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
                   const product = catalogue.find((p) => p.id === item.productId);
                   return (
                     <UnassignedDraggable key={item.id} itemId={item.id}
-                      name={item.isPlaceholder ? (item.placeholderName || 'New SKU') : (product?.name || item.productId)}
+                      name={item.isPlaceholder ? (item.placeholderName || 'New SKU') : (product ? anonDisplay(product, catalogue).name : item.productId)}
                       onRemove={() => removeItemFromShelf(shelfId, item.id)} />
                   );
                 })}
@@ -1115,7 +1118,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
         <DragOverlay>
           {activeProduct && (
-            <div className="matrix-drag-preview">{activeProduct.name}</div>
+            <div className="matrix-drag-preview">{anonDisplay(activeProduct, catalogue).name}</div>
           )}
         </DragOverlay>
 

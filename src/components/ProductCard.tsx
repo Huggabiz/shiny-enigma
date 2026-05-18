@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Product, ShelfItem, FuturePricing } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
+import { anonDisplay } from '../utils/anonymise';
 import { computeLensTintBackground } from '../utils/lensTint';
 import { CloseIcon } from './Icons';
 import './ProductCard.css';
@@ -203,11 +204,13 @@ export function ProductCard({
 
   // Pull display data from placeholderData when present
   const phData = item.placeholderData;
+  const catalogue = useProjectStore.getState().project?.catalogue ?? [];
+  const anon = product ? anonDisplay(product, catalogue) : null;
   const displayName = item.isPlaceholder
     ? (phData?.name || item.placeholderName || 'New SKU')
-    : product?.name || 'Unknown';
+    : anon?.name || 'Unknown';
   const displaySku = item.isPlaceholder ? phData?.sku || '' : product?.sku || '';
-  const displayImageUrl = item.isPlaceholder ? phData?.imageUrl : product?.imageUrl;
+  const displayImageUrl = item.isPlaceholder ? phData?.imageUrl : anon?.imageUrl;
   const displaySource: 'live' | 'dev' = item.isPlaceholder
     ? (phData?.source || 'live')
     : (product?.source || 'live');

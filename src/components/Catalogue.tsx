@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useProjectStore } from '../store/useProjectStore';
 import type { Product } from '../types';
+import { anonDisplay } from '../utils/anonymise';
 import './Catalogue.css';
 
 interface CatalogueProps {
@@ -42,13 +43,14 @@ function UsageBadges({ productId, currentProductIds, futureProductIds, otherCurr
   );
 }
 
-function CatalogueItem({ product, expanded, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds }: {
+function CatalogueItem({ product, expanded, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds, catalogue }: {
   product: Product;
   expanded: boolean;
   currentProductIds: Set<string>;
   futureProductIds: Set<string>;
   otherCurrentIds?: Set<string>;
   otherFutureIds?: Set<string>;
+  catalogue: Product[];
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `catalogue-${product.id}`,
@@ -59,6 +61,7 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds,
   const inFuture = futureProductIds.has(product.id);
   const usedClass = (inCurrent || inFuture) ? 'used' : '';
   const devClass = product.source === 'dev' ? 'dev' : '';
+  const anon = anonDisplay(product, catalogue);
 
   if (expanded) {
     return (
@@ -70,14 +73,14 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds,
       >
         <UsageBadges productId={product.id} currentProductIds={currentProductIds} futureProductIds={futureProductIds} otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds} />
         <div className="catalogue-item-image-large">
-          {product.imageUrl ? (
-            <img src={product.imageUrl} alt={product.name} />
+          {anon.imageUrl ? (
+            <img src={anon.imageUrl} alt={anon.name} />
           ) : (
-            <div className="catalogue-item-placeholder-large">{product.name.charAt(0)}</div>
+            <div className="catalogue-item-placeholder-large">{anon.name.charAt(0)}</div>
           )}
         </div>
         <div className="catalogue-item-info-expanded">
-          <div className="catalogue-item-name-expanded">{product.name}</div>
+          <div className="catalogue-item-name-expanded">{anon.name}</div>
           <div className="catalogue-item-sku-expanded">{product.sku}</div>
           <div className="catalogue-item-details">
             <span>Vol: {product.volume.toLocaleString()}</span>
@@ -100,15 +103,15 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds,
     >
       <UsageBadges productId={product.id} currentProductIds={currentProductIds} futureProductIds={futureProductIds} otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds} />
       <div className="catalogue-item-image">
-        {product.imageUrl ? (
-          <img src={product.imageUrl} alt={product.name} />
+        {anon.imageUrl ? (
+          <img src={anon.imageUrl} alt={anon.name} />
         ) : (
-          <div className="catalogue-item-placeholder">{product.name.charAt(0)}</div>
+          <div className="catalogue-item-placeholder">{anon.name.charAt(0)}</div>
         )}
       </div>
       <div className="catalogue-item-info">
-        <div className="catalogue-item-name" title={product.name}>
-          {product.name}
+        <div className="catalogue-item-name" title={anon.name}>
+          {anon.name}
         </div>
         <div className="catalogue-item-meta">
           <span>{product.sku}</span>
@@ -425,6 +428,7 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
                             futureProductIds={futureProductIds}
                             otherCurrentIds={otherCurrentIds}
                             otherFutureIds={otherFutureIds}
+                            catalogue={products}
                           />
                         ))}
                       </div>

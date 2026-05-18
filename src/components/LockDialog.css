@@ -80,6 +80,31 @@
   box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
 }
 
+.lock-anon-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.lock-anon-toggle input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #1976d2;
+  cursor: pointer;
+}
+
+.lock-anon-hint {
+  margin: 0;
+  font-size: 10px;
+  color: #888;
+  line-height: 1.4;
+}
+
 .lock-error {
   font-size: 11px;
   color: #c62828;

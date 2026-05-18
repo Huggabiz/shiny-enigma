@@ -485,6 +485,10 @@ export interface Project {
    * locked — edits are blocked until the user supplies the matching
    * password. Navigation (view switching, scrolling) still works. */
   lockHash?: string;
+  /** When true AND the project is locked, dev products have their
+   * names replaced with "Dev Product NNN" and images hidden. Category,
+   * price, SKU code, and range position are preserved. */
+  anonymiseDev?: boolean;
   createdAt: string;
   updatedAt: string;
 }

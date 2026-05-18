@@ -4,6 +4,7 @@ import { getActivePlan, getStages } from '../types';
 import type {} from '../types';
 import { WAREHOUSE_KEYS, WAREHOUSE_LABELS } from '../types';
 import { CloseIcon } from './Icons';
+import { anonDisplay } from '../utils/anonymise';
 import './SkuDetailsPane.css';
 
 /**
@@ -70,11 +71,13 @@ export function SkuDetailsPane() {
   const pipeline = project.forecastPipelines?.[sku];
   const hasForecast = !!pipeline?.references.length;
 
+  const anon = anonDisplay(product, project.catalogue);
+
   return (
     <div className="sku-details-pane">
       <div className="sku-details-header">
         <div className="sku-details-title">
-          <span className="sku-details-name">{product.name}</span>
+          <span className="sku-details-name">{anon.name}</span>
           <span className="sku-details-sku">{sku}</span>
           {product.source === 'dev' && <span className="sku-details-dev">DEV</span>}
         </div>
@@ -85,9 +88,9 @@ export function SkuDetailsPane() {
 
       <div className="sku-details-body">
         {/* Product image */}
-        {product.imageUrl && (
+        {anon.imageUrl && (
           <div className="sku-details-image">
-            <img src={product.imageUrl} alt={product.name} />
+            <img src={anon.imageUrl} alt={anon.name} />
           </div>
         )}
 
