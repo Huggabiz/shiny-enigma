@@ -70,6 +70,7 @@ function App() {
     slideZoom,
     catalogueViewMode,
     isUnlocked,
+    viewerMode,
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
@@ -715,14 +716,17 @@ function App() {
               {duplicateWarning && <div className="duplicate-warning">{duplicateWarning}</div>}
             </div>
 
-            <div className="right-column">
-              {!linkMode && <SkuDetailsPane />}
-              <Catalogue products={project?.catalogue || []} onImport={() => setShowImport(true)}
-                currentProductIds={currentPlanProductIds} futureProductIds={futurePlanProductIds}
-                otherCurrentIds={otherPlansCurrentIds} otherFutureIds={otherPlansFutureIds}
-                isDropTarget={!!activeItem?.sourceShelf}
-                dropZoneId="catalogue-drop-zone" />
-            </div>
+            {!viewerMode && (
+              <div className="right-column">
+                {!linkMode && <SkuDetailsPane />}
+                <Catalogue products={project?.catalogue || []} onImport={() => setShowImport(true)}
+                  currentProductIds={currentPlanProductIds} futureProductIds={futurePlanProductIds}
+                  otherCurrentIds={otherPlansCurrentIds} otherFutureIds={otherPlansFutureIds}
+                  isDropTarget={!!activeItem?.sourceShelf}
+                  dropZoneId="catalogue-drop-zone" />
+              </div>
+            )}
+            {viewerMode && !linkMode && <SkuDetailsPane />}
 
             <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>
               {activeItem && <ProductCard item={activeItem.item} product={activeItem.product} overlay />}

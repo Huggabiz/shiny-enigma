@@ -9,7 +9,8 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 function editLocked(get: () => ProjectStore): boolean {
-  const { project, isUnlocked } = get();
+  const { project, isUnlocked, viewerMode } = get();
+  if (viewerMode) return true;
   return !!project?.lockHash && !isUnlocked;
 }
 
@@ -51,6 +52,7 @@ function updateShelf(project: Project, shelfId: string, updater: (shelf: Shelf) 
 
 interface ProjectStore {
   project: Project | null;
+  viewerMode: boolean;
   selectedItemId: string | null;
   linkMode: boolean;
   linkSource: string | null;
@@ -230,6 +232,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   linkSource: null,
   assumeContinuity: true,
   cardFormat: { ...DEFAULT_CARD_FORMAT },
+  viewerMode: !!window.__VIEWER_MODE__,
   showPlanTree: true,
   activeVariantId: null,
   showGhosted: true,
