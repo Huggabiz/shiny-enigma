@@ -11,12 +11,13 @@ const UNFILED_KEY = '__unfiled__';
 /** Key used when dragging a plan via HTML5 DnD — kept minimal so we can
  * drop onto a folder header and just call setPlanFolder. */
 const DND_MIME = 'application/x-range-plan-id';
+const DND_FOLDER_MIME = 'application/x-range-folder-id';
 
 export function PlanTree() {
   const {
     project, addPlan, removePlan, duplicatePlan, setActivePlan, setShowPlanTree,
     activeVariantId, setActiveVariant, addVariant, removeVariant,
-    addFolder, removeFolder, renameFolder, setPlanFolder,
+    addFolder, removeFolder, renameFolder, setPlanFolder, reorderFolders,
     activeView, toggleMultiplanEntry,
     isUnlocked, viewerMode,
   } = useProjectStore();
@@ -110,7 +111,9 @@ export function PlanTree() {
   };
 
   const handleFolderDragOver = (e: React.DragEvent<HTMLDivElement>, folderKey: string) => {
-    if (!e.dataTransfer.types.includes(DND_MIME)) return;
+    const hasPlan = e.dataTransfer.types.includes(DND_MIME);
+    const hasFolder = e.dataTransfer.types.includes(DND_FOLDER_MIME);
+    if (!hasPlan && !hasFolder) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dragOverFolderKey !== folderKey) setDragOverFolderKey(folderKey);
@@ -121,11 +124,34 @@ export function PlanTree() {
   };
 
   const handleFolderDrop = (e: React.DragEvent<HTMLDivElement>, folderKey: string) => {
-    const planId = e.dataTransfer.getData(DND_MIME);
     setDragOverFolderKey(null);
-    if (!planId) return;
-    e.preventDefault();
-    setPlanFolder(planId, folderKey === UNFILED_KEY ? undefined : folderKey);
+    const planId = e.dataTransfer.getData(DND_MIME);
+    if (planId) {
+      e.preventDefault();
+      setPlanFolder(planId, folderKey === UNFILED_KEY ? undefined : folderKey);
+      return;
+    }
+    const draggedFolderId = e.dataTransfer.getData(DND_FOLDER_MIME);
+    if (draggedFolderId && folderKey !== draggedFolderId) {
+      e.preventDefault();
+      const ids = folders.map((f) => f.id);
+      const fromIdx = ids.indexOf(draggedFolderId);
+      if (fromIdx < 0) return;
+      ids.splice(fromIdx, 1);
+      if (folderKey === UNFILED_KEY) {
+        ids.push(draggedFolderId);
+      } else {
+        const toIdx = ids.indexOf(folderKey);
+        if (toIdx < 0) return;
+        ids.splice(toIdx, 0, draggedFolderId);
+      }
+      reorderFolders(ids);
+    }
+  };
+
+  const handleFolderHeaderDragStart = (e: React.DragEvent<HTMLDivElement>, folderId: string) => {
+    e.dataTransfer.setData(DND_FOLDER_MIME, folderId);
+    e.dataTransfer.effectAllowed = 'move';
   };
 
   const renderPlan = (plan: RangePlan) => {
@@ -248,7 +274,11 @@ export function PlanTree() {
         onDragLeave={() => handleFolderDragLeave(folderKey)}
         onDrop={(e) => handleFolderDrop(e, folderKey)}
       >
-        <div className="plan-tree-folder-header">
+        <div
+          className="plan-tree-folder-header"
+          draggable={deletable}
+          onDragStart={deletable ? (e) => handleFolderHeaderDragStart(e, folderKey) : undefined}
+        >
           <button
             className="plan-tree-expand folder-expand"
             onClick={() => toggleFolder(folderKey)}

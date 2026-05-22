@@ -126,6 +126,14 @@
   user-select: none;
 }
 
+.plan-tree-folder-header[draggable="true"] {
+  cursor: grab;
+}
+
+.plan-tree-folder-header[draggable="true"]:active {
+  cursor: grabbing;
+}
+
 .plan-tree-folder-header .folder-expand {
   width: 14px;
 }
