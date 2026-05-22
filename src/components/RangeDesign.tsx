@@ -482,7 +482,13 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const [wrapperSize, setWrapperSize] = useState({ w: 0, h: 0 });
 
   const activePlan = project ? getActivePlan(project) : undefined;
-  const stages = activePlan && project ? getStages(activePlan, project) : [];
+  const allStages = activePlan && project ? getStages(activePlan, project) : [];
+  const stages = useMemo(() => {
+    const vk = project?.visibleStageKeys;
+    if (!vk || vk.length === 0) return allStages;
+    const filtered = allStages.filter((s) => vk.includes(s.key));
+    return filtered.length > 0 ? filtered : allStages;
+  }, [allStages, project?.visibleStageKeys]);
   const activeStage = stages.find((s) => s.key === shelfId) ?? stages[0];
   const shelf = activeStage?.shelf;
   const isFutureShelf = activeStage?.position === 'future';

@@ -489,6 +489,11 @@ export interface Project {
    * names replaced with "Dev Product NNN" and images hidden. Category,
    * price, SKU code, and range position are preserved. */
   anonymiseDev?: boolean;
+  /** When set, limits which stages are navigable in the viewer. Only
+   * stages whose key is in this array appear in stage selectors. Used
+   * by the HTML viewer export to let the exporter choose which stages
+   * to share. Absent = all stages visible. */
+  visibleStageKeys?: string[];
   createdAt: string;
   updatedAt: string;
 }

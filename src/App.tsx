@@ -74,7 +74,13 @@ function App() {
   } = useProjectStore();
 
   const activePlan = project ? getActivePlan(project) : undefined;
-  const stages = useMemo(() => activePlan && project ? getStages(activePlan, project) : [], [activePlan, project]);
+  const allStages = useMemo(() => activePlan && project ? getStages(activePlan, project) : [], [activePlan, project]);
+  const stages = useMemo(() => {
+    const vk = project?.visibleStageKeys;
+    if (!vk || vk.length === 0) return allStages;
+    const filtered = allStages.filter((s) => vk.includes(s.key));
+    return filtered.length > 0 ? filtered : allStages;
+  }, [allStages, project?.visibleStageKeys]);
   // Resolve transform view from/to stages — fall back to first/last
   // if the stored keys don't match (e.g. after stage deletion).
   const transformFrom = useMemo(
