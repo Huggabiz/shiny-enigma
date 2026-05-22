@@ -3,6 +3,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { saveProject, saveRangeStructure, loadProjectFile } from '../utils/projectFile';
 import { computeImportPlan, type ImportPlanPreview } from '../utils/importProject';
 import { exportToExcelEnriched } from '../utils/exportExcelEnriched';
+import { exportStandaloneHtml } from '../utils/exportHtml';
 import { APP_VERSION } from '../version';
 import { ImportProjectDialog } from './ImportProjectDialog';
 import { ExportDialog } from './ExportDialog';
@@ -25,6 +26,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
     activeVariantId,
     updateProjectName,
     isUnlocked, removeLock,
+    viewerMode,
   } = useProjectStore();
   const [editingName, setEditingName] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -123,9 +125,14 @@ export function Toolbar({ activeView }: ToolbarProps) {
             </span>
           )
         )}
-        {isLocked && (
+        {isLocked && !viewerMode && (
           <span className="toolbar-lock-badge" onClick={() => setLockDialog('unlock')} title="Project is locked — click to unlock">
             🔒 Locked
+          </span>
+        )}
+        {viewerMode && (
+          <span className="toolbar-lock-badge" style={{ cursor: 'default' }}>
+            📄 Viewer
           </span>
         )}
       </div>
@@ -209,6 +216,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
                   <hr />
                   <button onClick={() => { closeMenus(); setShowExportDialog(true); }}>Export PowerPoint</button>
                   <button onClick={() => { if (project) exportToExcelEnriched(project); closeMenus(); }}>Export Excel (SKU List)</button>
+                  <button onClick={async () => { if (project) { closeMenus(); await exportStandaloneHtml(project); } }}>Export Viewer (HTML)</button>
                 </div>
               )}
             </div>
@@ -221,14 +229,16 @@ export function Toolbar({ activeView }: ToolbarProps) {
               {openMenu === 'tools' && (
                 <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
                   <button onClick={() => { closeMenus(); setShowDashboard(true); }}>Dashboard</button>
-                  <hr />
-                  {!project?.lockHash ? (
-                    <button onClick={() => { closeMenus(); setLockDialog('set'); }}>Lock Project</button>
-                  ) : isLocked ? (
-                    <button onClick={() => { closeMenus(); setLockDialog('unlock'); }}>Unlock Project</button>
-                  ) : (
+                  {!viewerMode && (
                     <>
-                      <button onClick={() => { closeMenus(); removeLock(); }}>Remove Lock</button>
+                      <hr />
+                      {!project?.lockHash ? (
+                        <button onClick={() => { closeMenus(); setLockDialog('set'); }}>Lock Project</button>
+                      ) : isLocked ? (
+                        <button onClick={() => { closeMenus(); setLockDialog('unlock'); }}>Unlock Project</button>
+                      ) : (
+                        <button onClick={() => { closeMenus(); removeLock(); }}>Remove Lock</button>
+                      )}
                     </>
                   )}
                 </div>
@@ -236,39 +246,45 @@ export function Toolbar({ activeView }: ToolbarProps) {
             </div>
 
             {/* Manage dropdown */}
-            <div className="toolbar-dropdown-wrapper">
-              <button className="toolbar-btn" disabled={isLocked} onClick={() => setOpenMenu(openMenu === 'manage' ? null : 'manage')}>
-                Manage ▾
-              </button>
-              {openMenu === 'manage' && (
-                <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
-                  <button onClick={() => { closeMenus(); setShowStageManager(true); }}>Manage Stages</button>
-                  <hr />
-                  <button onClick={() => {
-                    if (confirm('Clear all ranges? Products removed from both shelves. Catalogue and matrix labels kept.')) clearRanges();
-                    closeMenus();
-                  }} className="danger">Clear Ranges</button>
-                  <button onClick={() => {
-                    if (confirm('Clear the catalogue? Range structure kept but product data lost.')) clearCatalogue();
-                    closeMenus();
-                  }} className="danger">Clear Catalogue</button>
-                </div>
-              )}
-            </div>
+            {!viewerMode && (
+              <div className="toolbar-dropdown-wrapper">
+                <button className="toolbar-btn" disabled={isLocked} onClick={() => setOpenMenu(openMenu === 'manage' ? null : 'manage')}>
+                  Manage ▾
+                </button>
+                {openMenu === 'manage' && (
+                  <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
+                    <button onClick={() => { closeMenus(); setShowStageManager(true); }}>Manage Stages</button>
+                    <hr />
+                    <button onClick={() => {
+                      if (confirm('Clear all ranges? Products removed from both shelves. Catalogue and matrix labels kept.')) clearRanges();
+                      closeMenus();
+                    }} className="danger">Clear Ranges</button>
+                    <button onClick={() => {
+                      if (confirm('Clear the catalogue? Range structure kept but product data lost.')) clearCatalogue();
+                      closeMenus();
+                    }} className="danger">Clear Catalogue</button>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
-        <input ref={loadRef} type="file" accept=".json" onChange={handleLoad} hidden />
-        <button className="toolbar-btn" onClick={() => loadRef.current?.click()}>Load</button>
-        <input ref={appendRef} type="file" accept=".json" onChange={handleAppend} hidden />
-        <button
-          className="toolbar-btn"
-          onClick={() => appendRef.current?.click()}
-          title="Append plans and lenses from another project file into this one"
-          disabled={!project || isLocked}
-        >
-          Append
-        </button>
+        {!viewerMode && (
+          <>
+            <input ref={loadRef} type="file" accept=".json" onChange={handleLoad} hidden />
+            <button className="toolbar-btn" onClick={() => loadRef.current?.click()}>Load</button>
+            <input ref={appendRef} type="file" accept=".json" onChange={handleAppend} hidden />
+            <button
+              className="toolbar-btn"
+              onClick={() => appendRef.current?.click()}
+              title="Append plans and lenses from another project file into this one"
+              disabled={!project || isLocked}
+            >
+              Append
+            </button>
+          </>
+        )}
       </div>
       {appendPreview && (
         <ImportProjectDialog

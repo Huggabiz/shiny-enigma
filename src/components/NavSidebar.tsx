@@ -9,7 +9,7 @@ interface NavSidebarProps {
 }
 
 export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
-  const { showPlanTree, setShowPlanTree } = useProjectStore();
+  const { showPlanTree, setShowPlanTree, viewerMode } = useProjectStore();
 
   return (
     <div className="nav-sidebar">
@@ -49,16 +49,19 @@ export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
         <span className="nav-label">Transform</span>
       </button>
 
-      <div className="nav-separator" />
-
-      <button
-        className={`nav-item ${activeView === 'forecast-lab' ? 'active' : ''}`}
-        onClick={() => onViewChange('forecast-lab')}
-        title="Forecast Lab — build SKU-level forecasts"
-      >
-        <span className="nav-icon">🧪</span>
-        <span className="nav-label">Forecast</span>
-      </button>
+      {!viewerMode && (
+        <>
+          <div className="nav-separator" />
+          <button
+            className={`nav-item ${activeView === 'forecast-lab' ? 'active' : ''}`}
+            onClick={() => onViewChange('forecast-lab')}
+            title="Forecast Lab — build SKU-level forecasts"
+          >
+            <span className="nav-icon">🧪</span>
+            <span className="nav-label">Forecast</span>
+          </button>
+        </>
+      )}
     </div>
   );
 }
