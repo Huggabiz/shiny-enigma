@@ -653,7 +653,7 @@ function App() {
                     <span>Show discontinued</span>
                   </label>
                   <SlideCanvasControls scrollAreaSelector=".transform-view-scroll" />
-                  <button className="transform-copy-btn" onClick={copyCurrentToFuture}>Copy Current → Future</button>
+                  {!viewerMode && <button className="transform-copy-btn" onClick={copyCurrentToFuture}>Copy Current → Future</button>}
                 </div>
               </div>
 

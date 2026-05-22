@@ -141,7 +141,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
       <div className="toolbar-actions">
         {project && (
           <>
-            {isTransform && (
+            {isTransform && !viewerMode && (
               <>
                 <label className="toolbar-checkbox" title="Products added to current range auto-add to future">
                   <input type="checkbox" checked={assumeContinuity}
