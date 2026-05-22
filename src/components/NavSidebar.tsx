@@ -1,4 +1,5 @@
 import { useProjectStore } from '../store/useProjectStore';
+import { getActivePlan, getStages } from '../types';
 import './NavSidebar.css';
 
 export type ViewType = 'transform' | 'range-design' | 'multiplan' | 'forecast-lab';
@@ -9,7 +10,18 @@ interface NavSidebarProps {
 }
 
 export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
-  const { showPlanTree, setShowPlanTree, viewerMode } = useProjectStore();
+  const { showPlanTree, setShowPlanTree, viewerMode, project } = useProjectStore();
+
+  const visibleStageCount = (() => {
+    if (!project) return 0;
+    const plan = getActivePlan(project);
+    if (!plan) return 0;
+    const all = getStages(plan, project);
+    const vk = project.visibleStageKeys;
+    if (!vk || vk.length === 0) return all.length;
+    return all.filter((s) => vk.includes(s.key)).length || all.length;
+  })();
+  const showTransform = visibleStageCount >= 2;
 
   return (
     <div className="nav-sidebar">
@@ -40,14 +52,16 @@ export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
         <span className="nav-icon">▦</span>
         <span className="nav-label">Range</span>
       </button>
-      <button
-        className={`nav-item ${activeView === 'transform' ? 'active' : ''}`}
-        onClick={() => onViewChange('transform')}
-        title="Range Transformation"
-      >
-        <span className="nav-icon">⇄</span>
-        <span className="nav-label">Transform</span>
-      </button>
+      {showTransform && (
+        <button
+          className={`nav-item ${activeView === 'transform' ? 'active' : ''}`}
+          onClick={() => onViewChange('transform')}
+          title="Range Transformation"
+        >
+          <span className="nav-icon">⇄</span>
+          <span className="nav-label">Transform</span>
+        </button>
+      )}
 
       {!viewerMode && (
         <>
