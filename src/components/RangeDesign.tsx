@@ -22,7 +22,7 @@ import type { Product, Shelf, MatrixLayout, PlaceholderData, ShelfItem } from '.
 import { getActivePlan, getStages } from '../types';
 import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH } from '../utils/matrixLayout';
 import { computeLensTintBackground } from '../utils/lensTint';
-import { anonDisplay } from '../utils/anonymise';
+import { anonDisplay, shouldAnonymise } from '../utils/anonymise';
 import './RangeDesign.css';
 
 interface RangeDesignProps {
@@ -259,11 +259,12 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   });
   const catalogue = project?.catalogue ?? [];
   const anon = product ? anonDisplay(product, catalogue) : null;
+  const phAnon = isPlaceholder && placeholderData?.source === 'dev' && shouldAnonymise();
   const displayName = isPlaceholder
-    ? (placeholderData?.name || placeholderName || 'New SKU')
+    ? (phAnon ? 'Dev Placeholder' : (placeholderData?.name || placeholderName || 'New SKU'))
     : (anon?.name || 'Unknown');
   const displaySku = isPlaceholder ? (placeholderData?.sku || '') : (product?.sku || '');
-  const displayImageUrl = isPlaceholder ? placeholderData?.imageUrl : anon?.imageUrl;
+  const displayImageUrl = isPlaceholder ? (phAnon ? undefined : placeholderData?.imageUrl) : anon?.imageUrl;
   const displayVolume = isPlaceholder ? placeholderData?.volume : product?.volume;
   const displayForecast = isPlaceholder ? placeholderData?.forecastVolume : product?.forecastVolume;
   // Future-shelf cards read the future-pricing override when present so
@@ -284,7 +285,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   const displayRevenue = isPlaceholder ? placeholderData?.revenue : product?.revenue;
   const displayFcstRev = isPlaceholder ? placeholderData?.forecastRevenue : product?.forecastRevenue;
   const displayCategory = isPlaceholder ? placeholderData?.category : product?.category;
-  const isDev = !isPlaceholder && product?.source === 'dev';
+  const isDev = isPlaceholder ? placeholderData?.source === 'dev' : product?.source === 'dev';
 
   // Compute RRP deltas vs the catalogue (live) price when a future
   // override is in play, so the future matrix card highlights price
