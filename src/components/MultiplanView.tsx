@@ -84,10 +84,13 @@ export function MultiplanView() {
 
   // Stages from the first plan (definitions are project-level).
   const firstPlan = project ? getActivePlan(project) : undefined;
-  const stagesForToggle = useMemo(
-    () => firstPlan && project ? getStages(firstPlan, project) : [],
-    [firstPlan, project],
-  );
+  const stagesForToggle = useMemo(() => {
+    const all = firstPlan && project ? getStages(firstPlan, project) : [];
+    const vk = project?.visibleStageKeys;
+    if (!vk || vk.length === 0) return all;
+    const filtered = all.filter((s) => vk.includes(s.key));
+    return filtered.length > 0 ? filtered : all;
+  }, [firstPlan, project]);
 
   const multiplanView = project?.multiplanView ?? { shelfSide: 'current' as const, entries: [] };
   const shelfSide = multiplanView.shelfSide;

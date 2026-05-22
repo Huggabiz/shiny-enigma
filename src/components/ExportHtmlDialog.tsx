@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CloseIcon } from './Icons';
 import { exportStandaloneHtml } from '../utils/exportHtml';
 import type { Project } from '../types';
+import { getActivePlan, getStages } from '../types';
 import './LockDialog.css';
 
 interface ExportHtmlDialogProps {
@@ -14,9 +15,39 @@ export function ExportHtmlDialog({ project, onClose }: ExportHtmlDialogProps) {
   const [anonymise, setAnonymise] = useState(project.anonymiseDev ?? false);
   const [busy, setBusy] = useState(false);
 
+  const activePlan = getActivePlan(project);
+  const stages = useMemo(
+    () => activePlan ? getStages(activePlan, project) : [],
+    [activePlan, project],
+  );
+
+  const [selectedStageKeys, setSelectedStageKeys] = useState<Set<string>>(
+    () => new Set(stages.map((s) => s.key)),
+  );
+
+  const toggleStage = (key: string) => {
+    setSelectedStageKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size > 1) next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   const handleExport = async () => {
     setBusy(true);
-    const exportProject = { ...project, anonymiseDev: anonymise, lockHash: project.lockHash || 'viewer' };
+    const visibleStageKeys = stages
+      .filter((s) => selectedStageKeys.has(s.key))
+      .map((s) => s.key);
+    const exportProject: Project = {
+      ...project,
+      anonymiseDev: anonymise,
+      lockHash: project.lockHash || 'viewer',
+      visibleStageKeys,
+    };
     await exportStandaloneHtml(exportProject);
     setBusy(false);
     onClose();
@@ -32,8 +63,27 @@ export function ExportHtmlDialog({ project, onClose }: ExportHtmlDialogProps) {
         <div className="lock-body">
           <p className="lock-hint">
             Creates a standalone HTML file that anyone can open in a browser.
-            The file is read-only — no editing, no catalogue, no forecast lab.
+            Read-only — no editing, no catalogue, no forecast lab.
           </p>
+
+          {stages.length > 1 && (
+            <>
+              <label className="lock-label">Stages to include</label>
+              <div className="export-stage-list">
+                {stages.map((s) => (
+                  <label key={s.key} className="export-stage-check">
+                    <input
+                      type="checkbox"
+                      checked={selectedStageKeys.has(s.key)}
+                      onChange={() => toggleStage(s.key)}
+                    />
+                    <span>{s.name}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
           {hasDevProducts && (
             <label className="lock-anon-toggle">
               <input
