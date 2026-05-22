@@ -661,7 +661,7 @@ function App() {
                         value={activePlan.name}
                         onSave={(next) => renamePlan(activePlan.id, next)}
                         trailing={activeVariant ? <span className="variant-badge">{activeVariant.name}</span> : null}
-                        disabled={!!project?.lockHash && !isUnlocked}
+                        disabled={(!!project?.lockHash && !isUnlocked) || viewerMode}
                       />
                 </div>
 

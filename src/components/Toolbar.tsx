@@ -3,13 +3,13 @@ import { useProjectStore } from '../store/useProjectStore';
 import { saveProject, saveRangeStructure, loadProjectFile } from '../utils/projectFile';
 import { computeImportPlan, type ImportPlanPreview } from '../utils/importProject';
 import { exportToExcelEnriched } from '../utils/exportExcelEnriched';
-import { exportStandaloneHtml } from '../utils/exportHtml';
 import { APP_VERSION } from '../version';
 import { ImportProjectDialog } from './ImportProjectDialog';
 import { ExportDialog } from './ExportDialog';
 import { DashboardDialog } from './DashboardDialog';
 import { StageManagerDialog } from './StageManagerDialog';
 import { LockDialog } from './LockDialog';
+import { ExportHtmlDialog } from './ExportHtmlDialog';
 import './Toolbar.css';
 
 interface ToolbarProps {
@@ -62,7 +62,8 @@ export function Toolbar({ activeView }: ToolbarProps) {
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [lockDialog, setLockDialog] = useState<'set' | 'unlock' | null>(null);
-  const isLocked = !!project?.lockHash && !isUnlocked;
+  const [showHtmlExport, setShowHtmlExport] = useState(false);
+  const isLocked = (!!project?.lockHash && !isUnlocked) || viewerMode;
 
   const closeMenus = () => setOpenMenu(null);
 
@@ -216,7 +217,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
                   <hr />
                   <button onClick={() => { closeMenus(); setShowExportDialog(true); }}>Export PowerPoint</button>
                   <button onClick={() => { if (project) exportToExcelEnriched(project); closeMenus(); }}>Export Excel (SKU List)</button>
-                  <button onClick={async () => { if (project) { closeMenus(); await exportStandaloneHtml(project); } }}>Export Viewer (HTML)</button>
+                  <button onClick={() => { closeMenus(); setShowHtmlExport(true); }}>Export Viewer (HTML)</button>
                 </div>
               )}
             </div>
@@ -304,6 +305,9 @@ export function Toolbar({ activeView }: ToolbarProps) {
       )}
       {lockDialog && (
         <LockDialog mode={lockDialog} onClose={() => setLockDialog(null)} />
+      )}
+      {showHtmlExport && project && (
+        <ExportHtmlDialog project={project} onClose={() => setShowHtmlExport(false)} />
       )}
     </div>
   );
