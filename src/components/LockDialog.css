@@ -105,6 +105,26 @@
   line-height: 1.4;
 }
 
+.export-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.export-stage-toggle-all {
+  border: none;
+  background: none;
+  font-size: 11px;
+  color: #1976d2;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+}
+
+.export-stage-toggle-all:hover {
+  text-decoration: underline;
+}
+
 .export-stage-list {
   display: flex;
   flex-direction: column;

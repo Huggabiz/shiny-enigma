@@ -68,7 +68,22 @@ export function ExportHtmlDialog({ project, onClose }: ExportHtmlDialogProps) {
 
           {stages.length > 1 && (
             <>
-              <label className="lock-label">Stages to include</label>
+              <div className="export-stage-header">
+                <label className="lock-label">Stages to include</label>
+                <button
+                  type="button"
+                  className="export-stage-toggle-all"
+                  onClick={() => {
+                    if (selectedStageKeys.size === stages.length) {
+                      setSelectedStageKeys(new Set([stages[0].key]));
+                    } else {
+                      setSelectedStageKeys(new Set(stages.map((s) => s.key)));
+                    }
+                  }}
+                >
+                  {selectedStageKeys.size === stages.length ? 'Deselect all' : 'Select all'}
+                </button>
+              </div>
               <div className="export-stage-list">
                 {stages.map((s) => (
                   <label key={s.key} className="export-stage-check">
