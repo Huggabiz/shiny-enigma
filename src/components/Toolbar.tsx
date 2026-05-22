@@ -195,21 +195,22 @@ export function Toolbar({ activeView }: ToolbarProps) {
 
             <div className="toolbar-divider" />
 
-            {/* Save/Export dropdown */}
-            <div className="toolbar-dropdown-wrapper">
-              <button className="toolbar-btn" onClick={() => setOpenMenu(openMenu === 'save' ? null : 'save')}>
-                Save / Export ▾
-              </button>
-              {openMenu === 'save' && (
-                <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
-                  <button onClick={async () => {
-                    closeMenus();
-                    if (!project) return;
-                    try { await saveProject(project); }
-                    catch (err) { console.error(err); alert('Failed to save project.'); }
-                  }}>Save Full Project</button>
-                  <button onClick={async () => {
-                    closeMenus();
+            {/* Save/Export dropdown — hidden in viewer mode */}
+            {!viewerMode && (
+              <div className="toolbar-dropdown-wrapper">
+                <button className="toolbar-btn" onClick={() => setOpenMenu(openMenu === 'save' ? null : 'save')}>
+                  Save / Export ▾
+                </button>
+                {openMenu === 'save' && (
+                  <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
+                    <button onClick={async () => {
+                      closeMenus();
+                      if (!project) return;
+                      try { await saveProject(project); }
+                      catch (err) { console.error(err); alert('Failed to save project.'); }
+                    }}>Save Full Project</button>
+                    <button onClick={async () => {
+                      closeMenus();
                     if (!project) return;
                     try { await saveRangeStructure(project); }
                     catch (err) { console.error(err); alert('Failed to save range structure.'); }
@@ -218,9 +219,10 @@ export function Toolbar({ activeView }: ToolbarProps) {
                   <button onClick={() => { closeMenus(); setShowExportDialog(true); }}>Export PowerPoint</button>
                   <button onClick={() => { if (project) exportToExcelEnriched(project); closeMenus(); }}>Export Excel (SKU List)</button>
                   <button onClick={() => { closeMenus(); setShowHtmlExport(true); }}>Export Viewer (HTML)</button>
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Tools dropdown */}
             <div className="toolbar-dropdown-wrapper">

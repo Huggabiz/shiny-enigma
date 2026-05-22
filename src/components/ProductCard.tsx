@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Product, ShelfItem, FuturePricing } from '../types';
 import { useProjectStore } from '../store/useProjectStore';
-import { anonDisplay } from '../utils/anonymise';
+import { anonDisplay, shouldAnonymise } from '../utils/anonymise';
 import { computeLensTintBackground } from '../utils/lensTint';
 import { CloseIcon } from './Icons';
 import './ProductCard.css';
@@ -206,15 +206,16 @@ export function ProductCard({
   const phData = item.placeholderData;
   const catalogue = useProjectStore.getState().project?.catalogue ?? [];
   const anon = product ? anonDisplay(product, catalogue) : null;
-  const displayName = item.isPlaceholder
-    ? (phData?.name || item.placeholderName || 'New SKU')
-    : anon?.name || 'Unknown';
-  const displaySku = item.isPlaceholder ? phData?.sku || '' : product?.sku || '';
-  const displayImageUrl = item.isPlaceholder ? phData?.imageUrl : anon?.imageUrl;
   const displaySource: 'live' | 'dev' = item.isPlaceholder
     ? (phData?.source || 'live')
     : (product?.source || 'live');
-  const isDev = !item.isPlaceholder && displaySource === 'dev';
+  const isDev = displaySource === 'dev';
+  const phAnon = isDev && item.isPlaceholder && shouldAnonymise();
+  const displayName = item.isPlaceholder
+    ? (phAnon ? 'Dev Placeholder' : (phData?.name || item.placeholderName || 'New SKU'))
+    : anon?.name || 'Unknown';
+  const displaySku = item.isPlaceholder ? phData?.sku || '' : product?.sku || '';
+  const displayImageUrl = item.isPlaceholder ? (phAnon ? undefined : phData?.imageUrl) : anon?.imageUrl;
 
   const isCompact = cardWidth !== undefined && cardWidth < 75;
 
