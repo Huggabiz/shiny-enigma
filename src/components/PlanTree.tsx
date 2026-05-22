@@ -18,9 +18,9 @@ export function PlanTree() {
     activeVariantId, setActiveVariant, addVariant, removeVariant,
     addFolder, removeFolder, renameFolder, setPlanFolder,
     activeView, toggleMultiplanEntry,
-    isUnlocked,
+    isUnlocked, viewerMode,
   } = useProjectStore();
-  const isLocked = !!project?.lockHash && !isUnlocked;
+  const isLocked = (!!project?.lockHash && !isUnlocked) || viewerMode;
   const isMultiplan = activeView === 'multiplan';
   // Fast lookup so each row can tell if its (planId, variantId|null)
   // pair is already in the multiplan view entries list.

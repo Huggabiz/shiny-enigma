@@ -487,7 +487,7 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
   const shelf = activeStage?.shelf;
   const isFutureShelf = activeStage?.position === 'future';
   const catalogue = project?.catalogue || [];
-  const isLocked = !!project?.lockHash && !useProjectStore.getState().isUnlocked;
+  const isLocked = !!project?.lockHash && !useProjectStore.getState().isUnlocked || useProjectStore.getState().viewerMode;
   const layout: MatrixLayout = useMemo(() =>
     shelf?.matrixLayout || { title: shelf?.name || '', xLabels: [], yLabels: [], assignments: [] },
     [shelf?.matrixLayout, shelf?.name]
@@ -1116,14 +1116,18 @@ export function RangeDesign({ shelfId, onShelfChange, onImport }: RangeDesignPro
 
         </div>
 
-        <div className="right-column">
+        {useProjectStore.getState().viewerMode ? (
           <SkuDetailsPane />
-          <Catalogue products={catalogue} onImport={onImport}
-            currentProductIds={currentProductIds} futureProductIds={futureProductIds}
-            otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds}
-            designShelfId={shelfId}
-            dropZoneId="catalogue-drop-zone-design" />
-        </div>
+        ) : (
+          <div className="right-column">
+            <SkuDetailsPane />
+            <Catalogue products={catalogue} onImport={onImport}
+              currentProductIds={currentProductIds} futureProductIds={futureProductIds}
+              otherCurrentIds={otherCurrentIds} otherFutureIds={otherFutureIds}
+              designShelfId={shelfId}
+              dropZoneId="catalogue-drop-zone-design" />
+          </div>
+        )}
 
         <DragOverlay>
           {activeProduct && (

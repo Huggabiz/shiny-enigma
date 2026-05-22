@@ -152,8 +152,8 @@ function groupByCategory(products: Product[]): GroupedProducts[] {
 
 export function Catalogue({ products, onImport, currentProductIds, futureProductIds, otherCurrentIds, otherFutureIds, isDropTarget, dropZoneId, designShelfId }: CatalogueProps) {
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({ id: dropZoneId || 'catalogue-drop-zone' });
-  const { catalogueFilters, setCatalogueFilters, catalogueViewMode: viewMode, setCatalogueViewMode: setViewMode, project: storeProject, isUnlocked } = useProjectStore();
-  const isLocked = !!storeProject?.lockHash && !isUnlocked;
+  const { catalogueFilters, setCatalogueFilters, catalogueViewMode: viewMode, setCatalogueViewMode: setViewMode, project: storeProject, isUnlocked, viewerMode: storeViewerMode } = useProjectStore();
+  const isLocked = (!!storeProject?.lockHash && !isUnlocked) || storeViewerMode;
   const search = catalogueFilters.search;
   const categoryFilter = catalogueFilters.category;
   const subCategoryFilter = catalogueFilters.subCategory;

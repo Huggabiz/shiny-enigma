@@ -34,11 +34,12 @@ export function LensSidebar() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const isUnlocked = useProjectStore((s) => s.isUnlocked);
+  const viewerMode = useProjectStore((s) => s.viewerMode);
   if (!project) return null;
   const lenses = project.lenses ?? [];
   const activeLensIds = project.activeLensIds ?? [];
   const editingLensId = project.editingLensId ?? null;
-  const isLocked = !!project.lockHash && !isUnlocked;
+  const isLocked = (!!project.lockHash && !isUnlocked) || viewerMode;
 
   const commitNew = () => {
     const trimmed = newName.trim();
