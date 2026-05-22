@@ -147,6 +147,13 @@
   cursor: pointer;
 }
 
+.export-lens-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .lock-error {
   font-size: 11px;
   color: #c62828;

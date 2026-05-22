@@ -21,8 +21,17 @@ export function ExportHtmlDialog({ project, onClose }: ExportHtmlDialogProps) {
     [activePlan, project],
   );
 
+  const customLenses = useMemo(
+    () => (project.lenses ?? []).filter((l) => !l.builtInKind),
+    [project.lenses],
+  );
+
   const [selectedStageKeys, setSelectedStageKeys] = useState<Set<string>>(
     () => new Set(stages.map((s) => s.key)),
+  );
+
+  const [selectedLensIds, setSelectedLensIds] = useState<Set<string>>(
+    () => new Set(customLenses.map((l) => l.id)),
   );
 
   const toggleStage = (key: string) => {
@@ -37,16 +46,34 @@ export function ExportHtmlDialog({ project, onClose }: ExportHtmlDialogProps) {
     });
   };
 
+  const toggleLens = (id: string) => {
+    setSelectedLensIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const handleExport = async () => {
     setBusy(true);
     const visibleStageKeys = stages
       .filter((s) => selectedStageKeys.has(s.key))
       .map((s) => s.key);
+    const exportLenses = (project.lenses ?? []).filter(
+      (l) => l.builtInKind || selectedLensIds.has(l.id),
+    );
+    const activeLensIds = (project.activeLensIds ?? []).filter(
+      (id) => exportLenses.some((l) => l.id === id),
+    );
     const exportProject: Project = {
       ...project,
       anonymiseDev: anonymise,
       lockHash: project.lockHash || 'viewer',
       visibleStageKeys,
+      lenses: exportLenses,
+      activeLensIds,
+      editingLensId: null,
     };
     await exportStandaloneHtml(exportProject);
     setBusy(false);
@@ -93,6 +120,40 @@ export function ExportHtmlDialog({ project, onClose }: ExportHtmlDialogProps) {
                       onChange={() => toggleStage(s.key)}
                     />
                     <span>{s.name}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
+          {customLenses.length > 0 && (
+            <>
+              <div className="export-stage-header">
+                <label className="lock-label">Lenses to include</label>
+                <button
+                  type="button"
+                  className="export-stage-toggle-all"
+                  onClick={() => {
+                    if (selectedLensIds.size === customLenses.length) {
+                      setSelectedLensIds(new Set());
+                    } else {
+                      setSelectedLensIds(new Set(customLenses.map((l) => l.id)));
+                    }
+                  }}
+                >
+                  {selectedLensIds.size === customLenses.length ? 'Deselect all' : 'Select all'}
+                </button>
+              </div>
+              <div className="export-stage-list">
+                {customLenses.map((l) => (
+                  <label key={l.id} className="export-stage-check">
+                    <input
+                      type="checkbox"
+                      checked={selectedLensIds.has(l.id)}
+                      onChange={() => toggleLens(l.id)}
+                    />
+                    <span className="export-lens-swatch" style={{ background: l.color }} />
+                    <span>{l.name}</span>
                   </label>
                 ))}
               </div>
