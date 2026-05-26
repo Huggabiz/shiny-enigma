@@ -494,6 +494,9 @@ export interface Project {
    * by the HTML viewer export to let the exporter choose which stages
    * to share. Absent = all stages visible. */
   visibleStageKeys?: string[];
+  /** ISO timestamp of when this viewer snapshot was exported. Only
+   * present in exported HTML viewer files. */
+  exportedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
