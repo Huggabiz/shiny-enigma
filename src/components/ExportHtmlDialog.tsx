@@ -69,6 +69,7 @@ export function ExportHtmlDialog({ project, onClose }: ExportHtmlDialogProps) {
     const exportProject: Project = {
       ...project,
       anonymiseDev: anonymise,
+      exportedAt: new Date().toISOString(),
       lockHash: project.lockHash || 'viewer',
       visibleStageKeys,
       lenses: exportLenses,

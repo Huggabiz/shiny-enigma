@@ -99,8 +99,12 @@ export function Toolbar({ activeView }: ToolbarProps) {
     }
   };
 
+  const exportedAt = project?.exportedAt;
+  const snapshotDate = exportedAt ? new Date(exportedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+
   return (
-    <div className="toolbar">
+    <>
+    <div className={`toolbar ${viewerMode ? 'toolbar-viewer' : ''}`}>
       <div className="toolbar-brand">
         <span className="toolbar-logo">Range Planner</span>
         <span className="toolbar-version">v{APP_VERSION}</span>
@@ -312,5 +316,11 @@ export function Toolbar({ activeView }: ToolbarProps) {
         <ExportHtmlDialog project={project} onClose={() => setShowHtmlExport(false)} />
       )}
     </div>
+    {viewerMode && snapshotDate && (
+      <div className="viewer-snapshot-banner">
+        Static snapshot exported {snapshotDate} — this is a read-only viewer
+      </div>
+    )}
+    </>
   );
 }
