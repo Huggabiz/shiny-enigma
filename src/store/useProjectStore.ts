@@ -157,6 +157,8 @@ interface ProjectStore {
   /** Cycle a custom lens's colour to the next palette entry that
    * isn't already in use by another lens. No-op for built-in lenses. */
   cycleLensColor: (lensId: string) => void;
+  /** Set a custom lens's colour to an exact value. */
+  setLensColor: (lensId: string, color: string) => void;
 
   // Stage management — stages are PROJECT-level (shared across all plans).
   // Each plan stores its own shelf for each stage.
@@ -811,6 +813,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       project: {
         ...project,
         lenses: lenses.map((l) => l.id === lensId ? { ...l, color: nextColor } : l),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  setLensColor: (lensId, color) => {
+    if (editLocked(get)) return;
+    const { project } = get();
+    if (!project) return;
+    const lenses = project.lenses ?? [];
+    const lens = lenses.find((l) => l.id === lensId);
+    if (!lens || lens.builtInKind || lens.color === color) return;
+    set({
+      project: {
+        ...project,
+        lenses: lenses.map((l) => l.id === lensId ? { ...l, color } : l),
         updatedAt: new Date().toISOString(),
       },
     });
