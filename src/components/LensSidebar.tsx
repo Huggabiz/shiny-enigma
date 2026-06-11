@@ -213,6 +213,7 @@ function LensColorPicker({ currentColor, position, onSelect, onClose }: {
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [adjusted, setAdjusted] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -222,14 +223,26 @@ function LensColorPicker({ currentColor, position, onSelect, onClose }: {
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  const style: React.CSSProperties = {
-    position: 'fixed',
-    top: position.top,
-    left: position.left,
-  };
+  useEffect(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    let top = position.top;
+    let left = position.left;
+    if (top + rect.height > window.innerHeight - 8) {
+      top = position.top - rect.height - 8;
+    }
+    if (left + rect.width > window.innerWidth - 8) {
+      left = window.innerWidth - rect.width - 8;
+    }
+    if (top !== position.top || left !== position.left) {
+      setAdjusted({ top, left });
+    }
+  }, [position]);
+
+  const pos = adjusted ?? position;
 
   return (
-    <div ref={ref} className="lens-color-picker" style={style} onClick={(e) => e.stopPropagation()}>
+    <div ref={ref} className="lens-color-picker" style={{ position: 'fixed', top: pos.top, left: pos.left }} onClick={(e) => e.stopPropagation()}>
       {LENS_PALETTE.map((color) => (
         <button
           key={color}
