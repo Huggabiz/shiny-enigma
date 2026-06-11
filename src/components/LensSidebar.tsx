@@ -33,6 +33,7 @@ export function LensSidebar() {
   const [newName, setNewName] = useState('');
   const [newScope, setNewScope] = useState<'global' | 'per-stage'>('global');
   const [colorPickerLensId, setColorPickerLensId] = useState<string | null>(null);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const isUnlocked = useProjectStore((s) => s.isUnlocked);
@@ -99,12 +100,19 @@ export function LensSidebar() {
               <span
                 className={`lens-swatch ${isEditing ? 'cyclable' : ''}`}
                 style={{ background: lens.color }}
-                onClick={isEditing ? (e) => { e.stopPropagation(); setColorPickerLensId(colorPickerLensId === lens.id ? null : lens.id); } : undefined}
+                onClick={isEditing ? (e) => {
+                  e.stopPropagation();
+                  if (colorPickerLensId === lens.id) { setColorPickerLensId(null); return; }
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  setPickerPos({ top: rect.bottom + 4, left: rect.left });
+                  setColorPickerLensId(lens.id);
+                } : undefined}
                 title={isEditing ? 'Click to choose colour' : undefined}
               />
               {colorPickerLensId === lens.id && (
                 <LensColorPicker
                   currentColor={lens.color}
+                  position={pickerPos}
                   onSelect={(color) => { setLensColor(lens.id, color); setColorPickerLensId(null); }}
                   onClose={() => setColorPickerLensId(null)}
                 />
@@ -198,8 +206,9 @@ export function LensSidebar() {
   );
 }
 
-function LensColorPicker({ currentColor, onSelect, onClose }: {
+function LensColorPicker({ currentColor, position, onSelect, onClose }: {
   currentColor: string;
+  position: { top: number; left: number };
   onSelect: (color: string) => void;
   onClose: () => void;
 }) {
@@ -213,8 +222,14 @@ function LensColorPicker({ currentColor, onSelect, onClose }: {
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: position.top,
+    left: position.left,
+  };
+
   return (
-    <div ref={ref} className="lens-color-picker" onClick={(e) => e.stopPropagation()}>
+    <div ref={ref} className="lens-color-picker" style={style} onClick={(e) => e.stopPropagation()}>
       {LENS_PALETTE.map((color) => (
         <button
           key={color}

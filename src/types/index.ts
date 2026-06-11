@@ -374,38 +374,36 @@ export const DEFAULT_DEV_LENS: Lens = {
 /** Auto-assigned colour palette for new lenses. Rotates through these
  * by `lenses.length % palette.length`, skipping the dev blue. */
 export const LENS_PALETTE: string[] = [
-  // Original set (backward compatible)
-  '#7b1fa2', // purple
-  '#388e3c', // green
-  '#f57c00', // orange
-  '#c62828', // red
-  '#0097a7', // teal
-  '#6a1b9a', // deep purple
-  '#5d4037', // brown
-  '#455a64', // blue grey
-  '#827717', // dark olive
-  '#bf360c', // deep orange
-  // Extended palette
-  '#1565c0', // blue
-  '#00838f', // dark cyan
-  '#2e7d32', // forest green
-  '#ad1457', // pink
-  '#4527a0', // indigo
-  '#ef6c00', // amber
-  '#283593', // dark indigo
-  '#00695c', // dark teal
-  '#9e9d24', // lime
-  '#d84315', // burnt orange
-  '#558b2f', // olive green
-  '#6d4c41', // mocha
-  '#37474f', // charcoal
-  '#880e4f', // magenta
-  '#1b5e20', // dark green
-  '#e65100', // vivid orange
+  // Row 1 — purples & pinks
+  '#7b1fa2', // purple (original)
   '#4a148c', // violet
-  '#006064', // deep teal
-  '#33691e', // grass
-  '#b71c1c', // crimson
+  '#ad1457', // pink
+  '#880e4f', // magenta
+  // Row 2 — blues & teals
+  '#1565c0', // blue
+  '#283593', // indigo
+  '#0097a7', // teal (original)
+  '#00695c', // dark teal
+  // Row 3 — greens & olives
+  '#388e3c', // green (original)
+  '#1b5e20', // dark green
+  '#558b2f', // olive green
+  '#827717', // dark olive (original)
+  // Row 4 — oranges & reds
+  '#f57c00', // orange (original)
+  '#e65100', // vivid orange
+  '#c62828', // red (original)
+  '#bf360c', // deep orange (original)
+  // Row 5 — earths & neutrals
+  '#5d4037', // brown (original)
+  '#6d4c41', // mocha
+  '#455a64', // blue grey (original)
+  '#37474f', // charcoal
+  // Row 6 — accents
+  '#6a1b9a', // deep purple (original)
+  '#9e9d24', // lime
+  '#00838f', // cyan
+  '#d84315', // burnt sienna
 ];
 
 /** True if a product is "in" a lens. Built-in 'dev' uses implicit
