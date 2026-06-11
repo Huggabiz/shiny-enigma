@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
+import { LENS_PALETTE } from '../types';
 import './LensSidebar.css';
 
 /**
@@ -26,11 +27,12 @@ export function LensSidebar() {
     renameLens,
     setActiveLens,
     setEditingLens,
-    cycleLensColor,
+    setLensColor,
   } = useProjectStore();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [newScope, setNewScope] = useState<'global' | 'per-stage'>('global');
+  const [colorPickerLensId, setColorPickerLensId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const isUnlocked = useProjectStore((s) => s.isUnlocked);
@@ -97,9 +99,16 @@ export function LensSidebar() {
               <span
                 className={`lens-swatch ${isEditing ? 'cyclable' : ''}`}
                 style={{ background: lens.color }}
-                onClick={isEditing ? (e) => { e.stopPropagation(); cycleLensColor(lens.id); } : undefined}
-                title={isEditing ? 'Click to cycle colour' : undefined}
+                onClick={isEditing ? (e) => { e.stopPropagation(); setColorPickerLensId(colorPickerLensId === lens.id ? null : lens.id); } : undefined}
+                title={isEditing ? 'Click to choose colour' : undefined}
               />
+              {colorPickerLensId === lens.id && (
+                <LensColorPicker
+                  currentColor={lens.color}
+                  onSelect={(color) => { setLensColor(lens.id, color); setColorPickerLensId(null); }}
+                  onClose={() => setColorPickerLensId(null)}
+                />
+              )}
               {renamingId === lens.id ? (
                 <input
                   className="lens-name-input"
@@ -185,6 +194,36 @@ export function LensSidebar() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function LensColorPicker({ currentColor, onSelect, onClose }: {
+  currentColor: string;
+  onSelect: (color: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} className="lens-color-picker" onClick={(e) => e.stopPropagation()}>
+      {LENS_PALETTE.map((color) => (
+        <button
+          key={color}
+          className={`lens-color-cell ${color === currentColor ? 'selected' : ''}`}
+          style={{ background: color }}
+          onClick={() => onSelect(color)}
+          title={color}
+        />
+      ))}
     </div>
   );
 }
