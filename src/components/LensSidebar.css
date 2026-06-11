@@ -110,23 +110,20 @@
 }
 
 .lens-color-picker {
-  position: absolute;
-  left: 28px;
-  top: 0;
-  z-index: 20;
+  z-index: 1000;
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   padding: 8px;
   display: grid;
-  grid-template-columns: repeat(6, 22px);
-  gap: 4px;
+  grid-template-columns: repeat(4, 24px);
+  gap: 5px;
 }
 
 .lens-color-cell {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: 2px solid transparent;
   border-radius: 4px;
   cursor: pointer;
