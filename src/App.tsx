@@ -23,6 +23,7 @@ import { ProductCard } from './components/ProductCard';
 import { ForecastPanel } from './components/ForecastPanel';
 import { RangeDesign } from './components/RangeDesign';
 import { MultiplanView } from './components/MultiplanView';
+import { MultiplanListView } from './components/MultiplanListView';
 import { ForecastLab } from './components/ForecastLab';
 import { SkuDetailsPane } from './components/SkuDetailsPane';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -179,7 +180,7 @@ function App() {
     if (!project) return;
     // Multiplan view has no fixed slide canvas, so there's nothing to
     // auto-fit. Skip the snap-to-width entirely when it's active.
-    if (activeView === 'multiplan' || activeView === 'forecast-lab') return;
+    if (activeView === 'multiplan' || activeView === 'multiplan-list' || activeView === 'forecast-lab') return;
     const selector = activeView === 'transform' ? '.transform-view-scroll' : '.range-view-scroll';
     // Wait for the new view's DOM to mount and CSS vars to commit. Two
     // RAFs is enough for the initial render; the fallback timeout also
@@ -744,6 +745,8 @@ function App() {
           )
         ) : activeView === 'range-design' ? (
           <RangeDesign shelfId={designShelfId} onShelfChange={setDesignShelfId} onImport={() => setShowImport(true)} />
+        ) : activeView === 'multiplan-list' ? (
+          <MultiplanListView />
         ) : activeView === 'multiplan' ? (
           <MultiplanView />
         ) : activeView === 'forecast-lab' ? (

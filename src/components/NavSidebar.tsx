@@ -2,7 +2,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { getActivePlan, getStages } from '../types';
 import './NavSidebar.css';
 
-export type ViewType = 'transform' | 'range-design' | 'multiplan' | 'forecast-lab';
+export type ViewType = 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'forecast-lab';
 
 interface NavSidebarProps {
   activeView: ViewType;
@@ -36,6 +36,14 @@ export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
 
       <div className="nav-separator" />
 
+      <button
+        className={`nav-item ${activeView === 'multiplan-list' ? 'active' : ''}`}
+        onClick={() => onViewChange('multiplan-list')}
+        title="Multiplan List — tabular SKU list across plans"
+      >
+        <span className="nav-icon">☷</span>
+        <span className="nav-label">List</span>
+      </button>
       <button
         className={`nav-item ${activeView === 'multiplan' ? 'active' : ''}`}
         onClick={() => onViewChange('multiplan')}
