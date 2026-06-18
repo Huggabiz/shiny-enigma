@@ -12,6 +12,7 @@ interface ListRow {
   matrixRow: string;
   matrixCol: string;
   ghosted: boolean;
+  planBreak: boolean;
 }
 
 interface ListColumnConfig {
@@ -49,7 +50,7 @@ export function MultiplanListView() {
     setShowGhosted,
     exclusiveLensFilter,
     setExclusiveLensFilter,
-    setMultiplanShelfSide,
+    setMultiplanListShelfSide,
     setSelectedItem,
     selectedItemId,
   } = useProjectStore();
@@ -66,9 +67,9 @@ export function MultiplanListView() {
     return filtered.length > 0 ? filtered : all;
   }, [firstPlan, project]);
 
-  const multiplanView = project?.multiplanView ?? { shelfSide: 'current' as const, entries: [] };
-  const shelfSide = multiplanView.shelfSide;
-  const entries = multiplanView.entries;
+  const listView = project?.multiplanListView ?? { shelfSide: 'current' as const, entries: [] };
+  const shelfSide = listView.shelfSide;
+  const entries = listView.entries;
 
   const customLenses = useMemo(
     () => (project?.lenses ?? []).filter((l) => !l.builtInKind),
@@ -86,6 +87,7 @@ export function MultiplanListView() {
   const rawRows = useMemo(() => {
     if (!project) return [];
     const result: ListRow[] = [];
+    let lastPlanLabel = '';
 
     for (const entry of entries) {
       const plan = project.plans.find((p) => p.id === entry.planId);
@@ -109,6 +111,8 @@ export function MultiplanListView() {
       const includedIds = variant ? new Set(variant[includedKey]) : null;
       const layout = shelf.matrixLayout;
       const planLabel = variant ? `${plan.name} (${variant.name})` : plan.name;
+      const planBreak = planLabel !== lastPlanLabel && lastPlanLabel !== '';
+      let isFirstInPlan = true;
 
       for (const item of shelf.items) {
         const isIncluded = !includedIds || includedIds.has(item.id);
@@ -128,13 +132,18 @@ export function MultiplanListView() {
           if (!inAny) continue;
         }
 
-        result.push({ product, item, planLabel, matrixRow, matrixCol, ghosted: !isIncluded });
+        result.push({
+          product, item, planLabel, matrixRow, matrixCol,
+          ghosted: !isIncluded,
+          planBreak: planBreak && isFirstInPlan,
+        });
+        isFirstInPlan = false;
       }
+      lastPlanLabel = planLabel;
     }
     return result;
   }, [project, entries, shelfSide, showGhosted, exclusiveLensFilter, activeLenses, catalogue]);
 
-  // Optionally merge duplicates by SKU
   const rows = useMemo(() => {
     if (!colConfig.mergeDuplicates) return rawRows;
     const merged: ListRow[] = [];
@@ -147,7 +156,7 @@ export function MultiplanListView() {
           existing.planLabel += `, ${row.planLabel}`;
         }
       } else {
-        const clone = { ...row, planLabel: row.planLabel };
+        const clone = { ...row };
         seen.set(key, clone);
         merged.push(clone);
       }
@@ -155,21 +164,18 @@ export function MultiplanListView() {
     return merged;
   }, [rawRows, colConfig.mergeDuplicates]);
 
-  // Group by matrixRow label
-  const grouped = useMemo(() => {
-    const map = new Map<string, ListRow[]>();
-    for (const row of rows) {
-      const key = row.matrixRow || '(Unassigned)';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(row);
-    }
-    return Array.from(map.entries());
-  }, [rows]);
-
   if (!project) return null;
 
   const toggleCol = (key: keyof ListColumnConfig) =>
     setColConfig((c) => ({ ...c, [key]: !c[key] }));
+
+  const dataColCount = [
+    colConfig.showCategory, colConfig.showVolume, colConfig.showRrp,
+    colConfig.showUsRrp, colConfig.showEuRrp, colConfig.showAusRrp,
+    colConfig.showRevenue, colConfig.showForecastVolume, colConfig.showForecastRevenue,
+  ].filter(Boolean).length;
+  const lensColCount = colConfig.showLenses ? customLenses.length : 0;
+  const totalCols = 6 + dataColCount + lensColCount;
 
   return (
     <div className="mpl-view">
@@ -182,7 +188,7 @@ export function MultiplanListView() {
               role="tab"
               aria-selected={shelfSide === s.key}
               className={shelfSide === s.key ? 'active' : ''}
-              onClick={() => setMultiplanShelfSide(s.key)}
+              onClick={() => setMultiplanListShelfSide(s.key)}
             >
               {s.name}
             </button>
@@ -197,6 +203,7 @@ export function MultiplanListView() {
               <div className="toolbar-dropdown mpl-col-dropdown" onMouseLeave={() => setShowColMenu(false)}>
                 <div className="dropdown-title">Show columns</div>
                 {([
+                  ['showCategory', 'Category'],
                   ['showVolume', 'Volume'],
                   ['showRrp', 'UK RRP'],
                   ['showUsRrp', 'US RRP'],
@@ -205,7 +212,6 @@ export function MultiplanListView() {
                   ['showRevenue', 'Revenue'],
                   ['showForecastVolume', 'Forecast Volume'],
                   ['showForecastRevenue', 'Forecast Revenue'],
-                  ['showCategory', 'Category'],
                   ['showLenses', 'Lenses'],
                 ] as const).map(([key, label]) => (
                   <label key={key} className="dropdown-checkbox">
@@ -245,8 +251,8 @@ export function MultiplanListView() {
             <thead>
               <tr>
                 <th className="mpl-th-plan">Plan</th>
-                <th className="mpl-th-group">Section</th>
-                <th className="mpl-th-col">Column</th>
+                <th className="mpl-th-grp">Group X</th>
+                <th className="mpl-th-grp">Group Y</th>
                 <th className="mpl-th-img" />
                 <th className="mpl-th-sku">SKU</th>
                 <th className="mpl-th-name">Product</th>
@@ -267,27 +273,30 @@ export function MultiplanListView() {
               </tr>
             </thead>
             <tbody>
-              {grouped.map(([groupLabel, groupRows]) => (
-                groupRows.map((row, i) => {
-                  const anon = row.product ? anonDisplay(row.product, catalogue) : null;
-                  const name = row.item.isPlaceholder
-                    ? (row.item.placeholderData?.name || row.item.placeholderName || 'Placeholder')
-                    : (anon?.name ?? '—');
-                  const sku = row.product?.sku ?? row.item.placeholderData?.sku ?? '';
-                  const imgUrl = row.item.isPlaceholder ? row.item.placeholderData?.imageUrl : anon?.imageUrl;
-                  const isSelected = row.item.id === selectedItemId;
+              {rows.map((row) => {
+                const anon = row.product ? anonDisplay(row.product, catalogue) : null;
+                const name = row.item.isPlaceholder
+                  ? (row.item.placeholderData?.name || row.item.placeholderName || 'Placeholder')
+                  : (anon?.name ?? '—');
+                const sku = row.product?.sku ?? row.item.placeholderData?.sku ?? '';
+                const imgUrl = row.item.isPlaceholder ? row.item.placeholderData?.imageUrl : anon?.imageUrl;
+                const isSelected = row.item.id === selectedItemId;
 
-                  return (
+                return (
+                  <>
+                    {row.planBreak && (
+                      <tr key={`break-${row.item.id}`} className="mpl-plan-break">
+                        <td colSpan={totalCols} />
+                      </tr>
+                    )}
                     <tr
                       key={row.item.id}
                       className={`mpl-row ${row.ghosted ? 'ghosted' : ''} ${isSelected ? 'selected' : ''}`}
                       onClick={() => setSelectedItem(row.item.id)}
                     >
                       <td className="mpl-td-plan">{row.planLabel}</td>
-                      {i === 0 ? (
-                        <td className="mpl-td-group" rowSpan={groupRows.length}>{groupLabel}</td>
-                      ) : null}
-                      <td className="mpl-td-col">{row.matrixCol}</td>
+                      <td className="mpl-td-grp">{row.matrixCol}</td>
+                      <td className="mpl-td-grp">{row.matrixRow}</td>
                       <td className="mpl-td-img">
                         {imgUrl ? (
                           <img src={imgUrl} alt="" className="mpl-img" />
@@ -323,9 +332,9 @@ export function MultiplanListView() {
                         );
                       })}
                     </tr>
-                  );
-                })
-              ))}
+                  </>
+                );
+              })}
             </tbody>
           </table>
         </div>
