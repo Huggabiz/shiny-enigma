@@ -16,6 +16,7 @@ interface ListRow {
 }
 
 interface ListColumnConfig {
+  showGroups: boolean;
   showVolume: boolean;
   showRrp: boolean;
   showUsRrp: boolean;
@@ -25,11 +26,11 @@ interface ListColumnConfig {
   showForecastVolume: boolean;
   showForecastRevenue: boolean;
   showCategory: boolean;
-  showLenses: boolean;
   mergeDuplicates: boolean;
 }
 
 const DEFAULT_COL_CONFIG: ListColumnConfig = {
+  showGroups: true,
   showVolume: true,
   showRrp: true,
   showUsRrp: false,
@@ -39,7 +40,6 @@ const DEFAULT_COL_CONFIG: ListColumnConfig = {
   showForecastVolume: false,
   showForecastRevenue: false,
   showCategory: false,
-  showLenses: true,
   mergeDuplicates: false,
 };
 
@@ -56,6 +56,7 @@ export function MultiplanListView() {
   } = useProjectStore();
 
   const [colConfig, setColConfig] = useState<ListColumnConfig>(DEFAULT_COL_CONFIG);
+  const [visibleLensIds, setVisibleLensIds] = useState<Set<string> | null>(null);
   const [showColMenu, setShowColMenu] = useState(false);
 
   const firstPlan = project ? getActivePlan(project) : undefined;
@@ -75,6 +76,21 @@ export function MultiplanListView() {
     () => (project?.lenses ?? []).filter((l) => !l.builtInKind),
     [project?.lenses],
   );
+
+  const shownLenses = useMemo(
+    () => visibleLensIds === null ? customLenses : customLenses.filter((l) => visibleLensIds.has(l.id)),
+    [customLenses, visibleLensIds],
+  );
+
+  const toggleLensCol = (lensId: string) => {
+    setVisibleLensIds((prev) => {
+      const current = prev ?? new Set(customLenses.map((l) => l.id));
+      const next = new Set(current);
+      if (next.has(lensId)) next.delete(lensId);
+      else next.add(lensId);
+      return next;
+    });
+  };
 
   const activeLenses = useMemo(() => {
     const ids = project?.activeLensIds ?? [];
@@ -170,12 +186,12 @@ export function MultiplanListView() {
     setColConfig((c) => ({ ...c, [key]: !c[key] }));
 
   const dataColCount = [
+    colConfig.showGroups, colConfig.showGroups,
     colConfig.showCategory, colConfig.showVolume, colConfig.showRrp,
     colConfig.showUsRrp, colConfig.showEuRrp, colConfig.showAusRrp,
     colConfig.showRevenue, colConfig.showForecastVolume, colConfig.showForecastRevenue,
   ].filter(Boolean).length;
-  const lensColCount = colConfig.showLenses ? customLenses.length : 0;
-  const totalCols = 6 + dataColCount + lensColCount;
+  const totalCols = 4 + dataColCount + shownLenses.length;
 
   return (
     <div className="mpl-view">
@@ -203,6 +219,7 @@ export function MultiplanListView() {
               <div className="toolbar-dropdown mpl-col-dropdown" onMouseLeave={() => setShowColMenu(false)}>
                 <div className="dropdown-title">Show columns</div>
                 {([
+                  ['showGroups', 'X/Y Groups'],
                   ['showCategory', 'Category'],
                   ['showVolume', 'Volume'],
                   ['showRrp', 'UK RRP'],
@@ -212,13 +229,27 @@ export function MultiplanListView() {
                   ['showRevenue', 'Revenue'],
                   ['showForecastVolume', 'Forecast Volume'],
                   ['showForecastRevenue', 'Forecast Revenue'],
-                  ['showLenses', 'Lenses'],
                 ] as const).map(([key, label]) => (
                   <label key={key} className="dropdown-checkbox">
                     <input type="checkbox" checked={colConfig[key]} onChange={() => toggleCol(key)} />
                     <span>{label}</span>
                   </label>
                 ))}
+                {customLenses.length > 0 && (
+                  <>
+                    <div className="dropdown-title">Lenses</div>
+                    {customLenses.map((l) => {
+                      const checked = visibleLensIds === null || visibleLensIds.has(l.id);
+                      return (
+                        <label key={l.id} className="dropdown-checkbox">
+                          <input type="checkbox" checked={checked} onChange={() => toggleLensCol(l.id)} />
+                          <span className="mpl-dropdown-lens-swatch" style={{ background: l.color }} />
+                          <span>{l.name}</span>
+                        </label>
+                      );
+                    })}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -251,8 +282,8 @@ export function MultiplanListView() {
             <thead>
               <tr>
                 <th className="mpl-th-plan">Plan</th>
-                <th className="mpl-th-grp">Group X</th>
-                <th className="mpl-th-grp">Group Y</th>
+                {colConfig.showGroups && <th className="mpl-th-grp">Group X</th>}
+                {colConfig.showGroups && <th className="mpl-th-grp">Group Y</th>}
                 <th className="mpl-th-img" />
                 <th className="mpl-th-sku">SKU</th>
                 <th className="mpl-th-name">Product</th>
@@ -265,7 +296,7 @@ export function MultiplanListView() {
                 {colConfig.showRevenue && <th className="mpl-th-num">Revenue</th>}
                 {colConfig.showForecastVolume && <th className="mpl-th-num">Fcst Vol</th>}
                 {colConfig.showForecastRevenue && <th className="mpl-th-num">Fcst Rev</th>}
-                {colConfig.showLenses && customLenses.map((l) => (
+                {shownLenses.map((l) => (
                   <th key={l.id} className="mpl-th-lens" title={l.name}>
                     <span className="mpl-lens-header-text">{l.name}</span>
                   </th>
@@ -295,8 +326,8 @@ export function MultiplanListView() {
                       onClick={() => setSelectedItem(row.item.id)}
                     >
                       <td className="mpl-td-plan">{row.planLabel}</td>
-                      <td className="mpl-td-grp">{row.matrixCol}</td>
-                      <td className="mpl-td-grp">{row.matrixRow}</td>
+                      {colConfig.showGroups && <td className="mpl-td-grp">{row.matrixCol}</td>}
+                      {colConfig.showGroups && <td className="mpl-td-grp">{row.matrixRow}</td>}
                       <td className="mpl-td-img">
                         {imgUrl ? (
                           <img src={imgUrl} alt="" className="mpl-img" />
@@ -315,7 +346,7 @@ export function MultiplanListView() {
                       {colConfig.showRevenue && <td className="mpl-td-num">{(row.product?.revenue ?? row.item.placeholderData?.revenue ?? 0).toLocaleString()}</td>}
                       {colConfig.showForecastVolume && <td className="mpl-td-num">{(row.product?.forecastVolume ?? row.item.placeholderData?.forecastVolume ?? 0).toLocaleString()}</td>}
                       {colConfig.showForecastRevenue && <td className="mpl-td-num">{(row.product?.forecastRevenue ?? row.item.placeholderData?.forecastRevenue ?? 0).toLocaleString()}</td>}
-                      {colConfig.showLenses && customLenses.map((lens) => {
+                      {shownLenses.map((lens) => {
                         const inLens = row.product ? isProductInLens(lens, row.product, shelfSide) : false;
                         return (
                           <td key={lens.id} className="mpl-td-lens">
