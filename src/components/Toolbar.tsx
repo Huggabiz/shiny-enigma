@@ -13,7 +13,7 @@ import { ExportHtmlDialog } from './ExportHtmlDialog';
 import './Toolbar.css';
 
 interface ToolbarProps {
-  activeView?: 'transform' | 'range-design' | 'multiplan' | 'forecast-lab';
+  activeView?: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'forecast-lab';
 }
 
 export function Toolbar({ activeView }: ToolbarProps) {
