@@ -146,6 +146,11 @@ interface ProjectStore {
   reorderMultiplanEntries: (entries: import('../types').MultiplanEntry[]) => void;
   clearMultiplanEntries: () => void;
 
+  // Multiplan List view — independent selection from the card multiplan view
+  setMultiplanListShelfSide: (side: string) => void;
+  toggleMultiplanListEntry: (planId: string, variantId: string | null) => void;
+  clearMultiplanListEntries: () => void;
+
   // Lens management — see types/Lens for the data model.
   createLens: (name: string, scope?: 'global' | 'per-stage') => void;
   removeLens: (lensId: string) => void;
@@ -651,6 +656,31 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         updatedAt: new Date().toISOString(),
       },
     });
+  },
+
+  setMultiplanListShelfSide: (side) => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.multiplanListView ?? { shelfSide: 'current', entries: [] };
+    set({ project: { ...project, multiplanListView: { ...current, shelfSide: side }, updatedAt: new Date().toISOString() } });
+  },
+
+  toggleMultiplanListEntry: (planId, variantId) => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.multiplanListView ?? { shelfSide: 'current' as const, entries: [] };
+    const exists = current.entries.some((e) => e.planId === planId && e.variantId === variantId);
+    const entries = exists
+      ? current.entries.filter((e) => !(e.planId === planId && e.variantId === variantId))
+      : [...current.entries, { planId, variantId }];
+    set({ project: { ...project, multiplanListView: { ...current, entries }, updatedAt: new Date().toISOString() } });
+  },
+
+  clearMultiplanListEntries: () => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.multiplanListView ?? { shelfSide: 'current' as const, entries: [] };
+    set({ project: { ...project, multiplanListView: { ...current, entries: [] }, updatedAt: new Date().toISOString() } });
   },
 
   // Lens management — Lens is project-level state. The built-in Dev

@@ -501,6 +501,9 @@ export interface Project {
    * and which side of the range (current / future) to render. Optional
    * for backwards-compat; the store action lazily initialises it. */
   multiplanView?: MultiplanViewState;
+  /** Separate state for the Multiplan List view — independent entry
+   * selection from the card-based multiplan view. */
+  multiplanListView?: MultiplanViewState;
   /** SHA-256 hex hash of the lock password. When present the project is
    * locked — edits are blocked until the user supplies the matching
    * password. Navigation (view switching, scrolling) still works. */

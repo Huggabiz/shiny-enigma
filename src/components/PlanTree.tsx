@@ -18,20 +18,23 @@ export function PlanTree() {
     project, addPlan, removePlan, duplicatePlan, setActivePlan, setShowPlanTree,
     activeVariantId, setActiveVariant, addVariant, removeVariant,
     addFolder, removeFolder, renameFolder, setPlanFolder, reorderFolders,
-    activeView, toggleMultiplanEntry,
+    activeView, toggleMultiplanEntry, toggleMultiplanListEntry,
     isUnlocked, viewerMode,
   } = useProjectStore();
   const isLocked = (!!project?.lockHash && !isUnlocked) || viewerMode;
   const isMultiplan = activeView === 'multiplan' || activeView === 'multiplan-list';
+  const isList = activeView === 'multiplan-list';
+  const toggleEntry = isList ? toggleMultiplanListEntry : toggleMultiplanEntry;
   // Fast lookup so each row can tell if its (planId, variantId|null)
   // pair is already in the multiplan view entries list.
   const multiplanKeySet = useMemo(() => {
+    const source = isList ? project?.multiplanListView : project?.multiplanView;
     const set = new Set<string>();
-    for (const e of project?.multiplanView?.entries ?? []) {
+    for (const e of source?.entries ?? []) {
       set.add(`${e.planId}:${e.variantId ?? ''}`);
     }
     return set;
-  }, [project?.multiplanView?.entries]);
+  }, [project?.multiplanView?.entries, project?.multiplanListView?.entries, isList]);
   // Track collapsed plans (not expanded) so new plans default to expanded.
   const [collapsedPlans, setCollapsedPlans] = useState<Set<string>>(new Set());
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
@@ -181,7 +184,7 @@ export function PlanTree() {
               className="plan-tree-multiplan-check"
               checked={masterInMultiplan}
               onClick={(e) => e.stopPropagation()}
-              onChange={() => toggleMultiplanEntry(plan.id, null)}
+              onChange={() => toggleEntry(plan.id, null)}
               title={`${masterInMultiplan ? 'Remove' : 'Add'} ${plan.name} (master) from multiplan view`}
             />
           )}
@@ -232,7 +235,7 @@ export function PlanTree() {
                   className="plan-tree-multiplan-check variant"
                   checked={variantInMultiplan}
                   onClick={(e) => e.stopPropagation()}
-                  onChange={() => toggleMultiplanEntry(plan.id, variant.id)}
+                  onChange={() => toggleEntry(plan.id, variant.id)}
                   title={`${variantInMultiplan ? 'Remove' : 'Add'} ${plan.name} (${variant.name}) from multiplan view`}
                 />
               )}

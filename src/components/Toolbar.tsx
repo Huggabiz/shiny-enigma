@@ -164,8 +164,8 @@ export function Toolbar({ activeView }: ToolbarProps) {
 
             <div className="toolbar-divider" />
 
-            {/* Card Format dropdown */}
-            <div className="toolbar-dropdown-wrapper">
+            {/* Card Format dropdown — hidden in list view (has its own Columns dropdown) */}
+            {activeView !== 'multiplan-list' && <div className="toolbar-dropdown-wrapper">
               <button className="toolbar-btn" onClick={() => setOpenMenu(openMenu === 'format' ? null : 'format')}>
                 Card Format ▾
               </button>
@@ -195,7 +195,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
                   ))}
                 </div>
               )}
-            </div>
+            </div>}
 
             <div className="toolbar-divider" />
 

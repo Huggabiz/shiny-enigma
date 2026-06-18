@@ -52,13 +52,10 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
-.mpl-table thead {
+.mpl-table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
-}
-
-.mpl-table th {
   background: #f8f9fa;
   padding: 8px 10px;
   text-align: left;
@@ -72,8 +69,7 @@
 }
 
 .mpl-th-plan { width: 120px; }
-.mpl-th-group { width: 100px; }
-.mpl-th-col { width: 80px; }
+.mpl-th-grp { width: 90px; }
 .mpl-th-img { width: 36px; }
 .mpl-th-sku { width: 100px; }
 .mpl-th-name { min-width: 140px; }
@@ -99,6 +95,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: 0.2px;
+}
+
+/* Plan break — thin gap row between different plans */
+.mpl-plan-break td {
+  height: 8px;
+  padding: 0;
+  border-bottom: none;
+  background: #f5f5f5;
 }
 
 .mpl-row {
@@ -130,17 +134,7 @@
   color: #555;
 }
 
-.mpl-td-group {
-  font-size: 11px;
-  font-weight: 700;
-  color: #555;
-  background: #fafafa;
-  border-right: 3px solid #dce6f0;
-  vertical-align: top;
-  padding-top: 10px;
-}
-
-.mpl-td-col {
+.mpl-td-grp {
   font-size: 10px;
   color: #888;
   font-weight: 600;
@@ -201,8 +195,8 @@
 
 .mpl-lens-chip {
   display: inline-block;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 4px;
   border: 2px solid;
 }
