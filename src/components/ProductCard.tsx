@@ -308,8 +308,8 @@ export function ProductCard({
       {...attributes}
       {...listeners}
     >
-      {item.isPlaceholder && (
-        <div className={`card-new-badge ${isCompact ? 'compact' : ''}`}>New</div>
+      {item.isPlaceholder && !isDev && (
+        <div className={`card-new-badge placeholder-badge ${isCompact ? 'compact' : ''}`}>PH</div>
       )}
       {isDev && (
         <div className={`card-new-badge dev ${isCompact ? 'compact' : ''}`}>DEV</div>
@@ -322,7 +322,7 @@ export function ProductCard({
           {displayImageUrl ? (
             <img src={displayImageUrl} alt={displayName} />
           ) : (
-            <div className={`card-image-placeholder ${item.isPlaceholder || isDev ? 'new-product' : ''}`}>
+            <div className={`card-image-placeholder ${isDev ? 'new-product' : item.isPlaceholder ? 'placeholder-product' : ''}`}>
               {item.isPlaceholder ? '＋' : displayName.charAt(0)}
             </div>
           )}

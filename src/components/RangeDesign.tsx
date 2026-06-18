@@ -384,6 +384,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
           and don't affect the content layout. */}
       <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}><CloseIcon size={8} color="#fff" /></button>
       {isDev && <div className="matrix-card-dev-badge">DEV</div>}
+      {isPlaceholder && !isDev && <div className="matrix-card-ph-badge">PH</div>}
       <div className="matrix-card-content">
         {cardFormat.showImage && (
           <div className="matrix-card-image">
