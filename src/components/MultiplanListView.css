@@ -31,6 +31,16 @@
   gap: 12px;
 }
 
+.mpl-toolbar-actions .toolbar-btn {
+  background: #f0f0f0;
+  color: #333;
+  border-color: #ddd;
+}
+
+.mpl-toolbar-actions .toolbar-btn:hover {
+  background: #e0e0e0;
+}
+
 .mpl-col-dropdown {
   min-width: 180px;
 }
