@@ -143,6 +143,12 @@
   box-shadow: 0 1px 4px rgba(21, 101, 192, 0.4);
 }
 
+.card-new-badge.placeholder-badge {
+  background: #ef6c00;
+  font-size: 7px;
+  box-shadow: 0 1px 4px rgba(239, 108, 0, 0.4);
+}
+
 .card-remove {
   position: absolute;
   top: -6px;
@@ -200,6 +206,11 @@
 .card-image-placeholder.new-product {
   background: #b2ebf2;
   color: #00838f;
+}
+
+.card-image-placeholder.placeholder-product {
+  background: #ffe0b2;
+  color: #e65100;
 }
 
 .card-name {
