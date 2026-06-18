@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { getActivePlan, getStages, isProductInLens } from '../types';
 import type { Product, Shelf, ShelfItem, Lens } from '../types';
@@ -8,11 +8,39 @@ import './MultiplanListView.css';
 interface ListRow {
   product: Product | null;
   item: ShelfItem;
-  planNames: string[];
+  planLabel: string;
   matrixRow: string;
   matrixCol: string;
   ghosted: boolean;
 }
+
+interface ListColumnConfig {
+  showVolume: boolean;
+  showRrp: boolean;
+  showUsRrp: boolean;
+  showEuRrp: boolean;
+  showAusRrp: boolean;
+  showRevenue: boolean;
+  showForecastVolume: boolean;
+  showForecastRevenue: boolean;
+  showCategory: boolean;
+  showLenses: boolean;
+  mergeDuplicates: boolean;
+}
+
+const DEFAULT_COL_CONFIG: ListColumnConfig = {
+  showVolume: true,
+  showRrp: true,
+  showUsRrp: false,
+  showEuRrp: false,
+  showAusRrp: false,
+  showRevenue: false,
+  showForecastVolume: false,
+  showForecastRevenue: false,
+  showCategory: false,
+  showLenses: true,
+  mergeDuplicates: false,
+};
 
 export function MultiplanListView() {
   const {
@@ -22,10 +50,12 @@ export function MultiplanListView() {
     exclusiveLensFilter,
     setExclusiveLensFilter,
     setMultiplanShelfSide,
-    cardFormat,
     setSelectedItem,
     selectedItemId,
   } = useProjectStore();
+
+  const [colConfig, setColConfig] = useState<ListColumnConfig>(DEFAULT_COL_CONFIG);
+  const [showColMenu, setShowColMenu] = useState(false);
 
   const firstPlan = project ? getActivePlan(project) : undefined;
   const stagesForToggle = useMemo(() => {
@@ -53,10 +83,9 @@ export function MultiplanListView() {
 
   const catalogue = project?.catalogue ?? [];
 
-  const rows = useMemo(() => {
+  const rawRows = useMemo(() => {
     if (!project) return [];
     const result: ListRow[] = [];
-    const seen = new Map<string, ListRow>();
 
     for (const entry of entries) {
       const plan = project.plans.find((p) => p.id === entry.planId);
@@ -86,7 +115,6 @@ export function MultiplanListView() {
         if (!isIncluded && !showGhosted) continue;
 
         const product = item.isPlaceholder ? null : catalogue.find((p) => p.id === item.productId) ?? null;
-        const productKey = product?.sku ?? item.id;
 
         const assignment = layout?.assignments.find((a) => a.itemId === item.id);
         const matrixRow = assignment && layout ? (layout.yLabels[assignment.row] ?? '') : '';
@@ -100,18 +128,32 @@ export function MultiplanListView() {
           if (!inAny) continue;
         }
 
-        const existing = seen.get(productKey);
-        if (existing) {
-          if (!existing.planNames.includes(planLabel)) existing.planNames.push(planLabel);
-        } else {
-          const row: ListRow = { product, item, planNames: [planLabel], matrixRow, matrixCol, ghosted: !isIncluded };
-          seen.set(productKey, row);
-          result.push(row);
-        }
+        result.push({ product, item, planLabel, matrixRow, matrixCol, ghosted: !isIncluded });
       }
     }
     return result;
   }, [project, entries, shelfSide, showGhosted, exclusiveLensFilter, activeLenses, catalogue]);
+
+  // Optionally merge duplicates by SKU
+  const rows = useMemo(() => {
+    if (!colConfig.mergeDuplicates) return rawRows;
+    const merged: ListRow[] = [];
+    const seen = new Map<string, ListRow>();
+    for (const row of rawRows) {
+      const key = row.product?.sku ?? row.item.id;
+      const existing = seen.get(key);
+      if (existing) {
+        if (!existing.planLabel.includes(row.planLabel)) {
+          existing.planLabel += `, ${row.planLabel}`;
+        }
+      } else {
+        const clone = { ...row, planLabel: row.planLabel };
+        seen.set(key, clone);
+        merged.push(clone);
+      }
+    }
+    return merged;
+  }, [rawRows, colConfig.mergeDuplicates]);
 
   // Group by matrixRow label
   const grouped = useMemo(() => {
@@ -125,6 +167,9 @@ export function MultiplanListView() {
   }, [rows]);
 
   if (!project) return null;
+
+  const toggleCol = (key: keyof ListColumnConfig) =>
+    setColConfig((c) => ({ ...c, [key]: !c[key] }));
 
   return (
     <div className="mpl-view">
@@ -144,6 +189,37 @@ export function MultiplanListView() {
           ))}
         </div>
         <div className="mpl-toolbar-actions">
+          <div className="toolbar-dropdown-wrapper">
+            <button className="toolbar-btn" onClick={() => setShowColMenu(!showColMenu)}>
+              Columns ▾
+            </button>
+            {showColMenu && (
+              <div className="toolbar-dropdown mpl-col-dropdown" onMouseLeave={() => setShowColMenu(false)}>
+                <div className="dropdown-title">Show columns</div>
+                {([
+                  ['showVolume', 'Volume'],
+                  ['showRrp', 'UK RRP'],
+                  ['showUsRrp', 'US RRP'],
+                  ['showEuRrp', 'EU RRP'],
+                  ['showAusRrp', 'AUS RRP'],
+                  ['showRevenue', 'Revenue'],
+                  ['showForecastVolume', 'Forecast Volume'],
+                  ['showForecastRevenue', 'Forecast Revenue'],
+                  ['showCategory', 'Category'],
+                  ['showLenses', 'Lenses'],
+                ] as const).map(([key, label]) => (
+                  <label key={key} className="dropdown-checkbox">
+                    <input type="checkbox" checked={colConfig[key]} onChange={() => toggleCol(key)} />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+          <label className="multiplan-show-excluded">
+            <input type="checkbox" checked={colConfig.mergeDuplicates} onChange={() => toggleCol('mergeDuplicates')} />
+            Merge duplicates
+          </label>
           {activeLenses.length > 0 && (
             <label className="multiplan-show-excluded">
               <input type="checkbox" checked={exclusiveLensFilter} onChange={(e) => setExclusiveLensFilter(e.target.checked)} />
@@ -168,20 +244,24 @@ export function MultiplanListView() {
           <table className="mpl-table">
             <thead>
               <tr>
+                <th className="mpl-th-plan">Plan</th>
                 <th className="mpl-th-group">Section</th>
                 <th className="mpl-th-col">Column</th>
                 <th className="mpl-th-img" />
-                <th className="mpl-th-name">Product</th>
                 <th className="mpl-th-sku">SKU</th>
-                <th className="mpl-th-plans">Plans</th>
-                {cardFormat.showVolume && <th className="mpl-th-num">Volume</th>}
-                {cardFormat.showRrp && <th className="mpl-th-num">UK RRP</th>}
-                {cardFormat.showRevenue && <th className="mpl-th-num">Revenue</th>}
-                {cardFormat.showForecastVolume && <th className="mpl-th-num">Fcst Vol</th>}
-                {cardFormat.showForecastRevenue && <th className="mpl-th-num">Fcst Rev</th>}
-                {customLenses.map((l) => (
+                <th className="mpl-th-name">Product</th>
+                {colConfig.showCategory && <th className="mpl-th-data">Category</th>}
+                {colConfig.showVolume && <th className="mpl-th-num">Volume</th>}
+                {colConfig.showRrp && <th className="mpl-th-num">UK RRP</th>}
+                {colConfig.showUsRrp && <th className="mpl-th-num">US RRP</th>}
+                {colConfig.showEuRrp && <th className="mpl-th-num">EU RRP</th>}
+                {colConfig.showAusRrp && <th className="mpl-th-num">AUS RRP</th>}
+                {colConfig.showRevenue && <th className="mpl-th-num">Revenue</th>}
+                {colConfig.showForecastVolume && <th className="mpl-th-num">Fcst Vol</th>}
+                {colConfig.showForecastRevenue && <th className="mpl-th-num">Fcst Rev</th>}
+                {colConfig.showLenses && customLenses.map((l) => (
                   <th key={l.id} className="mpl-th-lens" title={l.name}>
-                    <span className="mpl-lens-dot-header" style={{ background: l.color }} />
+                    <span className="mpl-lens-header-text">{l.name}</span>
                   </th>
                 ))}
               </tr>
@@ -203,6 +283,7 @@ export function MultiplanListView() {
                       className={`mpl-row ${row.ghosted ? 'ghosted' : ''} ${isSelected ? 'selected' : ''}`}
                       onClick={() => setSelectedItem(row.item.id)}
                     >
+                      <td className="mpl-td-plan">{row.planLabel}</td>
                       {i === 0 ? (
                         <td className="mpl-td-group" rowSpan={groupRows.length}>{groupLabel}</td>
                       ) : null}
@@ -214,19 +295,30 @@ export function MultiplanListView() {
                           <span className="mpl-img-ph">{name.charAt(0)}</span>
                         )}
                       </td>
-                      <td className="mpl-td-name">{name}</td>
                       <td className="mpl-td-sku">{sku}</td>
-                      <td className="mpl-td-plans">{row.planNames.join(', ')}</td>
-                      {cardFormat.showVolume && <td className="mpl-td-num">{(row.product?.volume ?? row.item.placeholderData?.volume ?? 0).toLocaleString()}</td>}
-                      {cardFormat.showRrp && <td className="mpl-td-num">{row.product?.rrp ?? row.item.placeholderData?.rrp ?? '—'}</td>}
-                      {cardFormat.showRevenue && <td className="mpl-td-num">{(row.product?.revenue ?? row.item.placeholderData?.revenue ?? 0).toLocaleString()}</td>}
-                      {cardFormat.showForecastVolume && <td className="mpl-td-num">{(row.product?.forecastVolume ?? row.item.placeholderData?.forecastVolume ?? 0).toLocaleString()}</td>}
-                      {cardFormat.showForecastRevenue && <td className="mpl-td-num">{(row.product?.forecastRevenue ?? row.item.placeholderData?.forecastRevenue ?? 0).toLocaleString()}</td>}
-                      {customLenses.map((lens) => {
+                      <td className="mpl-td-name">{name}</td>
+                      {colConfig.showCategory && <td className="mpl-td-data">{row.product?.category ?? ''}</td>}
+                      {colConfig.showVolume && <td className="mpl-td-num">{(row.product?.volume ?? row.item.placeholderData?.volume ?? 0).toLocaleString()}</td>}
+                      {colConfig.showRrp && <td className="mpl-td-num">{row.product?.rrp ?? row.item.placeholderData?.rrp ?? '—'}</td>}
+                      {colConfig.showUsRrp && <td className="mpl-td-num">{row.product?.usRrp ?? '—'}</td>}
+                      {colConfig.showEuRrp && <td className="mpl-td-num">{row.product?.euRrp ?? '—'}</td>}
+                      {colConfig.showAusRrp && <td className="mpl-td-num">{row.product?.ausRrp ?? '—'}</td>}
+                      {colConfig.showRevenue && <td className="mpl-td-num">{(row.product?.revenue ?? row.item.placeholderData?.revenue ?? 0).toLocaleString()}</td>}
+                      {colConfig.showForecastVolume && <td className="mpl-td-num">{(row.product?.forecastVolume ?? row.item.placeholderData?.forecastVolume ?? 0).toLocaleString()}</td>}
+                      {colConfig.showForecastRevenue && <td className="mpl-td-num">{(row.product?.forecastRevenue ?? row.item.placeholderData?.forecastRevenue ?? 0).toLocaleString()}</td>}
+                      {colConfig.showLenses && customLenses.map((lens) => {
                         const inLens = row.product ? isProductInLens(lens, row.product, shelfSide) : false;
                         return (
                           <td key={lens.id} className="mpl-td-lens">
-                            {inLens && <span className="mpl-lens-dot" style={{ background: lens.color }} />}
+                            {inLens && (
+                              <span
+                                className="mpl-lens-chip"
+                                style={{
+                                  borderColor: lens.color,
+                                  background: lens.color + '25',
+                                }}
+                              />
+                            )}
                           </td>
                         );
                       })}

@@ -22,7 +22,7 @@ export function PlanTree() {
     isUnlocked, viewerMode,
   } = useProjectStore();
   const isLocked = (!!project?.lockHash && !isUnlocked) || viewerMode;
-  const isMultiplan = activeView === 'multiplan';
+  const isMultiplan = activeView === 'multiplan' || activeView === 'multiplan-list';
   // Fast lookup so each row can tell if its (planId, variantId|null)
   // pair is already in the multiplan view entries list.
   const multiplanKeySet = useMemo(() => {
