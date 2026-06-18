@@ -31,6 +31,10 @@
   gap: 12px;
 }
 
+.mpl-col-dropdown {
+  min-width: 180px;
+}
+
 .mpl-scroll {
   flex: 1;
   overflow: auto;
@@ -67,14 +71,35 @@
   white-space: nowrap;
 }
 
+.mpl-th-plan { width: 120px; }
 .mpl-th-group { width: 100px; }
 .mpl-th-col { width: 80px; }
 .mpl-th-img { width: 36px; }
-.mpl-th-name { min-width: 140px; }
 .mpl-th-sku { width: 100px; }
-.mpl-th-plans { min-width: 100px; }
+.mpl-th-name { min-width: 140px; }
+.mpl-th-data { min-width: 80px; }
 .mpl-th-num { width: 80px; text-align: right; }
-.mpl-th-lens { width: 28px; text-align: center; padding: 8px 4px; }
+
+.mpl-th-lens {
+  width: 32px;
+  text-align: center;
+  padding: 4px 2px 6px;
+  vertical-align: bottom;
+}
+
+.mpl-lens-header-text {
+  display: block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 9px;
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+  max-height: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.2px;
+}
 
 .mpl-row {
   cursor: pointer;
@@ -97,6 +122,12 @@
   padding: 6px 10px;
   border-bottom: 1px solid #f0f0f0;
   vertical-align: middle;
+}
+
+.mpl-td-plan {
+  font-size: 10px;
+  font-weight: 600;
+  color: #555;
 }
 
 .mpl-td-group {
@@ -141,19 +172,19 @@
   color: #aaa;
 }
 
-.mpl-td-name {
-  font-weight: 600;
-  color: #333;
-}
-
 .mpl-td-sku {
   font-family: ui-monospace, monospace;
   font-size: 10px;
   color: #888;
 }
 
-.mpl-td-plans {
-  font-size: 10px;
+.mpl-td-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.mpl-td-data {
+  font-size: 11px;
   color: #666;
 }
 
@@ -165,19 +196,13 @@
 
 .mpl-td-lens {
   text-align: center;
-  padding: 6px 4px;
+  padding: 3px 2px;
 }
 
-.mpl-lens-dot {
+.mpl-lens-chip {
   display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.mpl-lens-dot-header {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 2px solid;
 }
