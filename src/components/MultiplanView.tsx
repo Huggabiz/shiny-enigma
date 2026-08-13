@@ -16,7 +16,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useProjectStore } from '../store/useProjectStore';
 import { ProductCard } from './ProductCard';
-import { computeShelfLayout, RAIL_PADDING } from '../utils/layout';
+import { computeShelfLayout, RAIL_PADDING, CARD_GAP } from '../utils/layout';
 import { deriveLabelsFromMatrix, packLabelsIntoRows } from '../utils/shelfLabels';
 import { getActivePlan, getStages } from '../types';
 import type { Product, RangePlan, Shelf, ShelfItem } from '../types';
@@ -30,21 +30,6 @@ function entryKey(entry: { planId: string; variantId: string | null }): string {
   return `${entry.planId}:${entry.variantId ?? 'master'}`;
 }
 
-/**
- * MultiplanView — stacked horizontal strips, one per selected
- * (plan, variant|master) pair. Read-only: click is selection only,
- * double-click jumps into that plan's transform view with the right
- * variant active.
- *
- * Selection happens via checkboxes in the PlanTree sidebar (shown
- * only when this view is active). The global Current/Future toggle
- * lives in the toolbar above the rows.
- *
- * Card sizing reuses computeShelfLayout so each row's cards shrink to
- * fit the available rail width — exactly like the transform-view
- * shelves. Lens tinting uses the existing .product-card.lens-* classes
- * once wired there (out of scope for this ship).
- */
 export function MultiplanView() {
   const {
     project,
@@ -62,27 +47,18 @@ export function MultiplanView() {
     setExclusiveLensFilter,
   } = useProjectStore();
 
-  // Active lenses for exclusive filter
   const activeLensesForFilter = useMemo(() => {
     const ids = project?.activeLensIds ?? [];
     if (ids.length === 0) return [];
     return ids.map((id) => (project?.lenses ?? []).find((l) => l.id === id)).filter((l): l is import('../types').Lens => !!l);
   }, [project?.activeLensIds, project?.lenses]);
 
-  // Sensors for the row-reorder DndContext. Small activation distance
-  // so a click on the drag handle (label column) registers as a click
-  // unless the user actually drags — protects the remove ×, etc.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
-  // Container width for computeShelfLayout — the multiplan rows share
-  // the same flex column so one width serves every row. Measured via
-  // a ref set on the first row's cards area (simpler than a dedicated
-  // ResizeObserver since every row has the same width).
   const railWidth = useRailWidth();
 
-  // Stages from the first plan (definitions are project-level).
   const firstPlan = project ? getActivePlan(project) : undefined;
   const stagesForToggle = useMemo(() => {
     const all = firstPlan && project ? getStages(firstPlan, project) : [];
@@ -96,12 +72,6 @@ export function MultiplanView() {
   const shelfSide = multiplanView.shelfSide;
   const entries = multiplanView.entries;
 
-  // Resolve each entry to a concrete (plan, variant|null, visibleRows)
-  // tuple. Entries that reference a deleted plan/variant are filtered
-  // out silently so stale state doesn't crash the render. Each row
-  // item is wrapped with a `ghosted` flag so variant rows can render
-  // excluded items as ghost cards when `showGhosted` is enabled —
-  // matches the range-view behaviour so the checkbox is truly global.
   const resolvedRows = useMemo(() => {
     if (!project) return [];
     return entries
@@ -111,12 +81,7 @@ export function MultiplanView() {
         const variant = entry.variantId
           ? plan.variants.find((v) => v.id === entry.variantId) ?? null
           : null;
-        // Entry's variantId was non-null but the variant is gone →
-        // drop the row instead of silently falling back to master.
         if (entry.variantId && !variant) return null;
-        // Resolve the shelf for the active stage. For 'current' and
-        // 'future' use the dedicated fields; for intermediate stages
-        // look up by stageId in the plan's intermediateShelves.
         let shelf: Shelf;
         if (shelfSide === 'current') {
           shelf = plan.currentShelf;
@@ -135,7 +100,6 @@ export function MultiplanView() {
               .filter((i) => includedIds.has(i.id) || showGhosted)
               .map((i) => ({ item: i, ghosted: !includedIds.has(i.id) }))
           : shelf.items.map((i) => ({ item: i, ghosted: false }));
-        // Exclusive lens filter
         if (exclusiveLensFilter && activeLensesForFilter.length > 0) {
           rowItems = rowItems.filter(({ item }) => {
             const prod = project.catalogue.find((p) => p.id === item.productId);
@@ -256,12 +220,6 @@ export function MultiplanView() {
   );
 }
 
-/**
- * Hook: measures the container width of the first multiplan row so
- * computeShelfLayout can size cards. All rows share one width — only
- * one ResizeObserver needed. The callback ref is stabilised with
- * useCallback so React doesn't tear down the observer on every render.
- */
 function useRailWidth() {
   const [width, setWidth] = useState(0);
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -280,24 +238,16 @@ function useRailWidth() {
 
 interface MultiplanRowItem {
   item: ShelfItem;
-  /** True when the item is NOT included in this row's active variant
-   * but is being shown as a ghost because `showGhosted` is enabled.
-   * Always false for master-range rows. */
   ghosted: boolean;
 }
 
 interface MultiplanRowProps {
-  /** Sortable id used by dnd-kit's SortableContext. Derived from the
-   * (plan, variant|master) pair via entryKey(). */
   sortId: string;
   plan: RangePlan;
   variant: { id: string; name: string } | null;
-  /** The shelf is resolved upstream (current vs future) and drives
-   * matrix-derived label generation. */
   shelf: Shelf;
   rowItems: MultiplanRowItem[];
   catalogue: Product[];
-  /** Stage key for per-stage lens tinting. */
   stageKey: string;
   railWidth: number;
   firstRow: boolean;
@@ -320,11 +270,6 @@ function MultiplanRow({
   onRemove,
   onDoubleClick,
 }: MultiplanRowProps) {
-  // useSortable attaches drag listeners to the label column via
-  // spread {...attributes} {...listeners}. A 5px activation distance
-  // (set on the parent DndContext's PointerSensor) lets normal clicks
-  // on the label column still work (e.g. the remove ×) — only a real
-  // mouse drag starts the reorder.
   const {
     attributes,
     listeners,
@@ -345,12 +290,11 @@ function MultiplanRow({
     () => computeShelfLayout(rowItems.length, railWidth),
     [rowItems.length, railWidth],
   );
-  const { cardWidth, slotWidth } = layout;
+  const MULTIPLAN_MIN_CARD = 60;
+  const cardWidth = Math.max(MULTIPLAN_MIN_CARD, layout.cardWidth);
+  const slotWidth = cardWidth + CARD_GAP;
   const offsetLeft = RAIL_PADDING;
 
-  // Matrix-derived labels — same "matrix title format" the transform
-  // view shows above each shelf rail. Uses the shared shelfLabels
-  // util so the positioning maths match Shelf.tsx exactly.
   const visibleItemIds = useMemo(() => rowItems.map((r) => r.item.id), [rowItems]);
   const { xLabels, yLabels } = useMemo(
     () => deriveLabelsFromMatrix(shelf, visibleItemIds),
@@ -358,7 +302,8 @@ function MultiplanRow({
   );
   const xLabelRows = useMemo(() => packLabelsIntoRows(xLabels), [xLabels]);
   const yLabelRows = useMemo(() => packLabelsIntoRows(yLabels), [yLabels]);
-  const hasMatrixLabels = xLabelRows.length > 0 || yLabelRows.length > 0;
+  const isWrapping = cardWidth > layout.cardWidth;
+  const hasMatrixLabels = !isWrapping && (xLabelRows.length > 0 || yLabelRows.length > 0);
   const nonGhostedCount = useMemo(() => rowItems.filter((r) => !r.ghosted).length, [rowItems]);
 
   return (
