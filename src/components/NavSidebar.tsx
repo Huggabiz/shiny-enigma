@@ -2,7 +2,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { getActivePlan, getStages } from '../types';
 import './NavSidebar.css';
 
-export type ViewType = 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'forecast-lab';
+export type ViewType = 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab';
 
 interface NavSidebarProps {
   activeView: ViewType;
@@ -36,6 +36,14 @@ export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
 
       <div className="nav-separator" />
 
+      <button
+        className={`nav-item ${activeView === 'analyse' ? 'active' : ''}`}
+        onClick={() => onViewChange('analyse')}
+        title="Analyse — category breakdown dashboards"
+      >
+        <span className="nav-icon">◔</span>
+        <span className="nav-label">Analyse</span>
+      </button>
       <button
         className={`nav-item ${activeView === 'multiplan-list' ? 'active' : ''}`}
         onClick={() => onViewChange('multiplan-list')}

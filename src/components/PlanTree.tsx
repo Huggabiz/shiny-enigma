@@ -18,23 +18,24 @@ export function PlanTree() {
     project, addPlan, removePlan, duplicatePlan, setActivePlan, setShowPlanTree,
     activeVariantId, setActiveVariant, addVariant, removeVariant,
     addFolder, removeFolder, renameFolder, setPlanFolder, reorderFolders,
-    activeView, toggleMultiplanEntry, toggleMultiplanListEntry,
+    activeView, toggleMultiplanEntry, toggleMultiplanListEntry, toggleAnalyseEntry,
     isUnlocked, viewerMode,
   } = useProjectStore();
   const isLocked = (!!project?.lockHash && !isUnlocked) || viewerMode;
-  const isMultiplan = activeView === 'multiplan' || activeView === 'multiplan-list';
+  const isMultiplan = activeView === 'multiplan' || activeView === 'multiplan-list' || activeView === 'analyse';
   const isList = activeView === 'multiplan-list';
-  const toggleEntry = isList ? toggleMultiplanListEntry : toggleMultiplanEntry;
+  const isAnalyse = activeView === 'analyse';
+  const toggleEntry = isAnalyse ? toggleAnalyseEntry : isList ? toggleMultiplanListEntry : toggleMultiplanEntry;
   // Fast lookup so each row can tell if its (planId, variantId|null)
   // pair is already in the multiplan view entries list.
   const multiplanKeySet = useMemo(() => {
-    const source = isList ? project?.multiplanListView : project?.multiplanView;
+    const source = isAnalyse ? project?.analyseView : isList ? project?.multiplanListView : project?.multiplanView;
     const set = new Set<string>();
     for (const e of source?.entries ?? []) {
       set.add(`${e.planId}:${e.variantId ?? ''}`);
     }
     return set;
-  }, [project?.multiplanView?.entries, project?.multiplanListView?.entries, isList]);
+  }, [project?.multiplanView?.entries, project?.multiplanListView?.entries, project?.analyseView?.entries, isList, isAnalyse]);
   // Track collapsed plans (not expanded) so new plans default to expanded.
   const [collapsedPlans, setCollapsedPlans] = useState<Set<string>>(new Set());
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());

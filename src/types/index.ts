@@ -504,6 +504,9 @@ export interface Project {
   /** Separate state for the Multiplan List view — independent entry
    * selection from the card-based multiplan view. */
   multiplanListView?: MultiplanViewState;
+  /** Analyse view state — which plans to include in the analysis
+   * dashboard. Reuses MultiplanEntry for plan selection. */
+  analyseView?: { entries: MultiplanEntry[] };
   /** SHA-256 hex hash of the lock password. When present the project is
    * locked — edits are blocked until the user supplies the matching
    * password. Navigation (view switching, scrolling) still works. */

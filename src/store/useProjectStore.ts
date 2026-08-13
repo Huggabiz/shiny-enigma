@@ -63,14 +63,14 @@ interface ProjectStore {
   setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean }>) => void;
 
   // Views — lifted out of App local state so the export loop can drive them
-  activeView: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'forecast-lab';
+  activeView: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab';
   designShelfId: string;
   /** Transform view stage selection — which two stages to compare.
    * Defaults to 'current' and 'future'. Must satisfy from < to in
    * the getStages() order. */
   transformFromKey: string;
   transformToKey: string;
-  setActiveView: (view: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'forecast-lab') => void;
+  setActiveView: (view: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab') => void;
   setDesignShelfId: (shelfId: string) => void;
   setTransformStages: (fromKey: string, toKey: string) => void;
 
@@ -150,6 +150,10 @@ interface ProjectStore {
   setMultiplanListShelfSide: (side: string) => void;
   toggleMultiplanListEntry: (planId: string, variantId: string | null) => void;
   clearMultiplanListEntries: () => void;
+
+  // Analyse view — plan selection for the analysis dashboard
+  toggleAnalyseEntry: (planId: string, variantId: string | null) => void;
+  clearAnalyseEntries: () => void;
 
   // Lens management — see types/Lens for the data model.
   createLens: (name: string, scope?: 'global' | 'per-stage') => void;
@@ -681,6 +685,24 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!project) return;
     const current = project.multiplanListView ?? { shelfSide: 'current' as const, entries: [] };
     set({ project: { ...project, multiplanListView: { ...current, entries: [] }, updatedAt: new Date().toISOString() } });
+  },
+
+  toggleAnalyseEntry: (planId, variantId) => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.analyseView ?? { entries: [] };
+    const exists = current.entries.some((e) => e.planId === planId && e.variantId === variantId);
+    const entries = exists
+      ? current.entries.filter((e) => !(e.planId === planId && e.variantId === variantId))
+      : [...current.entries, { planId, variantId }];
+    set({ project: { ...project, analyseView: { ...current, entries }, updatedAt: new Date().toISOString() } });
+  },
+
+  clearAnalyseEntries: () => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.analyseView ?? { entries: [] };
+    set({ project: { ...project, analyseView: { ...current, entries: [] }, updatedAt: new Date().toISOString() } });
   },
 
   // Lens management — Lens is project-level state. The built-in Dev

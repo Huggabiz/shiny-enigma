@@ -1,0 +1,188 @@
+.analyse-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #f5f5f5;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.analyse-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.analyse-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.analyse-toolbar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.analyse-metric-toggle {
+  display: inline-flex;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 14px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.analyse-metric-toggle button {
+  padding: 4px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+}
+
+.analyse-metric-toggle button:hover {
+  color: #333;
+}
+
+.analyse-metric-toggle button.active {
+  background: #1976d2;
+  color: #fff;
+}
+
+.analyse-toolbar-meta {
+  font-size: 11px;
+  color: #888;
+}
+
+.analyse-clear {
+  padding: 4px 10px;
+  font-size: 11px;
+  background: #fff;
+  color: #c62828;
+  border: 1px solid #ffcdd2;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.analyse-clear:hover {
+  background: #ffebee;
+}
+
+.analyse-canvas-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 20px;
+}
+
+.analyse-canvas {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  max-width: 1280px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.analyse-canvas-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 24px 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.analyse-canvas-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.analyse-canvas-header p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #888;
+}
+
+.analyse-sunburst {
+  width: 100%;
+  height: 100%;
+}
+
+.analyse-sunburst text {
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.analyse-tooltip {
+  position: absolute;
+  padding: 8px 12px;
+  background: rgba(26, 26, 46, 0.92);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.analyse-tooltip.visible {
+  opacity: 1;
+}
+
+.analyse-tooltip-label {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.analyse-tooltip-value {
+  font-weight: 400;
+  color: #ccc;
+}
+
+.analyse-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.analyse-empty h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: #1a1a2e;
+}
+
+.analyse-empty p {
+  margin: 0;
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 1.5;
+}
