@@ -5,11 +5,17 @@ import type { Product, RangePlan, ShelfItem } from '../types';
 import './AnalyseView.css';
 
 type Metric = 'rrp' | 'revenue';
+type SheetId = 'sunburst' | 'icicle';
 
-interface SunburstNode {
+const SHEETS: { id: SheetId; label: string }[] = [
+  { id: 'sunburst', label: 'Sunburst' },
+  { id: 'icicle', label: 'Icicle' },
+];
+
+interface HierNode {
   name: string;
   value?: number;
-  children?: SunburstNode[];
+  children?: HierNode[];
 }
 
 function getProductForItem(item: ShelfItem, catalogue: Product[]): Product | null {
@@ -33,12 +39,12 @@ function getSegmentLabel(shelf: { matrixLayout?: { xLabels: string[]; yLabels: s
   return xLabel || yLabel || 'Unsegmented';
 }
 
-function buildSunburstData(
+function buildHierarchyData(
   plans: RangePlan[],
   catalogue: Product[],
   metric: Metric,
   shelfSide: string,
-): SunburstNode {
+): HierNode {
   const categoryMap = new Map<string, Map<string, Map<string, { name: string; sku: string; value: number }[]>>>();
 
   for (const plan of plans) {
@@ -69,13 +75,13 @@ function buildSunburstData(
     }
   }
 
-  const children: SunburstNode[] = [];
+  const children: HierNode[] = [];
   for (const [cat, planMap] of categoryMap) {
-    const planChildren: SunburstNode[] = [];
+    const planChildren: HierNode[] = [];
     for (const [planName, segMap] of planMap) {
-      const segChildren: SunburstNode[] = [];
+      const segChildren: HierNode[] = [];
       for (const [seg, skus] of segMap) {
-        const skuNodes: SunburstNode[] = skus.map((s) => ({ name: `${s.sku} — ${s.name}`, value: s.value }));
+        const skuNodes: HierNode[] = skus.map((s) => ({ name: `${s.sku} — ${s.name}`, value: s.value }));
         segChildren.push({ name: seg, children: skuNodes });
       }
       planChildren.push({ name: planName, children: segChildren });
@@ -95,11 +101,29 @@ const RING_COLORS = [
   ['#00838f', '#0097a7', '#00acc1', '#26c6da', '#4dd0e1'],
 ];
 
+function getCategoryColor(node: d3.HierarchyNode<HierNode>, root: d3.HierarchyNode<HierNode>): string {
+  let ancestor = node;
+  while (ancestor.depth > 1 && ancestor.parent) ancestor = ancestor.parent;
+  const catIdx = (root.children ?? []).indexOf(ancestor) % RING_COLORS.length;
+  const palette = RING_COLORS[catIdx < 0 ? 0 : catIdx];
+  const shade = Math.min(node.depth - 1, palette.length - 1);
+  return palette[shade];
+}
+
+const DEPTH_LABELS = ['', 'Category', 'Range Plan', 'Segment', 'SKU'];
+
 function formatValue(v: number, metric: Metric): string {
   if (metric === 'rrp') return `£${v.toFixed(2)}`;
   if (v >= 1_000_000) return `£${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `£${(v / 1_000).toFixed(0)}K`;
   return `£${v.toFixed(0)}`;
+}
+
+interface ChartProps {
+  plans: RangePlan[];
+  catalogue: Product[];
+  metric: Metric;
+  shelfSide: string;
 }
 
 export function AnalyseView() {
@@ -110,6 +134,7 @@ export function AnalyseView() {
 
   const [metric, setMetric] = useState<Metric>('revenue');
   const [shelfSide, setShelfSide] = useState('current');
+  const [activeSheet, setActiveSheet] = useState<SheetId>('sunburst');
 
   const analyseView = project?.analyseView ?? { entries: [] };
   const entries = analyseView.entries;
@@ -122,6 +147,13 @@ export function AnalyseView() {
   }, [entries, project]);
 
   if (!project) return null;
+
+  const chartProps: ChartProps = {
+    plans: selectedPlans,
+    catalogue: project.catalogue,
+    metric,
+    shelfSide,
+  };
 
   return (
     <div className="analyse-view">
@@ -186,24 +218,36 @@ export function AnalyseView() {
           <p>
             Tick the checkboxes in the <strong>Range Plans</strong> sidebar
             on the left to add plans to the analysis. Each selected plan's
-            products will appear in the sunburst breakdown.
+            products will appear in the category breakdown.
           </p>
         </div>
       ) : (
-        <div className="analyse-canvas-wrapper">
-          <div className="analyse-canvas">
-            <div className="analyse-canvas-header">
-              <h3>Category Breakdown</h3>
-              <p>
-                {selectedPlans.map((p) => p.name).join(', ')} — by {metric === 'revenue' ? 'Historic Revenue' : 'RRP'}
-              </p>
+        <div className="analyse-body">
+          <div className="analyse-canvas-wrapper">
+            <div className="analyse-canvas">
+              <div className="analyse-canvas-header">
+                <h3>Category Breakdown</h3>
+                <p>
+                  {selectedPlans.map((p) => p.name).join(', ')} — by {metric === 'revenue' ? 'Historic Revenue' : 'RRP'}
+                </p>
+              </div>
+              {activeSheet === 'sunburst' ? (
+                <Sunburst {...chartProps} />
+              ) : (
+                <Icicle {...chartProps} />
+              )}
             </div>
-            <Sunburst
-              plans={selectedPlans}
-              catalogue={project.catalogue}
-              metric={metric}
-              shelfSide={shelfSide}
-            />
+          </div>
+          <div className="analyse-sheet-tabs">
+            {SHEETS.map((s) => (
+              <button
+                key={s.id}
+                className={`analyse-sheet-tab ${activeSheet === s.id ? 'active' : ''}`}
+                onClick={() => setActiveSheet(s.id)}
+              >
+                {s.label}
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -211,25 +255,18 @@ export function AnalyseView() {
   );
 }
 
-interface SunburstProps {
-  plans: RangePlan[];
-  catalogue: Product[];
-  metric: Metric;
-  shelfSide: string;
-}
+// ---------- shared hook: measure container ----------
 
-function Sunburst({ plans, catalogue, metric, shelfSide }: SunburstProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+function useMeasure() {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; value: string; depth: string } | null>(null);
   const [dims, setDims] = useState({ width: 800, height: 450 });
-
   const observerRef = useRef<ResizeObserver | null>(null);
+
   const measureRef = useCallback((el: HTMLDivElement | null) => {
     observerRef.current?.disconnect();
     observerRef.current = null;
     if (!el) return;
-    wrapperRef.current = el;
+    (wrapperRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
     const update = () => {
       const r = el.getBoundingClientRect();
       if (r.width > 0 && r.height > 0) setDims({ width: r.width, height: r.height });
@@ -242,7 +279,38 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: SunburstProps) {
 
   useEffect(() => () => observerRef.current?.disconnect(), []);
 
-  const data = useMemo(() => buildSunburstData(plans, catalogue, metric, shelfSide), [plans, catalogue, metric, shelfSide]);
+  return { wrapperRef, dims, measureRef };
+}
+
+// ---------- Tooltip ----------
+
+interface TooltipState { x: number; y: number; label: string; value: string; depth: string }
+
+function ChartTooltip({ tooltip }: { tooltip: TooltipState | null }) {
+  return (
+    <div
+      className={`analyse-tooltip ${tooltip ? 'visible' : ''}`}
+      style={tooltip ? { left: tooltip.x, top: tooltip.y } : undefined}
+    >
+      {tooltip && (
+        <>
+          {tooltip.depth && <div className="analyse-tooltip-value">{tooltip.depth}</div>}
+          <div className="analyse-tooltip-label">{tooltip.label}</div>
+          <div className="analyse-tooltip-value">{tooltip.value}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------- Sunburst ----------
+
+function Sunburst({ plans, catalogue, metric, shelfSide }: ChartProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { wrapperRef, dims, measureRef } = useMeasure();
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  const data = useMemo(() => buildHierarchyData(plans, catalogue, metric, shelfSide), [plans, catalogue, metric, shelfSide]);
 
   useEffect(() => {
     const svg = d3.select(svgRef.current);
@@ -252,17 +320,17 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: SunburstProps) {
     const radius = Math.min(width, height) / 2 * 0.82;
 
     const root = d3
-      .hierarchy<SunburstNode>(data)
+      .hierarchy<HierNode>(data)
       .sum((d) => d.value ?? 0)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
     if (!root.children || root.children.length === 0) return;
 
-    const partition = d3.partition<SunburstNode>().size([2 * Math.PI, radius]);
-    const partitioned = partition(root) as d3.HierarchyRectangularNode<SunburstNode>;
+    const partition = d3.partition<HierNode>().size([2 * Math.PI, radius]);
+    const partitioned = partition(root) as d3.HierarchyRectangularNode<HierNode>;
 
     const arc = d3
-      .arc<d3.HierarchyRectangularNode<SunburstNode>>()
+      .arc<d3.HierarchyRectangularNode<HierNode>>()
       .startAngle((d) => d.x0)
       .endAngle((d) => d.x1)
       .padAngle(0.002)
@@ -274,23 +342,14 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: SunburstProps) {
       .append('g')
       .attr('transform', `translate(${width / 2},${height / 2})`);
 
-    const depthLabels = ['', 'Category', 'Range Plan', 'Segment', 'SKU'];
-
-    type RNode = d3.HierarchyRectangularNode<SunburstNode>;
+    type RNode = d3.HierarchyRectangularNode<HierNode>;
     const nodes = (partitioned.descendants() as RNode[]).filter((d) => d.depth > 0);
 
     g.selectAll('path')
       .data(nodes)
       .join('path')
       .attr('d', arc as any)
-      .attr('fill', (d) => {
-        let ancestor: RNode = d;
-        while (ancestor.depth > 1 && ancestor.parent) ancestor = ancestor.parent as RNode;
-        const catIdx = (partitioned.children as RNode[])!.indexOf(ancestor) % RING_COLORS.length;
-        const palette = RING_COLORS[catIdx];
-        const shade = Math.min(d.depth - 1, palette.length - 1);
-        return palette[shade];
-      })
+      .attr('fill', (d) => getCategoryColor(d, partitioned))
       .attr('fill-opacity', (d) => 1 - d.depth * 0.08)
       .attr('stroke', '#fff')
       .attr('stroke-width', 0.5)
@@ -304,7 +363,7 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: SunburstProps) {
             y: event.clientY - rect.top - 8,
             label: d.data.name,
             value: formatValue(d.value ?? 0, metric),
-            depth: depthLabels[d.depth] ?? '',
+            depth: DEPTH_LABELS[d.depth] ?? '',
           });
         }
       })
@@ -321,7 +380,6 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: SunburstProps) {
         setTooltip(null);
       });
 
-    // Labels for category ring (depth 1) — only if arc is wide enough
     g.selectAll('text.cat-label')
       .data(nodes.filter((d) => d.depth === 1 && (d.x1 - d.x0) > 0.15))
       .join('text')
@@ -342,7 +400,6 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: SunburstProps) {
         return name.length > maxLen ? name.slice(0, maxLen - 1) + '…' : name;
       });
 
-    // Labels for plan ring (depth 2) — wider arcs only
     g.selectAll('text.plan-label')
       .data(nodes.filter((d) => d.depth === 2 && (d.x1 - d.x0) > 0.2))
       .join('text')
@@ -362,23 +419,110 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: SunburstProps) {
         const name = d.data.name;
         return name.length > maxLen ? name.slice(0, maxLen - 1) + '…' : name;
       });
-  }, [data, dims, metric]);
+  }, [data, dims, metric, wrapperRef]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
-      <div
-        className={`analyse-tooltip ${tooltip ? 'visible' : ''}`}
-        style={tooltip ? { left: tooltip.x, top: tooltip.y } : undefined}
-      >
-        {tooltip && (
-          <>
-            {tooltip.depth && <div className="analyse-tooltip-value">{tooltip.depth}</div>}
-            <div className="analyse-tooltip-label">{tooltip.label}</div>
-            <div className="analyse-tooltip-value">{tooltip.value}</div>
-          </>
-        )}
-      </div>
+      <ChartTooltip tooltip={tooltip} />
+    </div>
+  );
+}
+
+// ---------- Icicle (horizontal) ----------
+
+function Icicle({ plans, catalogue, metric, shelfSide }: ChartProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { wrapperRef, dims, measureRef } = useMeasure();
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  const data = useMemo(() => buildHierarchyData(plans, catalogue, metric, shelfSide), [plans, catalogue, metric, shelfSide]);
+
+  useEffect(() => {
+    const svg = d3.select(svgRef.current);
+    svg.selectAll('*').remove();
+
+    const { width, height } = dims;
+    const margin = { top: 44, right: 4, bottom: 4, left: 4 };
+    const innerW = width - margin.left - margin.right;
+    const innerH = height - margin.top - margin.bottom;
+
+    const root = d3
+      .hierarchy<HierNode>(data)
+      .sum((d) => d.value ?? 0)
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+
+    if (!root.children || root.children.length === 0) return;
+
+    const partition = d3.partition<HierNode>().size([innerH, innerW]).padding(1);
+    const partitioned = partition(root);
+
+    const g = svg
+      .append('g')
+      .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    type RNode = d3.HierarchyRectangularNode<HierNode>;
+    const nodes = (partitioned.descendants() as RNode[]).filter((d) => d.depth > 0);
+
+    g.selectAll('rect')
+      .data(nodes)
+      .join('rect')
+      .attr('x', (d) => d.y0)
+      .attr('y', (d) => d.x0)
+      .attr('width', (d) => Math.max(0, d.y1 - d.y0 - 1))
+      .attr('height', (d) => Math.max(0, d.x1 - d.x0))
+      .attr('fill', (d) => getCategoryColor(d, partitioned))
+      .attr('fill-opacity', (d) => 1 - d.depth * 0.06)
+      .attr('rx', 2)
+      .style('cursor', 'pointer')
+      .on('mouseenter', function (event, d) {
+        d3.select(this).attr('fill-opacity', 1).attr('stroke', '#333').attr('stroke-width', 1);
+        const rect = wrapperRef.current?.getBoundingClientRect();
+        if (rect) {
+          setTooltip({
+            x: event.clientX - rect.left + 12,
+            y: event.clientY - rect.top - 8,
+            label: d.data.name,
+            value: formatValue(d.value ?? 0, metric),
+            depth: DEPTH_LABELS[d.depth] ?? '',
+          });
+        }
+      })
+      .on('mousemove', function (event) {
+        const rect = wrapperRef.current?.getBoundingClientRect();
+        if (rect) {
+          setTooltip((prev) =>
+            prev ? { ...prev, x: event.clientX - rect.left + 12, y: event.clientY - rect.top - 8 } : null,
+          );
+        }
+      })
+      .on('mouseleave', function (_event, d) {
+        d3.select(this).attr('fill-opacity', 1 - d.depth * 0.06).attr('stroke', 'none');
+        setTooltip(null);
+      });
+
+    // Text labels — only when the rect is big enough
+    g.selectAll('text.icicle-label')
+      .data(nodes.filter((d) => (d.x1 - d.x0) > 14 && (d.y1 - d.y0) > 30))
+      .join('text')
+      .attr('class', 'icicle-label')
+      .attr('x', (d) => d.y0 + 4)
+      .attr('y', (d) => (d.x0 + d.x1) / 2)
+      .attr('dy', '0.35em')
+      .attr('font-size', (d) => d.depth <= 2 ? '10px' : '9px')
+      .attr('font-weight', (d) => d.depth === 1 ? '700' : '600')
+      .attr('fill', (d) => d.depth <= 2 ? '#fff' : '#333')
+      .text((d) => {
+        const maxLen = Math.floor((d.y1 - d.y0 - 8) / 6);
+        const name = d.data.name;
+        return name.length > maxLen ? name.slice(0, Math.max(1, maxLen - 1)) + '…' : name;
+      });
+  }, [data, dims, metric, wrapperRef]);
+
+  return (
+    <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
+      <ChartTooltip tooltip={tooltip} />
     </div>
   );
 }
