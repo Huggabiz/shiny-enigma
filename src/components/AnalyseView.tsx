@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { useProjectStore } from '../store/useProjectStore';
-import type { Lens, Product, RangePlan, ShelfItem } from '../types';
+import type { Lens, MatrixCellAssignment, Product, RangePlan, Shelf, ShelfItem } from '../types';
 import './AnalyseView.css';
 
 type Metric = 'rrp' | 'revenue';
+type AspMode = 'standard' | 'weighted';
 type SheetId = 'sunburst' | 'icicle';
 
 const SHEETS: { id: SheetId; label: string }[] = [
@@ -18,6 +19,8 @@ interface HierNode {
   children?: HierNode[];
   productId?: string;
   skuCount?: number;
+  totalRevenue?: number;
+  weightedRrpSum?: number;
 }
 
 function getProductForItem(item: ShelfItem, catalogue: Product[]): Product | null {
@@ -27,18 +30,23 @@ function getProductForItem(item: ShelfItem, catalogue: Product[]): Product | nul
   return catalogue.find((p) => p.id === item.productId) ?? null;
 }
 
-function getSegmentLabel(shelf: { matrixLayout?: { xLabels: string[]; yLabels: string[] }; items: ShelfItem[] }, item: ShelfItem): string {
+function getSegmentLabel(shelf: Shelf, item: ShelfItem): string {
   const ml = shelf.matrixLayout;
-  if (!ml) return 'Unsegmented';
-  const idx = shelf.items.indexOf(item);
-  if (idx < 0) return 'Unsegmented';
-  const cols = ml.xLabels.length || 1;
-  const xi = idx % cols;
-  const yi = Math.floor(idx / cols);
-  const xLabel = ml.xLabels[xi] ?? '';
-  const yLabel = ml.yLabels[yi] ?? '';
+  if (!ml || !ml.assignments || ml.assignments.length === 0) return 'Unsegmented';
+  const assignment = ml.assignments.find((a: MatrixCellAssignment) => a.itemId === item.id);
+  if (!assignment) return 'Unsegmented';
+  const xLabel = ml.xLabels[assignment.col] ?? '';
+  const yLabel = ml.yLabels[assignment.row] ?? '';
   if (xLabel && yLabel) return `${yLabel} / ${xLabel}`;
   return xLabel || yLabel || 'Unsegmented';
+}
+
+function resolveShelf(plan: RangePlan, shelfSide: string): Shelf | undefined {
+  if (shelfSide === 'current') return plan.currentShelf;
+  if (shelfSide === 'future') return plan.futureShelf;
+  const stageId = shelfSide.replace('stage-', '');
+  const entry = (plan.intermediateShelves ?? []).find((s) => s.stageId === stageId);
+  return entry?.shelf;
 }
 
 function buildHierarchyData(
@@ -47,17 +55,10 @@ function buildHierarchyData(
   metric: Metric,
   shelfSide: string,
 ): HierNode {
-  const categoryMap = new Map<string, Map<string, Map<string, { name: string; sku: string; value: number; productId: string }[]>>>();
+  const categoryMap = new Map<string, Map<string, Map<string, { name: string; sku: string; value: number; productId: string; revenue: number }[]>>>();
 
   for (const plan of plans) {
-    let shelf;
-    if (shelfSide === 'current') shelf = plan.currentShelf;
-    else if (shelfSide === 'future') shelf = plan.futureShelf;
-    else {
-      const stageId = shelfSide.replace('stage-', '');
-      const entry = (plan.intermediateShelves ?? []).find((s) => s.stageId === stageId);
-      shelf = entry?.shelf;
-    }
+    const shelf = resolveShelf(plan, shelfSide);
     if (!shelf) continue;
 
     for (const item of shelf.items) {
@@ -73,7 +74,13 @@ function buildHierarchyData(
       if (!planMap.has(plan.name)) planMap.set(plan.name, new Map());
       const segMap = planMap.get(plan.name)!;
       if (!segMap.has(segment)) segMap.set(segment, []);
-      segMap.get(segment)!.push({ name: prod.name, sku: prod.sku, value: val, productId: prod.id });
+      segMap.get(segment)!.push({
+        name: prod.name,
+        sku: prod.sku,
+        value: val,
+        productId: prod.id,
+        revenue: prod.revenue ?? 0,
+      });
     }
   }
 
@@ -81,23 +88,35 @@ function buildHierarchyData(
   for (const [cat, planMap] of categoryMap) {
     const planChildren: HierNode[] = [];
     let catSkuCount = 0;
+    let catRevenue = 0;
+    let catWeighted = 0;
     for (const [planName, segMap] of planMap) {
       const segChildren: HierNode[] = [];
       let planSkuCount = 0;
+      let planRevenue = 0;
+      let planWeighted = 0;
       for (const [seg, skus] of segMap) {
+        const segRevenue = skus.reduce((s, x) => s + x.revenue, 0);
+        const segWeighted = skus.reduce((s, x) => s + (x.value * x.revenue), 0);
         const skuNodes: HierNode[] = skus.map((s) => ({
           name: `${s.sku} — ${s.name}`,
           value: s.value,
           productId: s.productId,
           skuCount: 1,
+          totalRevenue: s.revenue,
+          weightedRrpSum: s.value * s.revenue,
         }));
-        segChildren.push({ name: seg, children: skuNodes, skuCount: skus.length });
+        segChildren.push({ name: seg, children: skuNodes, skuCount: skus.length, totalRevenue: segRevenue, weightedRrpSum: segWeighted });
         planSkuCount += skus.length;
+        planRevenue += segRevenue;
+        planWeighted += segWeighted;
       }
-      planChildren.push({ name: planName, children: segChildren, skuCount: planSkuCount });
+      planChildren.push({ name: planName, children: segChildren, skuCount: planSkuCount, totalRevenue: planRevenue, weightedRrpSum: planWeighted });
       catSkuCount += planSkuCount;
+      catRevenue += planRevenue;
+      catWeighted += planWeighted;
     }
-    children.push({ name: cat, children: planChildren, skuCount: catSkuCount });
+    children.push({ name: cat, children: planChildren, skuCount: catSkuCount, totalRevenue: catRevenue, weightedRrpSum: catWeighted });
   }
 
   return { name: 'All', children };
@@ -130,12 +149,19 @@ function formatValue(v: number, metric: Metric): string {
   return `£${v.toFixed(0)}`;
 }
 
-function formatMetricLabel(value: number, metric: Metric, depth: number, skuCount: number): string {
+function formatMetricLabel(
+  value: number, metric: Metric, depth: number,
+  skuCount: number, aspMode: AspMode, totalRevenue: number, weightedRrpSum: number,
+): string {
   if (metric === 'revenue') {
     return formatValue(value, 'revenue');
   }
   if (depth === 4) return `£${value.toFixed(2)}`;
   if (skuCount > 0) {
+    if (aspMode === 'weighted' && totalRevenue > 0) {
+      const wAsp = weightedRrpSum / totalRevenue;
+      return `wASP £${wAsp.toFixed(2)}`;
+    }
     const asp = value / skuCount;
     return `ASP £${asp.toFixed(2)}`;
   }
@@ -148,6 +174,7 @@ interface ChartProps {
   metric: Metric;
   shelfSide: string;
   activeLens?: Lens | null;
+  aspMode: AspMode;
 }
 
 export function AnalyseView() {
@@ -159,6 +186,7 @@ export function AnalyseView() {
   const [metric, setMetric] = useState<Metric>('revenue');
   const [shelfSide, setShelfSide] = useState('current');
   const [activeSheet, setActiveSheet] = useState<SheetId>('sunburst');
+  const [aspMode, setAspMode] = useState<AspMode>('standard');
 
   const analyseView = project?.analyseView ?? { entries: [] };
   const entries = analyseView.entries;
@@ -185,6 +213,7 @@ export function AnalyseView() {
     metric,
     shelfSide,
     activeLens,
+    aspMode,
   };
 
   return (
@@ -227,6 +256,26 @@ export function AnalyseView() {
             RRP
           </button>
         </div>
+        {metric === 'rrp' && (
+          <div className="analyse-metric-toggle" role="tablist">
+            <button
+              role="tab"
+              aria-selected={aspMode === 'standard'}
+              className={aspMode === 'standard' ? 'active' : ''}
+              onClick={() => setAspMode('standard')}
+            >
+              ASP
+            </button>
+            <button
+              role="tab"
+              aria-selected={aspMode === 'weighted'}
+              className={aspMode === 'weighted' ? 'active' : ''}
+              onClick={() => setAspMode('weighted')}
+            >
+              Weighted ASP
+            </button>
+          </div>
+        )}
         <div className="analyse-toolbar-actions">
           {activeLens && (
             <span className="analyse-toolbar-meta" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -487,7 +536,7 @@ function isInLens(node: d3.HierarchyNode<HierNode>, lens: Lens, stageKey: string
   return lens.productIds.includes(node.data.productId);
 }
 
-function Icicle({ plans, catalogue, metric, shelfSide, activeLens }: ChartProps) {
+function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: ChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -499,7 +548,7 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens }: ChartProps)
     svg.selectAll('*').remove();
 
     const { width, height } = dims;
-    const margin = { top: 44, right: 4, bottom: 4, left: 4 };
+    const margin = { top: 56, right: 4, bottom: 4, left: 4 };
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
@@ -560,7 +609,10 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens }: ChartProps)
         const rect = wrapperRef.current?.getBoundingClientRect();
         if (rect) {
           const sc = getSkuCount(d);
-          const metricStr = formatMetricLabel(d.value ?? 0, metric, d.depth, sc);
+          const metricStr = formatMetricLabel(
+            d.value ?? 0, metric, d.depth, sc, aspMode,
+            d.data.totalRevenue ?? 0, d.data.weightedRrpSum ?? 0,
+          );
           setTooltip({
             x: event.clientX - rect.left + 12,
             y: event.clientY - rect.top - 8,
@@ -620,7 +672,10 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens }: ChartProps)
 
       // Metric line
       const sc = getSkuCount(d);
-      const metricText = formatMetricLabel(d.value ?? 0, metric, d.depth, sc);
+      const metricText = formatMetricLabel(
+        d.value ?? 0, metric, d.depth, sc, aspMode,
+        d.data.totalRevenue ?? 0, d.data.weightedRrpSum ?? 0,
+      );
 
       const totalLines = lines.length + 1;
       const totalTextH = totalLines * lineH;
@@ -656,7 +711,7 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens }: ChartProps)
           .text(metricText.length > maxCharsPerLine ? metricText.slice(0, maxCharsPerLine - 1) + '…' : metricText);
       }
     });
-  }, [data, dims, metric, wrapperRef, activeLens, shelfSide]);
+  }, [data, dims, metric, wrapperRef, activeLens, shelfSide, aspMode]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
