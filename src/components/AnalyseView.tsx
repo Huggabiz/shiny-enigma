@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { useProjectStore } from '../store/useProjectStore';
+import { getActivePlan, getStages } from '../types';
 import type { Lens, MatrixCellAssignment, Product, RangePlan, Shelf, ShelfItem } from '../types';
 import './AnalyseView.css';
 
 type Metric = 'rrp' | 'revenue';
 type AspMode = 'standard' | 'weighted';
-type SheetId = 'sunburst' | 'icicle';
+type SheetId = 'icicle' | 'sunburst';
 
 const SHEETS: { id: SheetId; label: string }[] = [
-  { id: 'sunburst', label: 'Sunburst' },
   { id: 'icicle', label: 'Icicle' },
+  { id: 'sunburst', label: 'Sunburst' },
 ];
 
 interface HierNode {
@@ -54,6 +55,19 @@ function buildHierarchyData(
   catalogue: Product[],
   metric: Metric,
   shelfSide: string,
+  showSegments: boolean,
+): HierNode {
+  if (showSegments) {
+    return buildWithSegments(plans, catalogue, metric, shelfSide);
+  }
+  return buildWithoutSegments(plans, catalogue, metric, shelfSide);
+}
+
+function buildWithSegments(
+  plans: RangePlan[],
+  catalogue: Product[],
+  metric: Metric,
+  shelfSide: string,
 ): HierNode {
   const categoryMap = new Map<string, Map<string, Map<string, { name: string; sku: string; value: number; productId: string; revenue: number }[]>>>();
 
@@ -75,11 +89,8 @@ function buildHierarchyData(
       const segMap = planMap.get(plan.name)!;
       if (!segMap.has(segment)) segMap.set(segment, []);
       segMap.get(segment)!.push({
-        name: prod.name,
-        sku: prod.sku,
-        value: val,
-        productId: prod.id,
-        revenue: prod.revenue ?? 0,
+        name: prod.name, sku: prod.sku, value: val,
+        productId: prod.id, revenue: prod.revenue ?? 0,
       });
     }
   }
@@ -87,38 +98,73 @@ function buildHierarchyData(
   const children: HierNode[] = [];
   for (const [cat, planMap] of categoryMap) {
     const planChildren: HierNode[] = [];
-    let catSkuCount = 0;
-    let catRevenue = 0;
-    let catWeighted = 0;
+    let catSkuCount = 0, catRevenue = 0, catWeighted = 0;
     for (const [planName, segMap] of planMap) {
       const segChildren: HierNode[] = [];
-      let planSkuCount = 0;
-      let planRevenue = 0;
-      let planWeighted = 0;
+      let planSkuCount = 0, planRevenue = 0, planWeighted = 0;
       for (const [seg, skus] of segMap) {
         const segRevenue = skus.reduce((s, x) => s + x.revenue, 0);
         const segWeighted = skus.reduce((s, x) => s + (x.value * x.revenue), 0);
         const skuNodes: HierNode[] = skus.map((s) => ({
-          name: `${s.sku} — ${s.name}`,
-          value: s.value,
-          productId: s.productId,
-          skuCount: 1,
-          totalRevenue: s.revenue,
-          weightedRrpSum: s.value * s.revenue,
+          name: `${s.sku} — ${s.name}`, value: s.value, productId: s.productId,
+          skuCount: 1, totalRevenue: s.revenue, weightedRrpSum: s.value * s.revenue,
         }));
         segChildren.push({ name: seg, children: skuNodes, skuCount: skus.length, totalRevenue: segRevenue, weightedRrpSum: segWeighted });
-        planSkuCount += skus.length;
-        planRevenue += segRevenue;
-        planWeighted += segWeighted;
+        planSkuCount += skus.length; planRevenue += segRevenue; planWeighted += segWeighted;
       }
       planChildren.push({ name: planName, children: segChildren, skuCount: planSkuCount, totalRevenue: planRevenue, weightedRrpSum: planWeighted });
-      catSkuCount += planSkuCount;
-      catRevenue += planRevenue;
-      catWeighted += planWeighted;
+      catSkuCount += planSkuCount; catRevenue += planRevenue; catWeighted += planWeighted;
     }
     children.push({ name: cat, children: planChildren, skuCount: catSkuCount, totalRevenue: catRevenue, weightedRrpSum: catWeighted });
   }
+  return { name: 'All', children };
+}
 
+function buildWithoutSegments(
+  plans: RangePlan[],
+  catalogue: Product[],
+  metric: Metric,
+  shelfSide: string,
+): HierNode {
+  const categoryMap = new Map<string, Map<string, { name: string; sku: string; value: number; productId: string; revenue: number }[]>>();
+
+  for (const plan of plans) {
+    const shelf = resolveShelf(plan, shelfSide);
+    if (!shelf) continue;
+
+    for (const item of shelf.items) {
+      const prod = getProductForItem(item, catalogue);
+      if (!prod) continue;
+      const cat = prod.category || 'Uncategorised';
+      const val = metric === 'rrp' ? (prod.rrp ?? 0) : (prod.revenue ?? 0);
+      if (val <= 0) continue;
+
+      if (!categoryMap.has(cat)) categoryMap.set(cat, new Map());
+      const planMap = categoryMap.get(cat)!;
+      if (!planMap.has(plan.name)) planMap.set(plan.name, []);
+      planMap.get(plan.name)!.push({
+        name: prod.name, sku: prod.sku, value: val,
+        productId: prod.id, revenue: prod.revenue ?? 0,
+      });
+    }
+  }
+
+  const children: HierNode[] = [];
+  for (const [cat, planMap] of categoryMap) {
+    const planChildren: HierNode[] = [];
+    let catSkuCount = 0, catRevenue = 0, catWeighted = 0;
+    for (const [planName, skus] of planMap) {
+      const planRevenue = skus.reduce((s, x) => s + x.revenue, 0);
+      const planWeighted = skus.reduce((s, x) => s + (x.value * x.revenue), 0);
+      const skuNodes: HierNode[] = skus.map((s) => ({
+        name: `${s.sku} — ${s.name}`, value: s.value, productId: s.productId,
+        skuCount: 1, totalRevenue: s.revenue, weightedRrpSum: s.value * s.revenue,
+      }));
+      planChildren.push({ name: planName, children: skuNodes, skuCount: skus.length, totalRevenue: planRevenue, weightedRrpSum: planWeighted });
+      catSkuCount += skus.length; catRevenue += planRevenue; catWeighted += planWeighted;
+    }
+    children.push({ name: cat, children: planChildren, skuCount: catSkuCount, totalRevenue: catRevenue, weightedRrpSum: catWeighted });
+  }
   return { name: 'All', children };
 }
 
@@ -140,8 +186,6 @@ function getCategoryColor(node: d3.HierarchyNode<HierNode>, root: d3.HierarchyNo
   return palette[shade];
 }
 
-const DEPTH_LABELS = ['', 'Category', 'Range Plan', 'Segment', 'SKU'];
-
 function formatValue(v: number, metric: Metric): string {
   if (metric === 'rrp') return `£${v.toFixed(2)}`;
   if (v >= 1_000_000) return `£${(v / 1_000_000).toFixed(1)}M`;
@@ -150,13 +194,13 @@ function formatValue(v: number, metric: Metric): string {
 }
 
 function formatMetricLabel(
-  value: number, metric: Metric, depth: number,
+  value: number, metric: Metric, isLeaf: boolean,
   skuCount: number, aspMode: AspMode, totalRevenue: number, weightedRrpSum: number,
 ): string {
   if (metric === 'revenue') {
     return formatValue(value, 'revenue');
   }
-  if (depth === 4) return `£${value.toFixed(2)}`;
+  if (isLeaf) return `£${value.toFixed(2)}`;
   if (skuCount > 0) {
     if (aspMode === 'weighted' && totalRevenue > 0) {
       const wAsp = weightedRrpSum / totalRevenue;
@@ -175,6 +219,7 @@ interface ChartProps {
   shelfSide: string;
   activeLens?: Lens | null;
   aspMode: AspMode;
+  showSegments: boolean;
 }
 
 export function AnalyseView() {
@@ -185,8 +230,9 @@ export function AnalyseView() {
 
   const [metric, setMetric] = useState<Metric>('revenue');
   const [shelfSide, setShelfSide] = useState('current');
-  const [activeSheet, setActiveSheet] = useState<SheetId>('sunburst');
+  const [activeSheet, setActiveSheet] = useState<SheetId>('icicle');
   const [aspMode, setAspMode] = useState<AspMode>('standard');
+  const [showSegments, setShowSegments] = useState(true);
 
   const analyseView = project?.analyseView ?? { entries: [] };
   const entries = analyseView.entries;
@@ -205,6 +251,15 @@ export function AnalyseView() {
     return lenses.find((l) => l.id === ids[0]) ?? null;
   }, [project?.activeLensIds, project?.lenses]);
 
+  const firstPlan = project ? getActivePlan(project) : undefined;
+  const stagesForToggle = useMemo(() => {
+    const all = firstPlan && project ? getStages(firstPlan, project) : [];
+    const vk = project?.visibleStageKeys;
+    if (!vk || vk.length === 0) return all;
+    const filtered = all.filter((s) => vk.includes(s.key));
+    return filtered.length > 0 ? filtered : all;
+  }, [firstPlan, project]);
+
   if (!project) return null;
 
   const chartProps: ChartProps = {
@@ -214,6 +269,7 @@ export function AnalyseView() {
     shelfSide,
     activeLens,
     aspMode,
+    showSegments,
   };
 
   return (
@@ -221,22 +277,17 @@ export function AnalyseView() {
       <div className="analyse-toolbar">
         <h2 className="analyse-title">Analyse</h2>
         <div className="analyse-metric-toggle" role="tablist">
-          <button
-            role="tab"
-            aria-selected={shelfSide === 'current'}
-            className={shelfSide === 'current' ? 'active' : ''}
-            onClick={() => setShelfSide('current')}
-          >
-            Current
-          </button>
-          <button
-            role="tab"
-            aria-selected={shelfSide === 'future'}
-            className={shelfSide === 'future' ? 'active' : ''}
-            onClick={() => setShelfSide('future')}
-          >
-            Future
-          </button>
+          {stagesForToggle.map((s) => (
+            <button
+              key={s.key}
+              role="tab"
+              aria-selected={shelfSide === s.key}
+              className={shelfSide === s.key ? 'active' : ''}
+              onClick={() => setShelfSide(s.key)}
+            >
+              {s.name}
+            </button>
+          ))}
         </div>
         <div className="analyse-metric-toggle" role="tablist">
           <button
@@ -277,6 +328,14 @@ export function AnalyseView() {
           </div>
         )}
         <div className="analyse-toolbar-actions">
+          <label className="analyse-show-segments" title="Show matrix segment column between Plan and SKU">
+            <input
+              type="checkbox"
+              checked={showSegments}
+              onChange={(e) => setShowSegments(e.target.checked)}
+            />
+            Segments
+          </label>
           {activeLens && (
             <span className="analyse-toolbar-meta" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: activeLens.color, display: 'inline-block' }} />
@@ -392,12 +451,15 @@ function ChartTooltip({ tooltip }: { tooltip: TooltipState | null }) {
 
 // ---------- Sunburst ----------
 
-function Sunburst({ plans, catalogue, metric, shelfSide }: ChartProps) {
+function Sunburst({ plans, catalogue, metric, shelfSide, showSegments }: ChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  const data = useMemo(() => buildHierarchyData(plans, catalogue, metric, shelfSide), [plans, catalogue, metric, shelfSide]);
+  const data = useMemo(
+    () => buildHierarchyData(plans, catalogue, metric, shelfSide, showSegments),
+    [plans, catalogue, metric, shelfSide, showSegments],
+  );
 
   useEffect(() => {
     const svg = d3.select(svgRef.current);
@@ -450,7 +512,7 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: ChartProps) {
             y: event.clientY - rect.top - 8,
             label: d.data.name,
             value: formatValue(d.value ?? 0, metric),
-            depth: DEPTH_LABELS[d.depth] ?? '',
+            depth: (showSegments ? ['', 'Category', 'Range Plan', 'Segment', 'SKU'] : ['', 'Category', 'Range Plan', 'SKU'])[d.depth] ?? '',
           });
         }
       })
@@ -506,7 +568,7 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: ChartProps) {
         const name = d.data.name;
         return name.length > maxLen ? name.slice(0, maxLen - 1) + '…' : name;
       });
-  }, [data, dims, metric, wrapperRef]);
+  }, [data, dims, metric, wrapperRef, showSegments]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -518,9 +580,10 @@ function Sunburst({ plans, catalogue, metric, shelfSide }: ChartProps) {
 
 // ---------- Icicle (horizontal) ----------
 
-// Custom column widths as fractions of total width (depths 1-4).
-// Category and Plan are narrow (text wraps), Segment medium, SKU wide.
-const ICICLE_COL_WEIGHTS = [0.10, 0.10, 0.16, 0.64];
+// With segments: Cat 10%, Plan 10%, Segment 20%, SKU 20% (40% whitespace right)
+// Without segments: Cat 12%, Plan 12%, SKU 20% (56% whitespace right)
+const ICICLE_COLS_WITH_SEG = [0.10, 0.10, 0.20, 0.20];
+const ICICLE_COLS_NO_SEG   = [0.12, 0.12, 0.20];
 
 function getSkuCount(node: d3.HierarchyNode<HierNode>): number {
   if (node.data.skuCount != null) return node.data.skuCount;
@@ -536,12 +599,21 @@ function isInLens(node: d3.HierarchyNode<HierNode>, lens: Lens, stageKey: string
   return lens.productIds.includes(node.data.productId);
 }
 
-function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: ChartProps) {
+function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, showSegments }: ChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  const data = useMemo(() => buildHierarchyData(plans, catalogue, metric, shelfSide), [plans, catalogue, metric, shelfSide]);
+  const data = useMemo(
+    () => buildHierarchyData(plans, catalogue, metric, shelfSide, showSegments),
+    [plans, catalogue, metric, shelfSide, showSegments],
+  );
+
+  const colWeights = showSegments ? ICICLE_COLS_WITH_SEG : ICICLE_COLS_NO_SEG;
+  const maxDepth = colWeights.length;
+  const depthLabels = showSegments
+    ? ['', 'Category', 'Range Plan', 'Segment', 'SKU']
+    : ['', 'Category', 'Range Plan', 'SKU'];
 
   useEffect(() => {
     const svg = d3.select(svgRef.current);
@@ -559,27 +631,28 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
 
     if (!root.children || root.children.length === 0) return;
 
-    // Use partition for vertical proportions (x0/x1) then remap horizontal (y0/y1)
     const partition = d3.partition<HierNode>().size([innerH, innerW]).padding(1);
     const partitioned = partition(root);
 
     // Build cumulative column boundaries from weights
     const colStarts = [0];
-    for (let i = 0; i < ICICLE_COL_WEIGHTS.length; i++) {
-      colStarts.push(colStarts[i] + ICICLE_COL_WEIGHTS[i] * innerW);
+    for (let i = 0; i < colWeights.length; i++) {
+      colStarts.push(colStarts[i] + colWeights[i] * innerW);
     }
 
     type RNode = d3.HierarchyRectangularNode<HierNode>;
-    const nodes = (partitioned.descendants() as RNode[]).filter((d) => d.depth > 0);
+    const nodes = (partitioned.descendants() as RNode[]).filter((d) => d.depth > 0 && d.depth <= maxDepth);
 
-    // Remap y0/y1 to custom column widths (removing root gap)
+    // Remap y0/y1 to custom column widths
     for (const n of nodes) {
       const d = n.depth - 1;
-      if (d < ICICLE_COL_WEIGHTS.length) {
+      if (d < colWeights.length) {
         n.y0 = colStarts[d];
         n.y1 = colStarts[d + 1];
       }
     }
+
+    const isLeafDepth = maxDepth;
 
     const g = svg
       .append('g')
@@ -593,13 +666,13 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
       .attr('width', (d) => Math.max(0, d.y1 - d.y0 - 1))
       .attr('height', (d) => Math.max(0, d.x1 - d.x0))
       .attr('fill', (d) => {
-        if (d.depth === 4 && activeLens && isInLens(d, activeLens, shelfSide)) {
+        if (d.depth === isLeafDepth && activeLens && isInLens(d, activeLens, shelfSide)) {
           return activeLens.color;
         }
         return getCategoryColor(d, partitioned);
       })
       .attr('fill-opacity', (d) => {
-        if (d.depth === 4 && activeLens && isInLens(d, activeLens, shelfSide)) return 0.85;
+        if (d.depth === isLeafDepth && activeLens && isInLens(d, activeLens, shelfSide)) return 0.85;
         return 1 - d.depth * 0.06;
       })
       .attr('rx', 2)
@@ -610,7 +683,7 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
         if (rect) {
           const sc = getSkuCount(d);
           const metricStr = formatMetricLabel(
-            d.value ?? 0, metric, d.depth, sc, aspMode,
+            d.value ?? 0, metric, d.depth === isLeafDepth, sc, aspMode,
             d.data.totalRevenue ?? 0, d.data.weightedRrpSum ?? 0,
           );
           setTooltip({
@@ -618,7 +691,7 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
             y: event.clientY - rect.top - 8,
             label: d.data.name,
             value: metricStr + (sc > 1 ? ` (${sc} SKUs)` : ''),
-            depth: DEPTH_LABELS[d.depth] ?? '',
+            depth: depthLabels[d.depth] ?? '',
           });
         }
       })
@@ -631,7 +704,7 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
         }
       })
       .on('mouseleave', function (_event, d) {
-        const origOpacity = (d.depth === 4 && activeLens && isInLens(d, activeLens, shelfSide)) ? 0.85 : 1 - d.depth * 0.06;
+        const origOpacity = (d.depth === isLeafDepth && activeLens && isInLens(d, activeLens, shelfSide)) ? 0.85 : 1 - d.depth * 0.06;
         d3.select(this).attr('fill-opacity', origOpacity).attr('stroke', 'none');
         setTooltip(null);
       });
@@ -654,7 +727,6 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
       const lineH = fontSize + 2;
       const maxCharsPerLine = Math.max(2, Math.floor(cellW / charW));
 
-      // Wrap name into lines
       const name = d.data.name;
       const words = name.split(/\s+/);
       const lines: string[] = [];
@@ -670,10 +742,9 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
       }
       if (currentLine) lines.push(currentLine);
 
-      // Metric line
       const sc = getSkuCount(d);
       const metricText = formatMetricLabel(
-        d.value ?? 0, metric, d.depth, sc, aspMode,
+        d.value ?? 0, metric, d.depth === isLeafDepth, sc, aspMode,
         d.data.totalRevenue ?? 0, d.data.weightedRrpSum ?? 0,
       );
 
@@ -687,7 +758,7 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
         visibleLines[visibleLines.length - 1] = last.slice(0, Math.max(1, last.length - 1)) + '…';
       }
 
-      const isLight = d.depth <= 2;
+      const isDark = d.depth <= 2;
 
       visibleLines.forEach((line, i) => {
         group.append('text')
@@ -695,11 +766,10 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
           .attr('y', i * lineH + lineH * 0.75)
           .attr('font-size', `${fontSize}px`)
           .attr('font-weight', d.depth === 1 ? '700' : '600')
-          .attr('fill', isLight ? '#fff' : '#333')
+          .attr('fill', isDark ? '#fff' : '#333')
           .text(line);
       });
 
-      // Metric value below the name
       const metricY = visibleLines.length * lineH + lineH * 0.75;
       if (metricY + 2 < cellH) {
         group.append('text')
@@ -707,11 +777,11 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode }: Ch
           .attr('y', metricY)
           .attr('font-size', `${Math.max(7, fontSize - 1)}px`)
           .attr('font-weight', '400')
-          .attr('fill', isLight ? 'rgba(255,255,255,0.8)' : '#888')
+          .attr('fill', isDark ? 'rgba(255,255,255,0.8)' : '#555')
           .text(metricText.length > maxCharsPerLine ? metricText.slice(0, maxCharsPerLine - 1) + '…' : metricText);
       }
     });
-  }, [data, dims, metric, wrapperRef, activeLens, shelfSide, aspMode]);
+  }, [data, dims, metric, wrapperRef, activeLens, shelfSide, aspMode, colWeights, maxDepth, depthLabels]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>

@@ -80,6 +80,23 @@
   background: #ffebee;
 }
 
+.analyse-show-segments {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #555;
+  cursor: pointer;
+  user-select: none;
+}
+
+.analyse-show-segments input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #1976d2;
+  cursor: pointer;
+}
+
 .analyse-body {
   flex: 1;
   display: flex;
