@@ -94,6 +94,8 @@ export function parseSpreadsheet(
       ausRrp: numOrUndef(row[mapping.ausRrp]),
       revenue: Number(row[mapping.revenue]) || 0,
       forecastRevenue: numOrUndef(row[mapping.forecastRevenue]),
+      operatingMarginPct: numOrUndef(row[mapping.operatingMarginPct]),
+      operatingMarginGbp: numOrUndef(row[mapping.operatingMarginGbp]),
       imageUrl: row[mapping.imageUrl] ? String(row[mapping.imageUrl]).trim() : undefined,
       source,
     };

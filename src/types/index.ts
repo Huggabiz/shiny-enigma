@@ -57,6 +57,8 @@ export interface Product {
   ausRrp?: number;
   revenue: number;          // last year's revenue (actual)
   forecastRevenue?: number; // next year's revenue (forecast)
+  operatingMarginPct?: number;  // operating margin as a percentage
+  operatingMarginGbp?: number;  // operating margin in £
   imageUrl?: string;
   source?: 'live' | 'dev';
   // Keyed by horizon — 'default' for the immediate next future range.
@@ -83,6 +85,8 @@ export interface PlaceholderData {
   ausRrp?: number;
   revenue: number;
   forecastRevenue?: number;
+  operatingMarginPct?: number;
+  operatingMarginGbp?: number;
   imageUrl?: string;
   source: 'live' | 'dev';
 }
@@ -618,6 +622,8 @@ export interface CardFormat {
   showAusRrp: boolean;
   showRevenue: boolean;
   showForecastRevenue: boolean;
+  showOperatingMarginPct: boolean;
+  showOperatingMarginGbp: boolean;
   showCategory: boolean;
 }
 
@@ -633,6 +639,8 @@ export const DEFAULT_CARD_FORMAT: CardFormat = {
   showAusRrp: false,
   showRevenue: false,
   showForecastRevenue: false,
+  showOperatingMarginPct: false,
+  showOperatingMarginGbp: false,
   showCategory: false,
 };
 
@@ -657,6 +665,8 @@ export interface ColumnMapping {
   ausRrp: string;
   revenue: string;
   forecastRevenue: string;
+  operatingMarginPct: string;
+  operatingMarginGbp: string;
   imageUrl: string;
   source: string;
 }
@@ -681,6 +691,8 @@ export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
   ausRrp: 'AUS RRP',
   revenue: 'Revenue',
   forecastRevenue: 'Forecast Revenue',
+  operatingMarginPct: 'Operating Margin %',
+  operatingMarginGbp: 'Operating Margin £',
   imageUrl: 'Image URL',
   source: 'Source',
 };

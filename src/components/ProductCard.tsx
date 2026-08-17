@@ -352,6 +352,12 @@ export function ProductCard({
           {cardFormat.showRevenue && cardProduct.revenue > 0 && (
             <span className="card-revenue">{isCompact ? '' : 'Rev: '}{cardProduct.revenue.toLocaleString()}</span>
           )}
+          {cardFormat.showOperatingMarginPct && cardProduct.operatingMarginPct != null && (
+            <span className="card-margin">{isCompact ? '' : 'OM%: '}{cardProduct.operatingMarginPct.toFixed(1)}%</span>
+          )}
+          {cardFormat.showOperatingMarginGbp && cardProduct.operatingMarginGbp != null && (
+            <span className="card-margin">{isCompact ? '' : 'OM\u00a3: '}\u00a3{cardProduct.operatingMarginGbp.toLocaleString()}</span>
+          )}
           {cardFormat.showCategory && !isCompact && <span className="card-category">{cardProduct.category || '\u2014'}</span>}
         </div>
       )}

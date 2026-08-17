@@ -36,31 +36,31 @@ const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: str
     label: 'Volume UK',
     hint: 'UK warehouse volume (numeric)',
     required: false,
-    aliases: ['volume uk', 'vol uk', 'uk vol', 'uk volume', 'uk units'],
+    aliases: ['volume uk', 'vol uk', 'uk vol', 'uk volume', 'uk units', 'xpo | current period qty'],
   },
   volumeEu: {
     label: 'Volume EU',
     hint: 'EU warehouse volume (numeric)',
     required: false,
-    aliases: ['volume eu', 'vol eu', 'eu vol', 'eu volume', 'eu units', 'europe volume'],
+    aliases: ['volume eu', 'vol eu', 'eu vol', 'eu volume', 'eu units', 'europe volume', 'dsv | current period qty'],
   },
   volumeAus: {
     label: 'Volume AUS',
     hint: 'Australia warehouse volume (numeric)',
     required: false,
-    aliases: ['volume aus', 'vol aus', 'aus vol', 'aus volume', 'aus units', 'australia volume'],
+    aliases: ['volume aus', 'vol aus', 'aus vol', 'aus volume', 'aus units', 'australia volume', 'gtt | current period qty'],
   },
   volumeUs: {
     label: 'Volume US',
     hint: 'US warehouse volume (numeric)',
     required: false,
-    aliases: ['volume us', 'vol us', 'us vol', 'us volume', 'us units', 'usa volume'],
+    aliases: ['volume us', 'vol us', 'us vol', 'us volume', 'us units', 'usa volume', 'ttd | current period qty'],
   },
   volumeCn: {
     label: 'Volume CN',
     hint: 'CN (China/distribution) warehouse volume (numeric)',
     required: false,
-    aliases: ['volume cn', 'vol cn', 'cn vol', 'cn volume', 'cn units', 'china volume'],
+    aliases: ['volume cn', 'vol cn', 'cn vol', 'cn volume', 'cn units', 'china volume', 'vgrow | current period qty'],
   },
   // forecastVolume removed from import — the tool builds its own
   // forecast via the Forecast Lab. The entry stays for type-compat
@@ -83,6 +83,7 @@ const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: str
     aliases: [
       'ytd', 'actual revenue', 'ly revenue', 'last year revenue',
       '12m rev \u00a3 ly', '12m rev ly', '12m revenue ly', 'rev ly', 'revenue ly',
+      'current period sales',
     ],
   },
   forecastRevenue: {
@@ -94,6 +95,18 @@ const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: str
       '12m rev \u00a3 / yr1 fc', '12m rev / yr1 fc', '12m rev yr1 fc', '12m revenue yr1 fc',
       'rev yr1 fc', 'yr1 fc revenue', 'fc revenue',
     ],
+  },
+  operatingMarginPct: {
+    label: 'Operating Margin (%)',
+    hint: 'Operating margin as a percentage (numeric)',
+    required: false,
+    aliases: ['operating margin (%)', 'operating margin %', 'op margin %', 'margin %', 'margin pct', 'operating margin pct', 'op margin pct'],
+  },
+  operatingMarginGbp: {
+    label: 'Operating Margin (£)',
+    hint: 'Operating margin in GBP (numeric)',
+    required: false,
+    aliases: ['operating margin (£)', 'operating margin £', 'op margin £', 'margin £', 'operating margin gbp', 'op margin gbp', 'margin gbp'],
   },
   imageUrl: { label: 'Image URL', hint: 'Web URL to product image', required: false, aliases: ['image', 'image url', 'imageurl', 'img', 'picture', 'photo'] },
   source: { label: 'Source', hint: 'Live or Dev — set Dev for in-development products', required: false, aliases: ['status', 'product status'] },

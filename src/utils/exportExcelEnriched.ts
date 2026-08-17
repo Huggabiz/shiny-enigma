@@ -36,6 +36,8 @@ export function exportToExcelEnriched(project: Project): void {
     row['EU RRP'] = product.euRrp ?? '';
     row['AUS RRP'] = product.ausRrp ?? '';
     row['Revenue'] = product.revenue || '';
+    row['Operating Margin %'] = product.operatingMarginPct ?? '';
+    row['Operating Margin £'] = product.operatingMarginGbp ?? '';
 
     // Range plan usage — which plans and at which stages
     const planUsage: string[] = [];
