@@ -342,7 +342,7 @@ export function AnalyseView() {
               {activeSheet === 'icicle' ? (
                 <Icicle {...chartProps} />
               ) : activeSheet === 'scatter' ? (
-                <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} />
+                <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} key="scatter" />
               ) : (
                 <Sunburst {...chartProps} />
               )}
@@ -623,6 +623,10 @@ function ScatterPlot({ plans, catalogue, shelfSide }: ScatterProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [logX, setLogX] = useState(false);
+  const [logY, setLogY] = useState(false);
+  const [maxX, setMaxX] = useState('');
+  const [maxY, setMaxY] = useState('');
 
   const points = useMemo(() => {
     const seen = new Set<string>();
@@ -668,41 +672,56 @@ function ScatterPlot({ plans, catalogue, shelfSide }: ScatterProps) {
     return map;
   }, [categories]);
 
+  const maxXNum = maxX ? Number(maxX) : undefined;
+  const maxYNum = maxY ? Number(maxY) : undefined;
+
   useEffect(() => {
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
     const { width, height } = dims;
-    const margin = { top: 56, right: 24, bottom: 40, left: 60 };
+    const margin = { top: 56, right: 12, bottom: 40, left: 60 };
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
     if (innerW < 20 || innerH < 20 || points.length === 0) return;
 
     const xExtent = d3.extent(points, (p) => p.margin) as [number, number];
     const yExtent = d3.extent(points, (p) => p.rrp) as [number, number];
-    const xPad = (xExtent[1] - xExtent[0]) * 0.08 || 1;
-    const yPad = (yExtent[1] - yExtent[0]) * 0.08 || 1;
 
-    const xScale = d3.scaleLinear().domain([xExtent[0] - xPad, xExtent[1] + xPad]).range([0, innerW]);
-    const yScale = d3.scaleLinear().domain([yExtent[0] - yPad, yExtent[1] + yPad]).range([innerH, 0]);
+    const xMax = (maxXNum != null && maxXNum > 0) ? maxXNum : xExtent[1];
+    const yMax = (maxYNum != null && maxYNum > 0) ? maxYNum : yExtent[1];
+
+    let xScale: d3.ScaleLogarithmic<number, number> | d3.ScaleLinear<number, number>;
+    let yScale: d3.ScaleLogarithmic<number, number> | d3.ScaleLinear<number, number>;
+
+    if (logX) {
+      const lo = Math.max(1, Math.min(...points.map((p) => p.margin).filter((v) => v > 0)));
+      xScale = d3.scaleLog().domain([lo * 0.8, xMax * 1.05]).range([0, innerW]).clamp(true);
+    } else {
+      const xPad = (xMax - xExtent[0]) * 0.05 || 1;
+      xScale = d3.scaleLinear().domain([xExtent[0] - xPad, xMax + xPad]).range([0, innerW]);
+    }
+
+    if (logY) {
+      const lo = Math.max(0.01, Math.min(...points.map((p) => p.rrp).filter((v) => v > 0)));
+      yScale = d3.scaleLog().domain([lo * 0.8, yMax * 1.05]).range([innerH, 0]).clamp(true);
+    } else {
+      const yPad = (yMax - yExtent[0]) * 0.05 || 1;
+      yScale = d3.scaleLinear().domain([yExtent[0] - yPad, yMax + yPad]).range([innerH, 0]);
+    }
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Axes
     const xAxis = d3.axisBottom(xScale).ticks(Math.floor(innerW / 80)).tickFormat((d) => `£${d3.format(',.0f')(d as number)}`);
     const yAxis = d3.axisLeft(yScale).ticks(Math.floor(innerH / 40)).tickFormat((d) => `£${d3.format(',.2f')(d as number)}`);
 
-    g.append('g').attr('transform', `translate(0,${innerH})`).call(xAxis)
-      .selectAll('text').attr('font-size', '8px');
-    g.append('g').call(yAxis)
-      .selectAll('text').attr('font-size', '8px');
+    g.append('g').attr('transform', `translate(0,${innerH})`).call(xAxis).selectAll('text').attr('font-size', '8px');
+    g.append('g').call(yAxis).selectAll('text').attr('font-size', '8px');
 
-    // Axis labels
     g.append('text').attr('x', innerW / 2).attr('y', innerH + 32).attr('text-anchor', 'middle')
-      .attr('font-size', '9px').attr('fill', '#666').text('Operating Margin (£)');
+      .attr('font-size', '9px').attr('fill', '#666').text(`Operating Margin (£)${logX ? ' — log' : ''}`);
     g.append('text').attr('x', -innerH / 2).attr('y', -44).attr('text-anchor', 'middle')
-      .attr('transform', 'rotate(-90)').attr('font-size', '9px').attr('fill', '#666').text('RRP (£)');
+      .attr('transform', 'rotate(-90)').attr('font-size', '9px').attr('fill', '#666').text(`RRP (£)${logY ? ' — log' : ''}`);
 
-    // Grid lines
     g.append('g').attr('class', 'grid-x').attr('transform', `translate(0,${innerH})`)
       .call(d3.axisBottom(xScale).ticks(Math.floor(innerW / 80)).tickSize(-innerH).tickFormat(() => ''))
       .selectAll('line').attr('stroke', '#eee');
@@ -711,8 +730,14 @@ function ScatterPlot({ plans, catalogue, shelfSide }: ScatterProps) {
       .selectAll('line').attr('stroke', '#eee');
     g.selectAll('.grid-x .domain, .grid-y .domain').remove();
 
-    // Points
-    g.selectAll('circle').data(points).join('circle')
+    // Filter points that are within the visible domain
+    const visiblePoints = points.filter((p) => {
+      if (logX && p.margin <= 0) return false;
+      if (logY && p.rrp <= 0) return false;
+      return true;
+    });
+
+    g.selectAll('circle').data(visiblePoints).join('circle')
       .attr('cx', (d) => xScale(d.margin))
       .attr('cy', (d) => yScale(d.rrp))
       .attr('r', 5)
@@ -745,20 +770,41 @@ function ScatterPlot({ plans, catalogue, shelfSide }: ScatterProps) {
         setTooltip(null);
       });
 
-    // Legend
-    const legendG = svg.append('g').attr('transform', `translate(${margin.left + innerW + 4},${margin.top})`);
+    // Legend — inside the plot area, top-right corner
+    const legendG = g.append('g').attr('transform', `translate(${innerW - 8},4)`);
     let ly = 0;
     for (const [cat] of categories) {
       const color = colorMap.get(cat) ?? '#999';
-      legendG.append('circle').attr('cx', 6).attr('cy', ly + 5).attr('r', 4).attr('fill', color);
-      legendG.append('text').attr('x', 14).attr('y', ly + 8).attr('font-size', '8px').attr('fill', '#555').text(cat);
-      ly += 14;
+      const labelW = cat.length * 5 + 18;
+      legendG.append('rect').attr('x', -labelW).attr('y', ly - 2).attr('width', labelW + 4).attr('height', 14)
+        .attr('fill', '#fff').attr('fill-opacity', 0.85).attr('rx', 2);
+      legendG.append('circle').attr('cx', -labelW + 6).attr('cy', ly + 5).attr('r', 4).attr('fill', color);
+      legendG.append('text').attr('x', -labelW + 14).attr('y', ly + 8).attr('font-size', '8px').attr('fill', '#555').text(cat);
+      ly += 15;
     }
-  }, [points, dims, wrapperRef, colorMap, categories]);
+  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXNum, maxYNum]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
+      <div className="scatter-controls">
+        <label className="scatter-control-item" title="Logarithmic X axis">
+          <input type="checkbox" checked={logX} onChange={(e) => setLogX(e.target.checked)} />
+          Log X
+        </label>
+        <label className="scatter-control-item" title="Logarithmic Y axis">
+          <input type="checkbox" checked={logY} onChange={(e) => setLogY(e.target.checked)} />
+          Log Y
+        </label>
+        <label className="scatter-control-item" title="Max X axis value (blank = auto)">
+          X max
+          <input type="number" className="scatter-limit-input" value={maxX} onChange={(e) => setMaxX(e.target.value)} placeholder="auto" />
+        </label>
+        <label className="scatter-control-item" title="Max Y axis value (blank = auto)">
+          Y max
+          <input type="number" className="scatter-limit-input" value={maxY} onChange={(e) => setMaxY(e.target.value)} placeholder="auto" />
+        </label>
+      </div>
       <ChartTooltip tooltip={tooltip} />
     </div>
   );
