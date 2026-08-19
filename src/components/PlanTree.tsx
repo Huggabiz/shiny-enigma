@@ -290,6 +290,25 @@ export function PlanTree() {
           >
             {isCollapsed ? '▸' : '▾'}
           </button>
+          {isAnalyse && plans.length > 0 && (() => {
+            const allIn = plans.every((p) => multiplanKeySet.has(`${p.id}:`));
+            return (
+              <input
+                type="checkbox"
+                className="plan-tree-multiplan-check"
+                checked={allIn}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => {
+                  for (const p of plans) {
+                    const key = `${p.id}:`;
+                    if (allIn) { if (multiplanKeySet.has(key)) toggleEntry(p.id, null); }
+                    else { if (!multiplanKeySet.has(key)) toggleEntry(p.id, null); }
+                  }
+                }}
+                title={allIn ? 'Remove all plans in this folder' : 'Add all plans in this folder'}
+              />
+            );
+          })()}
           <span className="plan-tree-folder-icon">{isCollapsed ? '📁' : '📂'}</span>
           {isEditing && renamable ? (
             <input

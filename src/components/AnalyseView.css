@@ -80,23 +80,6 @@
   background: #ffebee;
 }
 
-.analyse-show-segments {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: #555;
-  cursor: pointer;
-  user-select: none;
-}
-
-.analyse-show-segments input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  accent-color: #1976d2;
-  cursor: pointer;
-}
-
 .analyse-body {
   flex: 1;
   display: flex;
@@ -111,7 +94,7 @@
   align-items: center;
   justify-content: center;
   overflow: auto;
-  padding: 20px 20px 0;
+  padding: 12px 20px 0;
   min-height: 0;
 }
 
@@ -125,29 +108,6 @@
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   position: relative;
   overflow: hidden;
-}
-
-.analyse-canvas-header {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  padding: 16px 24px 0;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.analyse-canvas-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: #1a1a2e;
-}
-
-.analyse-canvas-header p {
-  margin: 2px 0 0;
-  font-size: 11px;
-  color: #888;
 }
 
 .analyse-sunburst {
@@ -189,23 +149,23 @@
   color: #ccc;
 }
 
-.scatter-controls {
-  position: absolute;
-  bottom: 8px;
-  right: 12px;
+/* Chart config bar — sits between canvas and sheet tabs */
+.analyse-chart-config {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 4px 10px;
+  padding: 6px 20px;
   font-size: 10px;
   color: #555;
-  z-index: 5;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.scatter-control-item {
+.analyse-config-item {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -213,14 +173,14 @@
   user-select: none;
 }
 
-.scatter-control-item input[type="checkbox"] {
+.analyse-config-item input[type="checkbox"] {
   width: 12px;
   height: 12px;
   accent-color: #1976d2;
   cursor: pointer;
 }
 
-.scatter-limit-input {
+.analyse-config-input {
   width: 52px;
   padding: 2px 4px;
   border: 1px solid #ccc;
@@ -229,8 +189,15 @@
   text-align: right;
 }
 
-.scatter-limit-input::placeholder {
+.analyse-config-input::placeholder {
   color: #bbb;
+}
+
+.analyse-config-separator {
+  width: 1px;
+  height: 14px;
+  background: #ddd;
+  flex-shrink: 0;
 }
 
 .analyse-empty {
