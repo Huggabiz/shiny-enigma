@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import html2canvas from 'html2canvas';
 import { useProjectStore } from '../store/useProjectStore';
 import { getActivePlan, getStages } from '../types';
 import type { Lens, MatrixCellAssignment, Product, RangePlan, Shelf, ShelfItem } from '../types';
@@ -254,6 +255,48 @@ export function AnalyseView() {
   const catColors = useMemo(() => assignCategoryColors(allCategories, storedColors), [allCategories, storedColors]);
 
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [hiddenCats, setHiddenCats] = useState<Set<string>>(new Set());
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [snipStatus, setSnipStatus] = useState<string | null>(null);
+
+  const handleSnip = useCallback(async () => {
+    if (!canvasRef.current) return;
+    try {
+      setSnipStatus('Capturing...');
+      const canvas = await html2canvas(canvasRef.current, { backgroundColor: '#ffffff', scale: 2 });
+      canvas.toBlob(async (blob) => {
+        if (!blob) { setSnipStatus('Failed'); return; }
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          setSnipStatus('Copied!');
+        } catch { setSnipStatus('Failed'); }
+        setTimeout(() => setSnipStatus(null), 1500);
+      }, 'image/png');
+    } catch { setSnipStatus('Failed'); setTimeout(() => setSnipStatus(null), 1500); }
+  }, []);
+
+  const scatterVisiblePoints = useMemo(() => {
+    if (activeSheet !== 'scatter') return [];
+    const seen = new Set<string>();
+    const pts: { rrp: number; margin: number; category: string }[] = [];
+    for (const plan of selectedPlans) {
+      const shelf = resolveShelf(plan, shelfSide);
+      if (!shelf) continue;
+      for (const item of shelf.items) {
+        const prod = getProductForItem(item, project?.catalogue ?? []);
+        if (!prod || seen.has(prod.id)) continue;
+        seen.add(prod.id);
+        const cat = prod.category || 'Uncategorised';
+        if (hiddenCats.has(cat)) continue;
+        const rrp = prod.rrp ?? 0, margin = prod.operatingMarginGbp ?? 0;
+        if (rrp <= 0 && margin === 0) continue;
+        if (scatterConfig.logX && margin <= 0) continue;
+        if (scatterConfig.logY && rrp <= 0) continue;
+        pts.push({ rrp, margin, category: cat });
+      }
+    }
+    return pts;
+  }, [activeSheet, selectedPlans, shelfSide, project?.catalogue, hiddenCats, scatterConfig.logX, scatterConfig.logY]);
 
   const setCatColor = useCallback((cat: string, color: string) => {
     const updated = { ...storedColors, [cat]: color };
@@ -338,8 +381,33 @@ export function AnalyseView() {
       ) : (
         <div className="analyse-body">
           <div className="analyse-canvas-wrapper">
-            <div className="analyse-canvas">
-              {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} /> : <Sunburst {...chartProps} />}
+            <div className="analyse-canvas-area">
+              <div className="analyse-canvas" ref={canvasRef}>
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : <Sunburst {...chartProps} />}
+              </div>
+              {activeSheet === 'scatter' && scatterVisiblePoints.length > 0 && (() => {
+                const pts = scatterVisiblePoints;
+                const n = pts.length;
+                const avgRrp = pts.reduce((s, p) => s + p.rrp, 0) / n;
+                const avgOm = pts.reduce((s, p) => s + p.margin, 0) / n;
+                const totalOm = pts.reduce((s, p) => s + p.margin, 0);
+                const totalRev = pts.reduce((s, p) => s + p.rrp, 0);
+                const cats = new Set(pts.map((p) => p.category));
+                return (
+                  <div className="analyse-stats-panel">
+                    <p className="analyse-stats-title">Key Stats</p>
+                    <div className="analyse-stat-row"><span className="analyse-stat-label">SKUs shown</span><span className="analyse-stat-value">{n}</span></div>
+                    <div className="analyse-stat-row"><span className="analyse-stat-label">Categories</span><span className="analyse-stat-value">{cats.size}</span></div>
+                    <div className="analyse-stat-row"><span className="analyse-stat-label">Avg RRP</span><span className="analyse-stat-value">£{avgRrp.toFixed(2)}</span></div>
+                    <div className="analyse-stat-row"><span className="analyse-stat-label">Avg OM (£) / SKU</span><span className="analyse-stat-value">£{avgOm >= 1e3 ? `${(avgOm / 1e3).toFixed(1)}K` : avgOm.toFixed(0)}</span></div>
+                    <div className="analyse-stat-row"><span className="analyse-stat-label">Total OM (£)</span><span className="analyse-stat-value">£{totalOm >= 1e6 ? `${(totalOm / 1e6).toFixed(1)}M` : totalOm >= 1e3 ? `${(totalOm / 1e3).toFixed(0)}K` : totalOm.toFixed(0)}</span></div>
+                    <div className="analyse-stat-row"><span className="analyse-stat-label">Total RRP</span><span className="analyse-stat-value">£{totalRev >= 1e3 ? `${(totalRev / 1e3).toFixed(0)}K` : totalRev.toFixed(0)}</span></div>
+                  </div>
+                );
+              })()}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', maxWidth: 1280, width: '100%', margin: '4px auto 0' }}>
+              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
           </div>
 
@@ -535,14 +603,10 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, show
 
 interface ScatterPoint { sku: string; name: string; category: string; subCategory: string; rrp: number; margin: number; }
 
-function ScatterPlot({ plans, catalogue, shelfSide, config, catColors }: { plans: RangePlan[]; catalogue: Product[]; shelfSide: string; config: ScatterConfig; catColors: Map<string, string> }) {
+function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCats, onToggleCat }: { plans: RangePlan[]; catalogue: Product[]; shelfSide: string; config: ScatterConfig; catColors: Map<string, string>; hiddenCats: Set<string>; onToggleCat: (cat: string) => void }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  const [hiddenCats, setHiddenCats] = useState<Set<string>>(new Set());
-  const toggleCat = useCallback((cat: string) => {
-    setHiddenCats((prev) => { const next = new Set(prev); if (next.has(cat)) next.delete(cat); else next.add(cat); return next; });
-  }, []);
 
   const points = useMemo(() => {
     const seen = new Set<string>(), pts: ScatterPoint[] = [];
@@ -649,10 +713,10 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors }: { plans
       row.append('circle').attr('cx', 4).attr('cy', 5).attr('r', 4).attr('fill', hidden ? '#ccc' : c).attr('stroke', hidden ? '#999' : 'none').attr('stroke-width', hidden ? 1 : 0);
       row.append('text').attr('x', 12).attr('y', 8).attr('font-size', '8px').attr('fill', hidden ? '#bbb' : '#555').text(cat);
       if (hidden) row.append('line').attr('x1', 0).attr('y1', 5).attr('x2', cat.length * 5.5 + 14).attr('y2', 5).attr('stroke', '#bbb').attr('stroke-width', 0.5);
-      row.on('click', () => toggleCat(cat));
+      row.on('click', () => onToggleCat(cat));
       ly += 16;
     }
-  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, toggleCat]);
+  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, onToggleCat]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }

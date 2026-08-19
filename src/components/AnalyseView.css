@@ -160,16 +160,78 @@
   min-height: 0;
 }
 
+.analyse-canvas-area {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  max-width: 1280px;
+  width: 100%;
+}
+
 .analyse-canvas {
   aspect-ratio: 16 / 9;
-  width: 100%;
-  max-width: 1280px;
+  flex: 1;
+  min-width: 0;
   background: #fff;
   border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   position: relative;
   overflow: hidden;
+}
+
+.analyse-stats-panel {
+  width: 180px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-left: none;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  font-size: 11px;
+  color: #333;
+}
+
+.analyse-stats-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin: 0;
+}
+
+.analyse-stat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.analyse-stat-label {
+  font-size: 9px;
+  color: #888;
+}
+
+.analyse-stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.analyse-snip-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  background: #fff;
+  color: #1976d2;
+  border: 1px solid #bbdefb;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.analyse-snip-btn:hover {
+  background: #e3f2fd;
 }
 
 .analyse-sunburst {
