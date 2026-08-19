@@ -153,7 +153,7 @@ interface ChartProps { plans: RangePlan[]; catalogue: Product[]; metric: Metric;
 
 // Per-sheet config state that persists across tab switches
 interface IcicleConfig { metric: Metric; aspMode: AspMode; showSegments: boolean; }
-interface ScatterConfig { logX: boolean; logY: boolean; maxX: string; maxY: string; dotSize: number; }
+interface ScatterConfig { logX: boolean; logY: boolean; maxX: string; maxY: string; dotSize: number; contours: boolean; }
 
 export function AnalyseView() {
   const { project, clearAnalyseEntries } = useProjectStore();
@@ -163,7 +163,7 @@ export function AnalyseView() {
 
   // Per-sheet config persisted across tab switches
   const [icicleConfig, setIcicleConfig] = useState<IcicleConfig>({ metric: 'revenue', aspMode: 'standard', showSegments: true });
-  const [scatterConfig, setScatterConfig] = useState<ScatterConfig>({ logX: false, logY: false, maxX: '', maxY: '', dotSize: 5 });
+  const [scatterConfig, setScatterConfig] = useState<ScatterConfig>({ logX: false, logY: false, maxX: '', maxY: '', dotSize: 5, contours: false });
   // Sunburst reuses icicle config for metric
 
   const analyseView = project?.analyseView ?? { entries: [] };
@@ -270,6 +270,8 @@ export function AnalyseView() {
                 <input type="range" min="2" max="12" step="1" value={scatterConfig.dotSize} onChange={(e) => updateScatter({ dotSize: Number(e.target.value) })} style={{ width: 60, height: 12 }} />
                 <span>{scatterConfig.dotSize}</span>
               </label>
+              <div className="analyse-config-separator" />
+              <label className="analyse-config-item"><input type="checkbox" checked={scatterConfig.contours} onChange={(e) => updateScatter({ contours: e.target.checked })} /> Contours</label>
             </div>
           )}
 
@@ -453,7 +455,7 @@ function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan
     } return m;
   }, [categories]);
 
-  const { logX, logY, dotSize } = config;
+  const { logX, logY, dotSize, contours } = config;
   const maxXN = config.maxX ? Number(config.maxX) : undefined;
   const maxYN = config.maxY ? Number(config.maxY) : undefined;
 
@@ -486,6 +488,36 @@ function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan
     g.selectAll('.gx .domain, .gy .domain').remove();
 
     const vis = points.filter((p) => { if (logX && p.margin <= 0) return false; if (logY && p.rrp <= 0) return false; return true; });
+
+    // Per-category density contours
+    if (contours && vis.length >= 3) {
+      const contourG = g.append('g').attr('class', 'contour-layer');
+      const catGroups = new Map<string, ScatterPoint[]>();
+      for (const p of vis) { if (!catGroups.has(p.category)) catGroups.set(p.category, []); catGroups.get(p.category)!.push(p); }
+
+      for (const [cat, catPts] of catGroups) {
+        if (catPts.length < 2) continue;
+        const catColor = colorMap.get(cat) ?? '#999';
+        const bandwidth = Math.max(iW, iH) * 0.06;
+        const density = d3.contourDensity<ScatterPoint>()
+          .x((d) => xScale(d.margin))
+          .y((d) => yScale(d.rrp))
+          .size([iW, iH])
+          .bandwidth(bandwidth)
+          .thresholds(6)(catPts);
+
+        const maxDensity = d3.max(density, (d) => d.value) ?? 1;
+
+        contourG.selectAll(`path.contour-${cat.replace(/\W/g, '_')}`)
+          .data(density)
+          .join('path')
+          .attr('d', d3.geoPath())
+          .attr('fill', catColor)
+          .attr('fill-opacity', (d) => 0.03 + (d.value / maxDensity) * 0.22)
+          .attr('stroke', 'none');
+      }
+    }
+
     g.selectAll('circle').data(vis).join('circle')
       .attr('cx', (d) => xScale(d.margin)).attr('cy', (d) => yScale(d.rrp)).attr('r', dotSize)
       .attr('fill', (d) => { const k = d.subCategory ? `${d.category}::${d.subCategory}` : d.category; return colorMap.get(k) ?? colorMap.get(d.category) ?? '#999'; })
@@ -504,7 +536,7 @@ function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan
       lG.append('text').attr('x', 12).attr('y', ly + 8).attr('font-size', '8px').attr('fill', '#555').text(cat);
       ly += 16;
     }
-  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize]);
+  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
