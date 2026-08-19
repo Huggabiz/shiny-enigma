@@ -117,16 +117,16 @@ function buildWithout(plans: RangePlan[], catalogue: Product[], metric: Metric, 
 }
 
 const RING_COLORS = [
-  ['#1976d2', '#2196f3', '#42a5f5', '#64b5f6', '#90caf9'],
-  ['#388e3c', '#43a047', '#66bb6a', '#81c784', '#a5d6a7'],
-  ['#f57c00', '#fb8c00', '#ffa726', '#ffb74d', '#ffcc80'],
-  ['#7b1fa2', '#8e24aa', '#ab47bc', '#ba68c8', '#ce93d8'],
-  ['#c62828', '#d32f2f', '#e53935', '#ef5350', '#ef9a9a'],
-  ['#00838f', '#0097a7', '#00acc1', '#26c6da', '#4dd0e1'],
-  ['#5d4037', '#6d4c41', '#8d6e63', '#a1887f', '#bcaaa4'],
-  ['#455a64', '#546e7a', '#78909c', '#90a4ae', '#b0bec5'],
-  ['#e91e63', '#ec407a', '#f06292', '#f48fb1', '#f8bbd0'],
-  ['#00bcd4', '#26c6da', '#4dd0e1', '#80deea', '#b2ebf2'],
+  ['#1976d2', '#2196f3', '#42a5f5', '#64b5f6', '#90caf9'],  // blue
+  ['#388e3c', '#43a047', '#66bb6a', '#81c784', '#a5d6a7'],  // green
+  ['#f57c00', '#fb8c00', '#ffa726', '#ffb74d', '#ffcc80'],  // orange
+  ['#7b1fa2', '#8e24aa', '#ab47bc', '#ba68c8', '#ce93d8'],  // purple
+  ['#c62828', '#d32f2f', '#e53935', '#ef5350', '#ef9a9a'],  // red
+  ['#00838f', '#0097a7', '#00acc1', '#26c6da', '#4dd0e1'],  // teal
+  ['#e91e63', '#ec407a', '#f06292', '#f48fb1', '#f8bbd0'],  // pink
+  ['#827717', '#9e9d24', '#c0ca33', '#d4e157', '#e6ee9c'],  // lime
+  ['#4527a0', '#512da8', '#7e57c2', '#9575cd', '#b39ddb'],  // deep purple
+  ['#bf360c', '#d84315', '#f4511e', '#ff7043', '#ff8a65'],  // deep orange
 ];
 
 function hashString(s: string): number {
@@ -473,6 +473,10 @@ function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [hiddenCats, setHiddenCats] = useState<Set<string>>(new Set());
+  const toggleCat = useCallback((cat: string) => {
+    setHiddenCats((prev) => { const next = new Set(prev); if (next.has(cat)) next.delete(cat); else next.add(cat); return next; });
+  }, []);
 
   const points = useMemo(() => {
     const seen = new Set<string>(), pts: ScatterPoint[] = [];
@@ -502,7 +506,7 @@ function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
     const { width, height } = dims;
-    const margin = { top: 12, right: 12, bottom: 40, left: 60 };
+    const margin = { top: 12, right: 12, bottom: 52, left: 60 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || points.length === 0) return;
 
@@ -518,16 +522,18 @@ function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan
     if (logY) { const lo = Math.max(0.01, Math.min(...points.map((p) => p.rrp).filter((v) => v > 0))); yScale = d3.scaleLog().domain([lo * 0.8, yMax * 1.05]).range([iH, 0]).clamp(true); }
     else { const p = (yMax - yE[0]) * 0.05 || 1; yScale = d3.scaleLinear().domain([yE[0] - p, yMax + p]).range([iH, 0]); }
 
+    const fmtK = (d: d3.NumberValue) => { const v = +d; if (Math.abs(v) >= 1e6) return `£${(v / 1e6).toFixed(1)}M`; if (Math.abs(v) >= 1e3) return `£${(v / 1e3).toFixed(0)}K`; return `£${v.toFixed(0)}`; };
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-    g.append('g').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xScale).ticks(Math.floor(iW / 80)).tickFormat((d) => `£${d3.format(',.0f')(d as number)}`)).selectAll('text').attr('font-size', '8px');
+    const xAxisG = g.append('g').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xScale).ticks(Math.floor(iW / 100)).tickFormat(fmtK));
+    xAxisG.selectAll('text').attr('font-size', '8px').attr('text-anchor', 'end').attr('transform', 'rotate(-45)').attr('dx', '-4px').attr('dy', '4px');
     g.append('g').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickFormat((d) => `£${d3.format(',.2f')(d as number)}`)).selectAll('text').attr('font-size', '8px');
-    g.append('text').attr('x', iW / 2).attr('y', iH + 32).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', '#666').text(`Operating Margin (£)${logX ? ' — log' : ''}`);
+    g.append('text').attr('x', iW / 2).attr('y', iH + 36).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', '#666').text(`Operating Margin (£)${logX ? ' — log' : ''}`);
     g.append('text').attr('x', -iH / 2).attr('y', -44).attr('text-anchor', 'middle').attr('transform', 'rotate(-90)').attr('font-size', '9px').attr('fill', '#666').text(`RRP (£)${logY ? ' — log' : ''}`);
-    g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xScale).ticks(Math.floor(iW / 80)).tickSize(-iH).tickFormat(() => '')).selectAll('line').attr('stroke', '#eee');
+    g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xScale).ticks(Math.floor(iW / 100)).tickSize(-iH).tickFormat(() => '')).selectAll('line').attr('stroke', '#eee');
     g.append('g').attr('class', 'gy').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickSize(-iW).tickFormat(() => '')).selectAll('line').attr('stroke', '#eee');
     g.selectAll('.gx .domain, .gy .domain').remove();
 
-    const vis = points.filter((p) => { if (logX && p.margin <= 0) return false; if (logY && p.rrp <= 0) return false; return true; });
+    const vis = points.filter((p) => { if (hiddenCats.has(p.category)) return false; if (logX && p.margin <= 0) return false; if (logY && p.rrp <= 0) return false; return true; });
 
     // Per-category density contours
     if (contours && vis.length >= 3) {
@@ -566,17 +572,21 @@ function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan
       .on('mousemove', function (ev) { const r = wrapperRef.current?.getBoundingClientRect(); if (r) setTooltip((p) => p ? { ...p, x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8 } : null); })
       .on('mouseleave', function () { d3.select(this).attr('r', dotSize).attr('fill-opacity', 0.75).attr('stroke-width', 1); setTooltip(null); });
 
-    // Legend — inside plot, top-left, vertically stacked
+    // Legend — inside plot, top-left, clickable to toggle category visibility
     const lG = g.append('g').attr('transform', 'translate(8, 4)');
     let ly = 0;
     for (const [cat] of categories) {
       const c = colorMap.get(cat) ?? '#999';
-      lG.append('rect').attr('x', -4).attr('y', ly - 3).attr('width', cat.length * 5.5 + 22).attr('height', 15).attr('fill', '#fff').attr('fill-opacity', 0.88).attr('rx', 2);
-      lG.append('circle').attr('cx', 4).attr('cy', ly + 5).attr('r', 4).attr('fill', c);
-      lG.append('text').attr('x', 12).attr('y', ly + 8).attr('font-size', '8px').attr('fill', '#555').text(cat);
+      const hidden = hiddenCats.has(cat);
+      const row = lG.append('g').attr('transform', `translate(0, ${ly})`).style('cursor', 'pointer');
+      row.append('rect').attr('x', -4).attr('y', -3).attr('width', cat.length * 5.5 + 22).attr('height', 15).attr('fill', '#fff').attr('fill-opacity', 0.88).attr('rx', 2);
+      row.append('circle').attr('cx', 4).attr('cy', 5).attr('r', 4).attr('fill', hidden ? '#ccc' : c).attr('stroke', hidden ? '#999' : 'none').attr('stroke-width', hidden ? 1 : 0);
+      row.append('text').attr('x', 12).attr('y', 8).attr('font-size', '8px').attr('fill', hidden ? '#bbb' : '#555').text(cat);
+      if (hidden) row.append('line').attr('x1', 0).attr('y1', 5).attr('x2', cat.length * 5.5 + 14).attr('y2', 5).attr('stroke', '#bbb').attr('stroke-width', 0.5);
+      row.on('click', () => toggleCat(cat));
       ly += 16;
     }
-  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours]);
+  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, toggleCat]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
