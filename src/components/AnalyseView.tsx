@@ -129,25 +129,44 @@ const RING_COLORS = [
   ['#bf360c', '#d84315', '#f4511e', '#ff7043', '#ff8a65'],  // deep orange
 ];
 
-function hashString(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
-  return Math.abs(h);
+const PALETTE_BASES = RING_COLORS.map((p) => p[0]);
+
+function paletteIndexForBase(base: string): number {
+  const idx = PALETTE_BASES.indexOf(base);
+  return idx >= 0 ? idx : 0;
 }
 
-function stableCategoryIndex(catName: string): number {
-  return hashString(catName) % RING_COLORS.length;
-}
-
-function getCategoryColor(node: d3.HierarchyNode<HierNode>, _root: d3.HierarchyNode<HierNode>): string {
+function getCategoryColorFromMap(node: d3.HierarchyNode<HierNode>, catColors: Map<string, string>): string {
   let a = node; while (a.depth > 1 && a.parent) a = a.parent;
-  const ci = stableCategoryIndex(a.data.name);
-  const p = RING_COLORS[ci];
+  const base = catColors.get(a.data.name) ?? PALETTE_BASES[0];
+  const pi = paletteIndexForBase(base);
+  const p = RING_COLORS[pi];
   return p[Math.min(node.depth - 1, p.length - 1)];
 }
 
-function stableCatColor(catName: string): string {
-  return RING_COLORS[stableCategoryIndex(catName)][0];
+function assignCategoryColors(
+  categories: string[],
+  stored: Record<string, string>,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  const usedIndices = new Set<number>();
+  for (const cat of categories) {
+    if (stored[cat]) {
+      map.set(cat, stored[cat]);
+      const idx = PALETTE_BASES.indexOf(stored[cat]);
+      if (idx >= 0) usedIndices.add(idx);
+    }
+  }
+  let nextIdx = 0;
+  for (const cat of categories) {
+    if (map.has(cat)) continue;
+    while (usedIndices.has(nextIdx) && nextIdx < PALETTE_BASES.length) nextIdx++;
+    const idx = nextIdx < PALETTE_BASES.length ? nextIdx : (nextIdx % PALETTE_BASES.length);
+    map.set(cat, PALETTE_BASES[idx]);
+    usedIndices.add(idx);
+    nextIdx++;
+  }
+  return map;
 }
 
 function fmtVal(v: number, metric: Metric): string {
@@ -167,7 +186,7 @@ function fmtMetric(value: number, metric: Metric, isLeaf: boolean, sc: number, a
   return fmtVal(value, 'rrp');
 }
 
-interface ChartProps { plans: RangePlan[]; catalogue: Product[]; metric: Metric; shelfSide: string; activeLens?: Lens | null; aspMode: AspMode; showSegments: boolean; }
+interface ChartProps { plans: RangePlan[]; catalogue: Product[]; metric: Metric; shelfSide: string; activeLens?: Lens | null; aspMode: AspMode; showSegments: boolean; catColors: Map<string, string>; }
 
 // Per-sheet config state that persists across tab switches
 interface IcicleConfig { metric: Metric; aspMode: AspMode; showSegments: boolean; }
@@ -218,12 +237,36 @@ export function AnalyseView() {
     return f.length > 0 ? f : all;
   }, [firstPlan, project]);
 
+  const allCategories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const plan of selectedPlans) {
+      const shelf = resolveShelf(plan, shelfSide);
+      if (!shelf) continue;
+      for (const item of shelf.items) {
+        const prod = getProductForItem(item, project?.catalogue ?? []);
+        if (prod) cats.add(prod.category || 'Uncategorised');
+      }
+    }
+    return Array.from(cats).sort();
+  }, [selectedPlans, shelfSide, project?.catalogue]);
+
+  const storedColors = av?.categoryColors ?? {};
+  const catColors = useMemo(() => assignCategoryColors(allCategories, storedColors), [allCategories, storedColors]);
+
+  const [showColorPicker, setShowColorPicker] = useState(false);
+
+  const setCatColor = useCallback((cat: string, color: string) => {
+    const updated = { ...storedColors, [cat]: color };
+    setAnalyseConfig({ categoryColors: updated });
+  }, [storedColors, setAnalyseConfig]);
+
   if (!project) return null;
 
   const chartProps: ChartProps = {
     plans: selectedPlans, catalogue: project.catalogue,
     metric: icicleConfig.metric, shelfSide, activeLens,
     aspMode: icicleConfig.aspMode, showSegments: icicleConfig.showSegments,
+    catColors,
   };
 
   const updateIcicle = (patch: Partial<IcicleConfig>) => {
@@ -257,6 +300,29 @@ export function AnalyseView() {
               {activeLens.name}
             </span>
           )}
+          {allCategories.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <button className="analyse-clear" style={{ color: '#1976d2', borderColor: '#bbdefb' }} onClick={() => setShowColorPicker((v) => !v)}>Colors</button>
+              {showColorPicker && (
+                <div className="analyse-color-picker">
+                  {allCategories.map((cat) => {
+                    const current = catColors.get(cat) ?? PALETTE_BASES[0];
+                    return (
+                      <div key={cat} className="analyse-color-row">
+                        <span className="analyse-color-swatch" style={{ background: current }} />
+                        <span className="analyse-color-cat">{cat}</span>
+                        <div className="analyse-color-options">
+                          {PALETTE_BASES.map((base, i) => (
+                            <button key={i} className={`analyse-color-option ${base === current ? 'selected' : ''}`} style={{ background: base }} onClick={() => setCatColor(cat, base)} title={`Palette ${i + 1}`} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           <span className="analyse-toolbar-meta">{selectedPlans.length} plan{selectedPlans.length === 1 ? '' : 's'}</span>
           {entries.length > 0 && (
             <button className="analyse-clear" onClick={() => { if (confirm('Clear all selected plans from analyse view?')) clearAnalyseEntries(); }}>Clear</button>
@@ -273,7 +339,7 @@ export function AnalyseView() {
         <div className="analyse-body">
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas">
-              {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} /> : <Sunburst {...chartProps} />}
+              {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} /> : <Sunburst {...chartProps} />}
             </div>
           </div>
 
@@ -356,7 +422,7 @@ function ChartTooltip({ tooltip }: { tooltip: TooltipState | null }) {
 
 // ---------- Sunburst ----------
 
-function Sunburst({ plans, catalogue, metric, shelfSide, showSegments }: ChartProps) {
+function Sunburst({ plans, catalogue, metric, shelfSide, showSegments, catColors }: ChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -374,7 +440,7 @@ function Sunburst({ plans, catalogue, metric, shelfSide, showSegments }: ChartPr
     type RN = d3.HierarchyRectangularNode<HierNode>;
     const nodes = (part.descendants() as RN[]).filter((d) => d.depth > 0);
     const dn = showSegments ? ['', 'Category', 'Plan', 'Segment', 'SKU'] : ['', 'Category', 'Plan', 'SKU'];
-    g.selectAll('path').data(nodes).join('path').attr('d', arc as any).attr('fill', (d) => getCategoryColor(d, part)).attr('fill-opacity', (d) => 1 - d.depth * 0.08).attr('stroke', '#fff').attr('stroke-width', 0.5).style('cursor', 'pointer')
+    g.selectAll('path').data(nodes).join('path').attr('d', arc as any).attr('fill', (d) => getCategoryColorFromMap(d, catColors)).attr('fill-opacity', (d) => 1 - d.depth * 0.08).attr('stroke', '#fff').attr('stroke-width', 0.5).style('cursor', 'pointer')
       .on('mouseenter', function (ev, d) { d3.select(this).attr('fill-opacity', 1); const r = wrapperRef.current?.getBoundingClientRect(); if (r) setTooltip({ x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8, label: d.data.name, value: fmtVal(d.value ?? 0, metric), depth: dn[d.depth] ?? '' }); })
       .on('mousemove', function (ev) { const r = wrapperRef.current?.getBoundingClientRect(); if (r) setTooltip((p) => p ? { ...p, x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8 } : null); })
       .on('mouseleave', function (_, d) { d3.select(this).attr('fill-opacity', 1 - d.depth * 0.08); setTooltip(null); });
@@ -386,7 +452,7 @@ function Sunburst({ plans, catalogue, metric, shelfSide, showSegments }: ChartPr
       .attr('transform', (d) => { const a = ((d.x0 + d.x1) / 2) * (180 / Math.PI) - 90, r = (d.y0 + d.y1) / 2; return `rotate(${a}) translate(${r},0) rotate(${a > 90 ? 180 : 0})`; })
       .attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', '9px').attr('font-weight', '600').attr('fill', '#fff')
       .text((d) => { const m = Math.floor(((d.x1 - d.x0) * (d.y0 + d.y1) / 2) / 5.5); return d.data.name.length > m ? d.data.name.slice(0, m - 1) + '…' : d.data.name; });
-  }, [data, dims, metric, wrapperRef, showSegments]);
+  }, [data, dims, metric, wrapperRef, showSegments, catColors]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
@@ -404,7 +470,7 @@ function isInLens(n: d3.HierarchyNode<HierNode>, lens: Lens, sk: string): boolea
   return lens.productIds.includes(n.data.productId);
 }
 
-function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, showSegments }: ChartProps) {
+function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, showSegments, catColors }: ChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -429,7 +495,7 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, show
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
     g.selectAll('rect').data(nodes).join('rect')
       .attr('x', (d) => d.y0).attr('y', (d) => d.x0).attr('width', (d) => Math.max(0, d.y1 - d.y0 - 1)).attr('height', (d) => Math.max(0, d.x1 - d.x0))
-      .attr('fill', (d) => (d.depth === leaf && activeLens && isInLens(d, activeLens, shelfSide)) ? activeLens.color : getCategoryColor(d, part))
+      .attr('fill', (d) => (d.depth === leaf && activeLens && isInLens(d, activeLens, shelfSide)) ? activeLens.color : getCategoryColorFromMap(d, catColors))
       .attr('fill-opacity', (d) => (d.depth === leaf && activeLens && isInLens(d, activeLens, shelfSide)) ? 0.85 : 1 - d.depth * 0.06)
       .attr('rx', 2).style('cursor', 'pointer')
       .on('mouseenter', function (ev, d) {
@@ -458,18 +524,18 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, show
       const my = vis.length * lH + lH * 0.75;
       if (my + 2 < cH) gr.append('text').attr('x', 0).attr('y', my).attr('font-size', `${Math.max(7, fs - 1)}px`).attr('font-weight', '400').attr('fill', dk ? 'rgba(255,255,255,0.8)' : '#555').text(mt.length > mxC ? mt.slice(0, mxC - 1) + '…' : mt);
     });
-  }, [data, dims, metric, wrapperRef, activeLens, shelfSide, aspMode, cw, md, dl]);
+  }, [data, dims, metric, wrapperRef, activeLens, shelfSide, aspMode, cw, md, dl, catColors]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
 
 // ---------- Scatter ----------
 
-// Scatter uses stableCatColor for consistent category coloring
+// ---------- Scatter ----------
 
 interface ScatterPoint { sku: string; name: string; category: string; subCategory: string; rrp: number; margin: number; }
 
-function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan[]; catalogue: Product[]; shelfSide: string; config: ScatterConfig }) {
+function ScatterPlot({ plans, catalogue, shelfSide, config, catColors }: { plans: RangePlan[]; catalogue: Product[]; shelfSide: string; config: ScatterConfig; catColors: Map<string, string> }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -494,10 +560,10 @@ function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan
   const colorMap = useMemo(() => {
     const m = new Map<string, string>();
     for (const [cat, subs] of categories) {
-      const b = stableCatColor(cat); m.set(cat, b);
+      const b = catColors.get(cat) ?? PALETTE_BASES[0]; m.set(cat, b);
       Array.from(subs).forEach((sub, si, arr) => { m.set(`${cat}::${sub}`, d3.interpolateLab(b, '#fff')(0.15 + (si / Math.max(1, arr.length)) * 0.35)); });
     } return m;
-  }, [categories]);
+  }, [categories, catColors]);
 
   const { logX, logY, dotSize, contours } = config;
   const maxXN = config.maxX ? Number(config.maxX) : undefined;

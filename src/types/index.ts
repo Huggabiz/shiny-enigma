@@ -515,6 +515,7 @@ export interface Project {
     icicleConfig?: { metric?: string; aspMode?: string; showSegments?: boolean };
     scatterConfig?: { logX?: boolean; logY?: boolean; maxX?: string; maxY?: string; dotSize?: number; contours?: boolean };
     activeSheet?: string;
+    categoryColors?: Record<string, string>;
   };
   /** SHA-256 hex hash of the lock password. When present the project is
    * locked — edits are blocked until the user supplies the matching

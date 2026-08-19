@@ -80,6 +80,68 @@
   background: #ffebee;
 }
 
+.analyse-color-picker {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 8px 10px;
+  min-width: 220px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.analyse-color-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+
+.analyse-color-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.analyse-color-cat {
+  font-size: 11px;
+  color: #333;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.analyse-color-options {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.analyse-color-option {
+  width: 14px;
+  height: 14px;
+  border: 2px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.analyse-color-option:hover {
+  border-color: #999;
+}
+
+.analyse-color-option.selected {
+  border-color: #333;
+}
+
 .analyse-body {
   flex: 1;
   display: flex;
