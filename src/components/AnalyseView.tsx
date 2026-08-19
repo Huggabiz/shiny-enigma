@@ -123,13 +123,31 @@ const RING_COLORS = [
   ['#7b1fa2', '#8e24aa', '#ab47bc', '#ba68c8', '#ce93d8'],
   ['#c62828', '#d32f2f', '#e53935', '#ef5350', '#ef9a9a'],
   ['#00838f', '#0097a7', '#00acc1', '#26c6da', '#4dd0e1'],
+  ['#5d4037', '#6d4c41', '#8d6e63', '#a1887f', '#bcaaa4'],
+  ['#455a64', '#546e7a', '#78909c', '#90a4ae', '#b0bec5'],
+  ['#e91e63', '#ec407a', '#f06292', '#f48fb1', '#f8bbd0'],
+  ['#00bcd4', '#26c6da', '#4dd0e1', '#80deea', '#b2ebf2'],
 ];
 
-function getCategoryColor(node: d3.HierarchyNode<HierNode>, root: d3.HierarchyNode<HierNode>): string {
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+  return Math.abs(h);
+}
+
+function stableCategoryIndex(catName: string): number {
+  return hashString(catName) % RING_COLORS.length;
+}
+
+function getCategoryColor(node: d3.HierarchyNode<HierNode>, _root: d3.HierarchyNode<HierNode>): string {
   let a = node; while (a.depth > 1 && a.parent) a = a.parent;
-  const ci = (root.children ?? []).indexOf(a) % RING_COLORS.length;
-  const p = RING_COLORS[ci < 0 ? 0 : ci];
+  const ci = stableCategoryIndex(a.data.name);
+  const p = RING_COLORS[ci];
   return p[Math.min(node.depth - 1, p.length - 1)];
+}
+
+function stableCatColor(catName: string): string {
+  return RING_COLORS[stableCategoryIndex(catName)][0];
 }
 
 function fmtVal(v: number, metric: Metric): string {
@@ -155,15 +173,26 @@ interface ChartProps { plans: RangePlan[]; catalogue: Product[]; metric: Metric;
 interface IcicleConfig { metric: Metric; aspMode: AspMode; showSegments: boolean; }
 interface ScatterConfig { logX: boolean; logY: boolean; maxX: string; maxY: string; dotSize: number; contours: boolean; }
 
+const DEFAULT_ICICLE: IcicleConfig = { metric: 'revenue', aspMode: 'standard', showSegments: true };
+const DEFAULT_SCATTER: ScatterConfig = { logX: false, logY: false, maxX: '', maxY: '', dotSize: 5, contours: false };
+
 export function AnalyseView() {
-  const { project, clearAnalyseEntries } = useProjectStore();
+  const { project, clearAnalyseEntries, setAnalyseConfig } = useProjectStore();
 
+  const av = project?.analyseView;
   const [shelfSide, setShelfSide] = useState('current');
-  const [activeSheet, setActiveSheet] = useState<SheetId>('icicle');
+  const [activeSheet, setActiveSheet] = useState<SheetId>((av?.activeSheet as SheetId) || 'icicle');
 
-  // Per-sheet config persisted across tab switches
-  const [icicleConfig, setIcicleConfig] = useState<IcicleConfig>({ metric: 'revenue', aspMode: 'standard', showSegments: true });
-  const [scatterConfig, setScatterConfig] = useState<ScatterConfig>({ logX: false, logY: false, maxX: '', maxY: '', dotSize: 5, contours: false });
+  const [icicleConfig, setIcicleConfig] = useState<IcicleConfig>(() => ({
+    ...DEFAULT_ICICLE,
+    ...(av?.icicleConfig?.metric && { metric: av.icicleConfig.metric as Metric }),
+    ...(av?.icicleConfig?.aspMode && { aspMode: av.icicleConfig.aspMode as AspMode }),
+    ...(av?.icicleConfig?.showSegments != null && { showSegments: av.icicleConfig.showSegments }),
+  }));
+  const [scatterConfig, setScatterConfig] = useState<ScatterConfig>(() => ({
+    ...DEFAULT_SCATTER,
+    ...av?.scatterConfig,
+  }));
   // Sunburst reuses icicle config for metric
 
   const analyseView = project?.analyseView ?? { entries: [] };
@@ -197,8 +226,20 @@ export function AnalyseView() {
     aspMode: icicleConfig.aspMode, showSegments: icicleConfig.showSegments,
   };
 
-  const updateIcicle = (patch: Partial<IcicleConfig>) => setIcicleConfig((c) => ({ ...c, ...patch }));
-  const updateScatter = (patch: Partial<ScatterConfig>) => setScatterConfig((c) => ({ ...c, ...patch }));
+  const updateIcicle = (patch: Partial<IcicleConfig>) => {
+    setIcicleConfig((c) => {
+      const next = { ...c, ...patch };
+      setAnalyseConfig({ icicleConfig: next });
+      return next;
+    });
+  };
+  const updateScatter = (patch: Partial<ScatterConfig>) => {
+    setScatterConfig((c) => {
+      const next = { ...c, ...patch };
+      setAnalyseConfig({ scatterConfig: next });
+      return next;
+    });
+  };
 
   return (
     <div className="analyse-view">
@@ -277,7 +318,7 @@ export function AnalyseView() {
 
           <div className="analyse-sheet-tabs">
             {SHEETS.map((s) => (
-              <button key={s.id} className={`analyse-sheet-tab ${activeSheet === s.id ? 'active' : ''}`} onClick={() => setActiveSheet(s.id)}>{s.label}</button>
+              <button key={s.id} className={`analyse-sheet-tab ${activeSheet === s.id ? 'active' : ''}`} onClick={() => { setActiveSheet(s.id); setAnalyseConfig({ activeSheet: s.id }); }}>{s.label}</button>
             ))}
           </div>
         </div>
@@ -424,7 +465,7 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, show
 
 // ---------- Scatter ----------
 
-const SCAT_COLORS = ['#1976d2', '#388e3c', '#f57c00', '#7b1fa2', '#c62828', '#00838f', '#5d4037', '#455a64', '#e91e63', '#00bcd4', '#8bc34a', '#ff9800'];
+// Scatter uses stableCatColor for consistent category coloring
 
 interface ScatterPoint { sku: string; name: string; category: string; subCategory: string; rrp: number; margin: number; }
 
@@ -447,11 +488,10 @@ function ScatterPlot({ plans, catalogue, shelfSide, config }: { plans: RangePlan
   const categories = useMemo(() => { const m = new Map<string, Set<string>>(); for (const p of points) { if (!m.has(p.category)) m.set(p.category, new Set()); if (p.subCategory) m.get(p.category)!.add(p.subCategory); } return m; }, [points]);
 
   const colorMap = useMemo(() => {
-    const m = new Map<string, string>(); let i = 0;
+    const m = new Map<string, string>();
     for (const [cat, subs] of categories) {
-      const b = SCAT_COLORS[i % SCAT_COLORS.length]; m.set(cat, b);
+      const b = stableCatColor(cat); m.set(cat, b);
       Array.from(subs).forEach((sub, si, arr) => { m.set(`${cat}::${sub}`, d3.interpolateLab(b, '#fff')(0.15 + (si / Math.max(1, arr.length)) * 0.35)); });
-      i++;
     } return m;
   }, [categories]);
 

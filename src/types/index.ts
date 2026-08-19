@@ -510,7 +510,12 @@ export interface Project {
   multiplanListView?: MultiplanViewState;
   /** Analyse view state — which plans to include in the analysis
    * dashboard. Reuses MultiplanEntry for plan selection. */
-  analyseView?: { entries: MultiplanEntry[] };
+  analyseView?: {
+    entries: MultiplanEntry[];
+    icicleConfig?: { metric?: string; aspMode?: string; showSegments?: boolean };
+    scatterConfig?: { logX?: boolean; logY?: boolean; maxX?: string; maxY?: string; dotSize?: number; contours?: boolean };
+    activeSheet?: string;
+  };
   /** SHA-256 hex hash of the lock password. When present the project is
    * locked — edits are blocked until the user supplies the matching
    * password. Navigation (view switching, scrolling) still works. */

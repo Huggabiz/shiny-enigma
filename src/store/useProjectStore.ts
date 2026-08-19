@@ -154,6 +154,7 @@ interface ProjectStore {
   // Analyse view — plan selection for the analysis dashboard
   toggleAnalyseEntry: (planId: string, variantId: string | null) => void;
   clearAnalyseEntries: () => void;
+  setAnalyseConfig: (patch: Record<string, unknown>) => void;
 
   // Lens management — see types/Lens for the data model.
   createLens: (name: string, scope?: 'global' | 'per-stage') => void;
@@ -703,6 +704,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!project) return;
     const current = project.analyseView ?? { entries: [] };
     set({ project: { ...project, analyseView: { ...current, entries: [] }, updatedAt: new Date().toISOString() } });
+  },
+
+  setAnalyseConfig: (patch) => {
+    const { project } = get();
+    if (!project) return;
+    const current = project.analyseView ?? { entries: [] };
+    set({ project: { ...project, analyseView: { ...current, ...patch }, updatedAt: new Date().toISOString() } });
   },
 
   // Lens management — Lens is project-level state. The built-in Dev
