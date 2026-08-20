@@ -388,9 +388,6 @@ export function AnalyseView() {
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} catColors={catColors} />}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', maxWidth: 1280, width: '100%', margin: '4px auto 0' }}>
-              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
-            </div>
           </div>
 
           {/* Per-chart config bar */}
@@ -413,6 +410,8 @@ export function AnalyseView() {
                   Segments
                 </label>
               )}
+              <span style={{ flex: 1 }} />
+              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
           )}
           {activeSheet === 'scatter' && (
@@ -429,6 +428,8 @@ export function AnalyseView() {
               </label>
               <div className="analyse-config-separator" />
               <label className="analyse-config-item"><input type="checkbox" checked={scatterConfig.contours} onChange={(e) => updateScatter({ contours: e.target.checked })} /> Contours</label>
+              <span style={{ flex: 1 }} />
+              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
           )}
 
