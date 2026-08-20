@@ -256,6 +256,7 @@ export function AnalyseView() {
 
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [hiddenCats, setHiddenCats] = useState<Set<string>>(new Set());
+  const [growthPct, setGrowthPct] = useState(5);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [snipStatus, setSnipStatus] = useState<string | null>(null);
 
@@ -385,26 +386,7 @@ export function AnalyseView() {
               <div className="analyse-canvas" ref={canvasRef}>
                 {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : <Sunburst {...chartProps} />}
               </div>
-              {activeSheet === 'scatter' && scatterVisiblePoints.length > 0 && (() => {
-                const pts = scatterVisiblePoints;
-                const n = pts.length;
-                const avgRrp = pts.reduce((s, p) => s + p.rrp, 0) / n;
-                const avgOm = pts.reduce((s, p) => s + p.margin, 0) / n;
-                const totalOm = pts.reduce((s, p) => s + p.margin, 0);
-                const totalRev = pts.reduce((s, p) => s + p.rrp, 0);
-                const cats = new Set(pts.map((p) => p.category));
-                return (
-                  <div className="analyse-stats-panel">
-                    <p className="analyse-stats-title">Key Stats</p>
-                    <div className="analyse-stat-row"><span className="analyse-stat-label">SKUs shown</span><span className="analyse-stat-value">{n}</span></div>
-                    <div className="analyse-stat-row"><span className="analyse-stat-label">Categories</span><span className="analyse-stat-value">{cats.size}</span></div>
-                    <div className="analyse-stat-row"><span className="analyse-stat-label">Avg RRP</span><span className="analyse-stat-value">£{avgRrp.toFixed(2)}</span></div>
-                    <div className="analyse-stat-row"><span className="analyse-stat-label">Avg OM (£) / SKU</span><span className="analyse-stat-value">£{avgOm >= 1e3 ? `${(avgOm / 1e3).toFixed(1)}K` : avgOm.toFixed(0)}</span></div>
-                    <div className="analyse-stat-row"><span className="analyse-stat-label">Total OM (£)</span><span className="analyse-stat-value">£{totalOm >= 1e6 ? `${(totalOm / 1e6).toFixed(1)}M` : totalOm >= 1e3 ? `${(totalOm / 1e3).toFixed(0)}K` : totalOm.toFixed(0)}</span></div>
-                    <div className="analyse-stat-row"><span className="analyse-stat-label">Total RRP</span><span className="analyse-stat-value">£{totalRev >= 1e3 ? `${(totalRev / 1e3).toFixed(0)}K` : totalRev.toFixed(0)}</span></div>
-                  </div>
-                );
-              })()}
+              {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} catColors={catColors} />}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', maxWidth: 1280, width: '100%', margin: '4px auto 0' }}>
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
@@ -719,4 +701,72 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
   }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, onToggleCat]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
+}
+
+// ---------- Scatter Stats Panel ----------
+
+function fmtGbp(v: number): string {
+  if (Math.abs(v) >= 1e6) return `£${(v / 1e6).toFixed(1)}M`;
+  if (Math.abs(v) >= 1e3) return `£${(v / 1e3).toFixed(1)}K`;
+  return `£${v.toFixed(0)}`;
+}
+
+function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
+  points: { rrp: number; margin: number; category: string }[];
+  growthPct: number;
+  onGrowthChange: (v: number) => void;
+  catColors: Map<string, string>;
+}) {
+  if (points.length === 0) return null;
+  const n = points.length;
+  const avgRrp = points.reduce((s, p) => s + p.rrp, 0) / n;
+  const avgOm = points.reduce((s, p) => s + p.margin, 0) / n;
+  const totalOm = points.reduce((s, p) => s + p.margin, 0);
+
+  const catMap = new Map<string, { total: number; count: number }>();
+  for (const p of points) {
+    const e = catMap.get(p.category) ?? { total: 0, count: 0 };
+    e.total += p.margin; e.count++; catMap.set(p.category, e);
+  }
+
+  return (
+    <div className="analyse-stats-panel">
+      <p className="analyse-stats-title">Key Stats</p>
+      <div className="analyse-stat-row"><span className="analyse-stat-label">SKUs shown</span><span className="analyse-stat-value">{n}</span></div>
+      <div className="analyse-stat-row"><span className="analyse-stat-label">Avg RRP</span><span className="analyse-stat-value">£{avgRrp.toFixed(2)}</span></div>
+      <div className="analyse-stat-row"><span className="analyse-stat-label">Avg OM (£) / SKU</span><span className="analyse-stat-value">{fmtGbp(avgOm)}</span></div>
+      <div className="analyse-stat-row"><span className="analyse-stat-label">Total OM (£)</span><span className="analyse-stat-value">{fmtGbp(totalOm)}</span></div>
+
+      <div style={{ borderTop: '1px solid #eee', paddingTop: 8, marginTop: 4 }}>
+        <p className="analyse-stats-title">Growth Target</p>
+        <div className="analyse-stat-row" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <input
+            type="number" min="1" max="100" step="1"
+            className="analyse-config-input" style={{ width: 40 }}
+            value={growthPct} onChange={(e) => onGrowthChange(Math.max(1, Number(e.target.value) || 5))}
+          />
+          <span className="analyse-stat-label">% growth</span>
+        </div>
+        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {Array.from(catMap).map(([cat, { total, count }]) => {
+            const avgCatOm = total / count;
+            const target = total * (growthPct / 100);
+            const skusNeeded = avgCatOm > 0 ? Math.ceil(target / avgCatOm) : 0;
+            const color = catColors.get(cat) ?? '#999';
+            return (
+              <div key={cat} style={{ fontSize: 9 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  <span style={{ fontWeight: 600, color: '#333' }}>{cat}</span>
+                </div>
+                <div style={{ paddingLeft: 10, color: '#666' }}>
+                  +{skusNeeded} SKU{skusNeeded !== 1 ? 's' : ''} @ avg {fmtGbp(avgCatOm)}/SKU = {fmtGbp(target)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
