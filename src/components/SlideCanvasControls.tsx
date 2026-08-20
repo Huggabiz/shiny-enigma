@@ -4,6 +4,11 @@ import { getActivePlan } from '../types';
 interface SlideCanvasControlsProps {
   /** CSS selector for the scroll area whose size drives fit-to-width. */
   scrollAreaSelector?: string;
+  /** Override for applying a size selection. Views whose canvas is NOT
+   * backed by the active plan's slideSettings (e.g. the Set Lab) pass
+   * this to write the store's scale/mode directly — the default path
+   * persists to the plan and relies on App's mirror to apply it. */
+  onSizeChange?: (mode: 'auto' | 'manual', scale?: number) => void;
 }
 
 const SLIDE_LOGICAL_WIDTH = 1100;
@@ -43,7 +48,7 @@ export function fitSlideToWidth(scrollAreaSelector: string): void {
  * auto-computed resolution tier, nudge the zoom up / down, fit the slide
  * to the viewport width, and reset zoom.
  */
-export function SlideCanvasControls({ scrollAreaSelector }: SlideCanvasControlsProps) {
+export function SlideCanvasControls({ scrollAreaSelector, onSizeChange }: SlideCanvasControlsProps) {
   const {
     slideBaseScale, slideBaseScaleMode,
     slideZoom, setSlideZoom,
@@ -57,6 +62,11 @@ export function SlideCanvasControls({ scrollAreaSelector }: SlideCanvasControlsP
   const viewKey: 'transform' | 'range' = activeView === 'transform' ? 'transform' : 'range';
 
   const onResolutionChange = (value: string) => {
+    if (onSizeChange) {
+      if (value === 'auto') onSizeChange('auto');
+      else onSizeChange('manual', Number(value));
+      return;
+    }
     if (!activePlan) return;
     if (value === 'auto') {
       setPlanSlideSize(activePlan.id, viewKey, { mode: 'auto' });

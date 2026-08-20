@@ -385,7 +385,13 @@ export function SetLab() {
         <div className="range-design-canvas">
           <div className="range-design-title-bar">
             <div className="range-design-canvas-controls" style={{ marginLeft: 'auto' }}>
-              <SlideCanvasControls scrollAreaSelector=".range-view-scroll" />
+              <SlideCanvasControls
+                scrollAreaSelector=".range-view-scroll"
+                onSizeChange={(mode, scale) => {
+                  setSlideBaseScaleMode(mode);
+                  if (mode === 'manual' && scale) setSlideBaseScale(scale);
+                }}
+              />
             </div>
           </div>
 
@@ -606,14 +612,14 @@ function SetComponentCard({ product, quantity, catalogue, onRemove }: {
   const displayName = anon.name;
   const isDev = product.source === 'dev';
 
-  // Stack visual: quantity > 1 renders offset "shadow" layers behind the card.
+  // Stack visual: quantity > 1 gives the card layered box-shadows that
+  // read as more cards underneath. Shadows always paint behind their
+  // element, so the ordering can never invert against neighbours.
   const stackLayers = Math.min(quantity - 1, 2);
 
   return (
-    <div className="slab-stack" style={{ marginRight: stackLayers * 4, marginBottom: stackLayers * 3 }}>
-      {Array.from({ length: stackLayers }).map((_, i) => (
-        <div key={i} className="slab-stack-layer" style={{ top: (i + 1) * 3, left: (i + 1) * 4 }} />
-      ))}
+    <div className={`slab-stack ${stackLayers > 0 ? `stack-${stackLayers}` : ''}`}
+      style={{ marginRight: stackLayers * 3, marginBottom: stackLayers * 3 }}>
       <div className={`matrix-card ${isDev ? 'dev-product' : ''}`}>
         <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }} title={quantity > 1 ? 'Remove one' : 'Remove'}>
           <CloseIcon size={8} color="#fff" />
