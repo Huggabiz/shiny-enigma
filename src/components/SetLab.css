@@ -5,6 +5,8 @@
   min-width: 0;
 }
 
+/* ---------- Board sidebar ---------- */
+
 .slab-sidebar {
   width: 220px;
   flex-shrink: 0;
@@ -110,6 +112,8 @@
   color: #c62828;
 }
 
+/* ---------- Main area ---------- */
+
 .slab-main {
   flex: 1;
   display: flex;
@@ -136,7 +140,6 @@
 }
 
 .slab-toolbar-actions {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -149,67 +152,27 @@
   min-height: 0;
 }
 
-.slab-matrix-area {
+.slab-matrix-scroll {
   flex: 1;
   overflow: auto;
-  padding: 16px;
   min-width: 0;
 }
 
-.slab-matrix {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.slab-matrix-wrapper {
+  padding: 16px;
   min-width: fit-content;
 }
 
-.slab-matrix-header-row {
-  display: flex;
-  gap: 2px;
-  margin-left: 120px;
-}
-
-.slab-matrix-col-label {
-  width: 200px;
-  padding: 6px 8px;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #888;
-  background: #f5f5f5;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.slab-matrix-row {
-  display: flex;
-  gap: 2px;
-}
-
-.slab-matrix-row-label {
-  width: 120px;
-  flex-shrink: 0;
-  padding: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #888;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
+/* ---------- Matrix cells ---------- */
 
 .slab-cell {
-  width: 200px;
-  min-height: 100px;
   background: #fafafa;
   border: 1px dashed #ddd;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 4px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   transition: background 0.1s;
 }
 
@@ -219,13 +182,14 @@
   border-style: solid;
 }
 
+/* ---------- Set/Bundle card ---------- */
+
 .slab-set-card {
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
-  padding: 8px;
+  padding: 6px;
   font-size: 11px;
-  position: relative;
 }
 
 .slab-set-card.kind-set {
@@ -234,6 +198,10 @@
 
 .slab-set-card.kind-bundle {
   border-left: 3px solid #f57c00;
+}
+
+.slab-set-card.drop-over {
+  box-shadow: 0 0 0 2px #1976d2;
 }
 
 .slab-set-card-header {
@@ -245,13 +213,15 @@
 
 .slab-set-card-name {
   font-weight: 700;
+  font-size: 10px;
   color: #1a1a2e;
   flex: 1;
   min-width: 0;
+  cursor: pointer;
 }
 
 .slab-set-card-kind {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
   text-transform: uppercase;
   padding: 1px 5px;
@@ -283,66 +253,59 @@
   color: #c62828;
 }
 
-.slab-components {
+/* Product cards inside set containers */
+.slab-component-cards {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 2px;
-}
-
-.slab-component {
-  display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
-  padding: 3px 6px;
-  background: #f5f5f5;
-  border-radius: 3px;
-  font-size: 10px;
 }
 
-.slab-component-stack {
-  display: flex;
-  align-items: center;
+.slab-component-wrapper {
+  position: relative;
 }
 
-.slab-component-stack .slab-component {
-  margin-left: -4px;
-  border: 1px solid #fff;
-}
-
-.slab-component-stack .slab-component:first-child {
-  margin-left: 0;
-}
-
-.slab-component-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #333;
-}
-
-.slab-component-qty {
+.slab-qty-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 2;
+  background: #1976d2;
+  color: #fff;
+  font-size: 9px;
   font-weight: 700;
-  color: #1976d2;
-  flex-shrink: 0;
+  padding: 1px 4px;
+  border-radius: 8px;
+  line-height: 1.2;
 }
 
-.slab-component-remove {
-  width: 12px;
-  height: 12px;
+.slab-component-x {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
   border: none;
-  background: transparent;
-  color: #ccc;
-  cursor: pointer;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  border-radius: 50%;
   font-size: 10px;
-  padding: 0;
   line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
 }
 
-.slab-component-remove:hover {
-  color: #c62828;
+.slab-component-wrapper:hover .slab-component-x {
+  opacity: 1;
+}
+
+.slab-set-card-footer {
+  margin-top: 4px;
+  font-size: 9px;
+  color: #888;
+  text-align: right;
 }
 
 .slab-drop-hint {
