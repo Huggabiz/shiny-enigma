@@ -1,8 +1,13 @@
+import { useEffect, useRef } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { getActivePlan, getStages } from '../types';
 import './NavSidebar.css';
 
 export type ViewType = 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab' | 'set-lab';
+
+/** Views where the range-plan navigator is meaningful. The Plans button
+ * returns here when clicked from a lab view. */
+const LAB_VIEWS: ViewType[] = ['set-lab', 'forecast-lab'];
 
 interface NavSidebarProps {
   activeView: ViewType;
@@ -11,6 +16,22 @@ interface NavSidebarProps {
 
 export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
   const { showPlanTree, setShowPlanTree, viewerMode, project } = useProjectStore();
+
+  // Remember the last non-lab view so the Plans button can return to it
+  // from the Set Lab (where the plan tree has nothing meaningful to show).
+  const lastMainViewRef = useRef<ViewType>('range-design');
+  useEffect(() => {
+    if (!LAB_VIEWS.includes(activeView)) lastMainViewRef.current = activeView;
+  }, [activeView]);
+
+  const handlePlansClick = () => {
+    if (activeView === 'set-lab') {
+      onViewChange(lastMainViewRef.current);
+      setShowPlanTree(true);
+      return;
+    }
+    setShowPlanTree(!showPlanTree);
+  };
 
   const visibleStageCount = (() => {
     if (!project) return 0;
@@ -26,9 +47,9 @@ export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
   return (
     <div className="nav-sidebar">
       <button
-        className={`nav-item ${showPlanTree ? 'active' : ''}`}
-        onClick={() => setShowPlanTree(!showPlanTree)}
-        title="Range Plans"
+        className={`nav-item ${showPlanTree && activeView !== 'set-lab' ? 'active' : ''}`}
+        onClick={handlePlansClick}
+        title={activeView === 'set-lab' ? 'Back to range planning' : 'Range Plans'}
       >
         <span className="nav-icon">☰</span>
         <span className="nav-label">Plans</span>

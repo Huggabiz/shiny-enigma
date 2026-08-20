@@ -138,7 +138,9 @@ function App() {
     // via its own fit-driven auto-tier loop (see computeMatrixAutoTier).
     // Skip the App-level item-count-based assignment so the two resolvers
     // don't fight when the auto-tier wants to upgrade or downgrade.
-    if (activeView === 'range-design' && effectiveSlideSize.mode === 'auto') return;
+    // The Set Lab runs the same fit-driven auto-tier over its own board,
+    // so it owns the scale in auto mode too.
+    if ((activeView === 'range-design' || activeView === 'set-lab') && effectiveSlideSize.mode === 'auto') return;
     if (effectiveSlideSize.scale !== slideBaseScale) {
       setSlideBaseScale(effectiveSlideSize.scale);
     }
@@ -588,7 +590,7 @@ function App() {
       <div className="workspace">
         <NavSidebar activeView={activeView} onViewChange={setActiveView} />
 
-        {showPlanTree && <PlanTree />}
+        {showPlanTree && activeView !== 'set-lab' && <PlanTree />}
 
         {activeView === 'transform' ? (
           activePlan ? (

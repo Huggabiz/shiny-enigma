@@ -9,7 +9,7 @@ import { Catalogue } from './Catalogue';
 import { EditableTitle } from './EditableTitle';
 import { SlideCanvasControls } from './SlideCanvasControls';
 import { CloseIcon } from './Icons';
-import { BASE_GAP, computeMatrixLayout, MAX_CARD_WIDTH } from '../utils/matrixLayout';
+import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH } from '../utils/matrixLayout';
 import { anonDisplay } from '../utils/anonymise';
 import type { Product, SetBoard, SetBoardItem, SetItemKind, MatrixLayout } from '../types';
 import './SetLab.css';
@@ -25,7 +25,7 @@ export function SetLab() {
     project, addSetBoard, removeSetBoard, renameSetBoard, setActiveSetBoard,
     addSetBoardItem, removeSetBoardItem, updateSetBoardItem,
     updateSetBoardMatrix, setSetBoardMatrixAssignment,
-    slideBaseScale, cardFormat,
+    slideBaseScale, slideBaseScaleMode, setSlideBaseScale, cardFormat,
   } = useProjectStore();
 
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
@@ -86,21 +86,50 @@ export function SetLab() {
     return counts;
   }, [layout, activeBoard]);
 
-  const { columnWidths, rowHeights, cardWidth, cardHeight } = useMemo(() => {
+  // Available drawing area — same chrome subtraction as RangeDesign so
+  // the layout solver and the auto-tier see identical numbers.
+  const availArea = useMemo(() => {
     const numCols = layout.xLabels.length;
     const numRows = layout.yLabels.length;
     if (numCols === 0 || numRows === 0 || wrapperSize.w === 0 || wrapperSize.h === 0) {
-      return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH, cardHeight: MAX_CARD_WIDTH * 1.4 };
+      return { availW: 0, availH: 0, numCols, numRows };
     }
     const scaledGap = Math.ceil(BASE_GAP * uiScale);
     const availW = wrapperSize.w - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * scaledGap;
     const availH = wrapperSize.h - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * scaledGap;
-    if (availW <= 0 || availH <= 0) {
+    return { availW, availH, numCols, numRows };
+  }, [layout.xLabels, layout.yLabels, wrapperSize, uiScale, scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH]);
+
+  const { columnWidths, rowHeights, cardWidth, cardHeight } = useMemo(() => {
+    const { availW, availH, numCols, numRows } = availArea;
+    if (numCols === 0 || numRows === 0 || availW <= 0 || availH <= 0) {
       return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH, cardHeight: MAX_CARD_WIDTH * 1.4 };
     }
     const result = computeMatrixLayout(cellCounts, cardFormat, availW, availH, uiScale);
     return { columnWidths: result.colWidths, rowHeights: result.rowHeights, cardWidth: result.cardW, cardHeight: result.cardH };
-  }, [cellCounts, layout.xLabels, layout.yLabels, wrapperSize, cardFormat, uiScale, scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH]);
+  }, [cellCounts, availArea, cardFormat, uiScale]);
+
+  // Fit-driven auto-tier — same stable-baseline loop as RangeDesign
+  // (see the long comment there). The cached baseline stops the
+  // measure/re-measure feedback ping-pong on borderline layouts.
+  const baseAvailRef = useRef<{ baseW: number; baseH: number; numCols: number; numRows: number } | null>(null);
+  useEffect(() => {
+    if (slideBaseScaleMode !== 'auto') return;
+    const { availW, availH, numCols, numRows } = availArea;
+    if (numCols === 0 || numRows === 0 || availW <= 0 || availH <= 0) return;
+    const totalCards = cellCounts.flat().reduce((s, n) => s + n, 0);
+    if (totalCards === 0) return;
+    if (baseAvailRef.current &&
+        (baseAvailRef.current.numCols !== numCols || baseAvailRef.current.numRows !== numRows)) {
+      baseAvailRef.current = null;
+    }
+    if (!baseAvailRef.current) {
+      baseAvailRef.current = { baseW: availW / uiScale, baseH: availH / uiScale, numCols, numRows };
+    }
+    const { baseW, baseH } = baseAvailRef.current;
+    const recommended = computeMatrixAutoTier(cellCounts, cardFormat, baseW, baseH, uiScale);
+    if (recommended !== uiScale) setSlideBaseScale(recommended);
+  }, [cellCounts, availArea, cardFormat, uiScale, slideBaseScaleMode, setSlideBaseScale]);
 
   const gridCols = `${scaledRowHeaderW}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${scaledAddBtnW}px`;
 
@@ -126,16 +155,17 @@ export function SetLab() {
     if (name?.trim()) addSetBoard(name.trim());
   };
 
-  const handleNewItem = (kind: SetItemKind, row?: number, col?: number) => {
+  // Cell-hover creation — mirrors the placeholder-add mechanic in the
+  // range view: the + appears on cell hover and creates the container
+  // directly in that cell.
+  const handleNewItem = useCallback((kind: SetItemKind, row: number, col: number) => {
     if (!activeBoard) return;
     const name = prompt(`${kind === 'set' ? 'Set' : 'Bundle'} name:`);
     if (!name?.trim()) return;
     const id = `sbi-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     addSetBoardItem(activeBoard.id, { id, name: name.trim(), kind, components: [], position: activeBoard.items.length });
-    if (row != null && col != null) {
-      setTimeout(() => setSetBoardMatrixAssignment(activeBoard.id, id, row, col), 0);
-    }
-  };
+    setTimeout(() => setSetBoardMatrixAssignment(activeBoard.id, id, row, col), 0);
+  }, [activeBoard, addSetBoardItem, setSetBoardMatrixAssignment]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const id = String(event.active.id);
@@ -261,11 +291,7 @@ export function SetLab() {
 
         <div className="range-design-canvas">
           <div className="range-design-title-bar">
-            <div className="range-stage-selector" role="tablist">
-              <button className="slab-add-btn" onClick={() => handleNewItem('set')} title="Add a new empty set container">+ Set</button>
-              <button className="slab-add-btn bundle" onClick={() => handleNewItem('bundle')} title="Add a new empty bundle container">+ Bundle</button>
-            </div>
-            <div className="range-design-canvas-controls">
+            <div className="range-design-canvas-controls" style={{ marginLeft: 'auto' }}>
               <SlideCanvasControls scrollAreaSelector=".range-view-scroll" />
             </div>
           </div>
@@ -316,6 +342,7 @@ export function SetLab() {
                               board={activeBoard} catalogue={catalogue}
                               cardWidth={cardWidth} cardHeight={cardHeight}
                               cellHeight={rowHeights[row] || 80}
+                              onAddItem={handleNewItem}
                               onRemoveItem={(id) => removeSetBoardItem(activeBoard.id, id)}
                               onUpdateItem={(id, patch) => updateSetBoardItem(activeBoard.id, id, patch)}
                               onRemoveComponent={(itemId, prodId) => {
@@ -377,15 +404,17 @@ export function SetLab() {
 
 // ---------- Matrix cell (droppable, same visual as RangeDesign) ----------
 
-function SetLabCell({ row, col, itemIds, board, catalogue, cardWidth, cardHeight, cellHeight, onRemoveItem, onUpdateItem, onRemoveComponent }: {
+function SetLabCell({ row, col, itemIds, board, catalogue, cardWidth, cardHeight, cellHeight, onAddItem, onRemoveItem, onUpdateItem, onRemoveComponent }: {
   row: number; col: number; itemIds: string[];
   board: SetBoard; catalogue: Product[];
   cardWidth: number; cardHeight: number; cellHeight: number;
+  onAddItem: (kind: SetItemKind, row: number, col: number) => void;
   onRemoveItem: (id: string) => void;
   onUpdateItem: (id: string, patch: Partial<SetBoardItem>) => void;
   onRemoveComponent: (itemId: string, productId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `matrix-cell-${row}-${col}` });
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const items = itemIds.map((id) => board.items.find((i) => i.id === id)).filter((i): i is SetBoardItem => !!i);
 
   return (
@@ -394,7 +423,8 @@ function SetLabCell({ row, col, itemIds, board, catalogue, cardWidth, cardHeight
         '--matrix-card-width': `${Math.floor(cardWidth)}px`,
         '--matrix-card-height': `${Math.floor(cardHeight)}px`,
         height: `${cellHeight}px`,
-      } as React.CSSProperties}>
+      } as React.CSSProperties}
+      onMouseLeave={() => setAddMenuOpen(false)}>
       {items.map((item) => (
         <SetContainer key={item.id} item={item} catalogue={catalogue}
           onRemove={() => onRemoveItem(item.id)}
@@ -402,6 +432,14 @@ function SetLabCell({ row, col, itemIds, board, catalogue, cardWidth, cardHeight
           onToggleKind={() => onUpdateItem(item.id, { kind: item.kind === 'set' ? 'bundle' : 'set' })}
           onRemoveComponent={(prodId) => onRemoveComponent(item.id, prodId)} />
       ))}
+      {addMenuOpen ? (
+        <div className="slab-add-menu">
+          <button className="slab-add-menu-btn set" onClick={() => { setAddMenuOpen(false); onAddItem('set', row, col); }}>+ Set</button>
+          <button className="slab-add-menu-btn bundle" onClick={() => { setAddMenuOpen(false); onAddItem('bundle', row, col); }}>+ Bundle</button>
+        </div>
+      ) : (
+        <button className="matrix-cell-add-ph" onClick={() => setAddMenuOpen(true)} title="Add a set or bundle">+</button>
+      )}
     </div>
   );
 }
