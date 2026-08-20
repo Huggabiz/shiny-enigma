@@ -2,7 +2,7 @@ import { useProjectStore } from '../store/useProjectStore';
 import { getActivePlan, getStages } from '../types';
 import './NavSidebar.css';
 
-export type ViewType = 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab';
+export type ViewType = 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab' | 'set-lab';
 
 interface NavSidebarProps {
   activeView: ViewType;
@@ -89,6 +89,14 @@ export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
           >
             <span className="nav-icon">🧪</span>
             <span className="nav-label">Forecast</span>
+          </button>
+          <button
+            className={`nav-item ${activeView === 'set-lab' ? 'active' : ''}`}
+            onClick={() => onViewChange('set-lab')}
+            title="Set & Bundle Lab — experiment with product combinations"
+          >
+            <span className="nav-icon">⊞</span>
+            <span className="nav-label">Sets</span>
           </button>
         </>
       )}

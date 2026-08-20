@@ -63,14 +63,14 @@ interface ProjectStore {
   setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean }>) => void;
 
   // Views — lifted out of App local state so the export loop can drive them
-  activeView: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab';
+  activeView: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab' | 'set-lab';
   designShelfId: string;
   /** Transform view stage selection — which two stages to compare.
    * Defaults to 'current' and 'future'. Must satisfy from < to in
    * the getStages() order. */
   transformFromKey: string;
   transformToKey: string;
-  setActiveView: (view: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab') => void;
+  setActiveView: (view: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab' | 'set-lab') => void;
   setDesignShelfId: (shelfId: string) => void;
   setTransformStages: (fromKey: string, toKey: string) => void;
 
@@ -155,6 +155,18 @@ interface ProjectStore {
   toggleAnalyseEntry: (planId: string, variantId: string | null) => void;
   clearAnalyseEntries: () => void;
   setAnalyseConfig: (patch: Record<string, unknown>) => void;
+
+  // Set & Bundle Lab
+  addSetBoard: (name: string) => void;
+  removeSetBoard: (boardId: string) => void;
+  renameSetBoard: (boardId: string, name: string) => void;
+  setActiveSetBoard: (boardId: string) => void;
+  addSetBoardItem: (boardId: string, item: import('../types').SetBoardItem) => void;
+  removeSetBoardItem: (boardId: string, itemId: string) => void;
+  updateSetBoardItem: (boardId: string, itemId: string, patch: Partial<import('../types').SetBoardItem>) => void;
+  updateSetBoardMatrix: (boardId: string, layout: Partial<import('../types').MatrixLayout>) => void;
+  setSetBoardMatrixAssignment: (boardId: string, itemId: string, row: number, col: number) => void;
+  removeSetBoardMatrixAssignment: (boardId: string, itemId: string) => void;
 
   // Lens management — see types/Lens for the data model.
   createLens: (name: string, scope?: 'global' | 'per-stage') => void;
@@ -711,6 +723,95 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!project) return;
     const current = project.analyseView ?? { entries: [] };
     set({ project: { ...project, analyseView: { ...current, ...patch }, updatedAt: new Date().toISOString() } });
+  },
+
+  // Set & Bundle Lab
+  addSetBoard: (name) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = project.setBoards ?? [];
+    const id = `setboard-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const board: import('../types').SetBoard = { id, name, items: [], matrixLayout: { title: name, xLabels: ['Column 1'], yLabels: ['Row 1'], assignments: [] } };
+    set({ project: { ...project, setBoards: [...boards, board], activeSetBoardId: id, updatedAt: new Date().toISOString() } });
+  },
+
+  removeSetBoard: (boardId) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = (project.setBoards ?? []).filter((b) => b.id !== boardId);
+    const active = project.activeSetBoardId === boardId ? boards[0]?.id : project.activeSetBoardId;
+    set({ project: { ...project, setBoards: boards, activeSetBoardId: active, updatedAt: new Date().toISOString() } });
+  },
+
+  renameSetBoard: (boardId, name) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = (project.setBoards ?? []).map((b) => b.id === boardId ? { ...b, name, matrixLayout: b.matrixLayout ? { ...b.matrixLayout, title: name } : undefined } : b);
+    set({ project: { ...project, setBoards: boards, updatedAt: new Date().toISOString() } });
+  },
+
+  setActiveSetBoard: (boardId) => {
+    set({ project: { ...get().project!, activeSetBoardId: boardId, updatedAt: new Date().toISOString() } });
+  },
+
+  addSetBoardItem: (boardId, item) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = (project.setBoards ?? []).map((b) => b.id === boardId ? { ...b, items: [...b.items, item] } : b);
+    set({ project: { ...project, setBoards: boards, updatedAt: new Date().toISOString() } });
+  },
+
+  removeSetBoardItem: (boardId, itemId) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = (project.setBoards ?? []).map((b) => {
+      if (b.id !== boardId) return b;
+      const items = b.items.filter((i) => i.id !== itemId);
+      const ml = b.matrixLayout ? { ...b.matrixLayout, assignments: b.matrixLayout.assignments.filter((a) => a.itemId !== itemId) } : undefined;
+      return { ...b, items, matrixLayout: ml };
+    });
+    set({ project: { ...project, setBoards: boards, updatedAt: new Date().toISOString() } });
+  },
+
+  updateSetBoardItem: (boardId, itemId, patch) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = (project.setBoards ?? []).map((b) => b.id === boardId ? { ...b, items: b.items.map((i) => i.id === itemId ? { ...i, ...patch } : i) } : b);
+    set({ project: { ...project, setBoards: boards, updatedAt: new Date().toISOString() } });
+  },
+
+  updateSetBoardMatrix: (boardId, layout) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = (project.setBoards ?? []).map((b) => {
+      if (b.id !== boardId) return b;
+      const ml = b.matrixLayout ?? { title: b.name, xLabels: [], yLabels: [], assignments: [] };
+      return { ...b, matrixLayout: { ...ml, ...layout } };
+    });
+    set({ project: { ...project, setBoards: boards, updatedAt: new Date().toISOString() } });
+  },
+
+  setSetBoardMatrixAssignment: (boardId, itemId, row, col) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = (project.setBoards ?? []).map((b) => {
+      if (b.id !== boardId) return b;
+      const ml = b.matrixLayout ?? { title: b.name, xLabels: [], yLabels: [], assignments: [] };
+      const filtered = ml.assignments.filter((a) => a.itemId !== itemId);
+      return { ...b, matrixLayout: { ...ml, assignments: [...filtered, { itemId, row, col }] } };
+    });
+    set({ project: { ...project, setBoards: boards, updatedAt: new Date().toISOString() } });
+  },
+
+  removeSetBoardMatrixAssignment: (boardId, itemId) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = (project.setBoards ?? []).map((b) => {
+      if (b.id !== boardId) return b;
+      if (!b.matrixLayout) return b;
+      return { ...b, matrixLayout: { ...b.matrixLayout, assignments: b.matrixLayout.assignments.filter((a) => a.itemId !== itemId) } };
+    });
+    set({ project: { ...project, setBoards: boards, updatedAt: new Date().toISOString() } });
   },
 
   // Lens management — Lens is project-level state. The built-in Dev

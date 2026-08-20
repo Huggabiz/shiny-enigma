@@ -533,8 +533,37 @@ export interface Project {
   /** ISO timestamp of when this viewer snapshot was exported. Only
    * present in exported HTML viewer files. */
   exportedAt?: string;
+  /** Set & Bundle Lab — boards for experimenting with product
+   * combinations (sets and bundles). Each board has its own matrix
+   * layout independent of range plans. */
+  setBoards?: SetBoard[];
+  activeSetBoardId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// ---------- Set & Bundle Lab ----------
+
+export type SetItemKind = 'set' | 'bundle';
+
+export interface SetComponent {
+  productId: string;
+  quantity: number;
+}
+
+export interface SetBoardItem {
+  id: string;
+  name: string;
+  kind: SetItemKind;
+  components: SetComponent[];
+  position: number;
+}
+
+export interface SetBoard {
+  id: string;
+  name: string;
+  items: SetBoardItem[];
+  matrixLayout?: MatrixLayout;
 }
 
 // Helper to get the active plan from a project
