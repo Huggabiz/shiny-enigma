@@ -191,10 +191,10 @@ interface ChartProps { plans: RangePlan[]; catalogue: Product[]; metric: Metric;
 
 // Per-sheet config state that persists across tab switches
 interface IcicleConfig { metric: Metric; aspMode: AspMode; showSegments: boolean; }
-interface ScatterConfig { logX: boolean; logY: boolean; maxX: string; maxY: string; dotSize: number; contours: boolean; }
+interface ScatterConfig { logX: boolean; logY: boolean; maxX: string; maxY: string; dotSize: number; contours: boolean; xAxis: 'margin' | 'revenue'; }
 
 const DEFAULT_ICICLE: IcicleConfig = { metric: 'revenue', aspMode: 'standard', showSegments: true };
-const DEFAULT_SCATTER: ScatterConfig = { logX: false, logY: false, maxX: '', maxY: '', dotSize: 5, contours: false };
+const DEFAULT_SCATTER: ScatterConfig = { logX: false, logY: false, maxX: '', maxY: '', dotSize: 5, contours: false, xAxis: 'margin' };
 
 export function AnalyseView() {
   const { project, clearAnalyseEntries, setAnalyseConfig } = useProjectStore();
@@ -279,7 +279,8 @@ export function AnalyseView() {
   const scatterVisiblePoints = useMemo(() => {
     if (activeSheet !== 'scatter') return [];
     const seen = new Set<string>();
-    const pts: { rrp: number; margin: number; category: string }[] = [];
+    const pts: { rrp: number; margin: number; revenue: number; category: string }[] = [];
+    const xField = scatterConfig.xAxis ?? 'margin';
     for (const plan of selectedPlans) {
       const shelf = resolveShelf(plan, shelfSide);
       if (!shelf) continue;
@@ -289,11 +290,12 @@ export function AnalyseView() {
         seen.add(prod.id);
         const cat = prod.category || 'Uncategorised';
         if (hiddenCats.has(cat)) continue;
-        const rrp = prod.rrp ?? 0, margin = prod.operatingMarginGbp ?? 0;
-        if (rrp <= 0 && margin === 0) continue;
-        if (scatterConfig.logX && margin <= 0) continue;
+        const rrp = prod.rrp ?? 0, margin = prod.operatingMarginGbp ?? 0, revenue = prod.revenue ?? 0;
+        const xVal = xField === 'revenue' ? revenue : margin;
+        if (rrp <= 0 && xVal === 0) continue;
+        if (scatterConfig.logX && xVal <= 0) continue;
         if (scatterConfig.logY && rrp <= 0) continue;
-        pts.push({ rrp, margin, category: cat });
+        pts.push({ rrp, margin, revenue, category: cat });
       }
     }
     return pts;
@@ -416,6 +418,11 @@ export function AnalyseView() {
           )}
           {activeSheet === 'scatter' && (
             <div className="analyse-chart-config">
+              <div className="analyse-metric-toggle" role="tablist">
+                <button role="tab" className={(scatterConfig.xAxis ?? 'margin') === 'margin' ? 'active' : ''} onClick={() => updateScatter({ xAxis: 'margin' })}>OM £</button>
+                <button role="tab" className={(scatterConfig.xAxis ?? 'margin') === 'revenue' ? 'active' : ''} onClick={() => updateScatter({ xAxis: 'revenue' })}>Revenue</button>
+              </div>
+              <div className="analyse-config-separator" />
               <label className="analyse-config-item"><input type="checkbox" checked={scatterConfig.logX} onChange={(e) => updateScatter({ logX: e.target.checked })} /> Log X</label>
               <label className="analyse-config-item"><input type="checkbox" checked={scatterConfig.logY} onChange={(e) => updateScatter({ logY: e.target.checked })} /> Log Y</label>
               <div className="analyse-config-separator" />
@@ -584,7 +591,7 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, show
 
 // ---------- Scatter ----------
 
-interface ScatterPoint { sku: string; name: string; category: string; subCategory: string; rrp: number; margin: number; }
+interface ScatterPoint { sku: string; name: string; category: string; subCategory: string; rrp: number; margin: number; revenue: number; }
 
 function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCats, onToggleCat }: { plans: RangePlan[]; catalogue: Product[]; shelfSide: string; config: ScatterConfig; catColors: Map<string, string>; hiddenCats: Set<string>; onToggleCat: (cat: string) => void }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -595,9 +602,9 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
     const seen = new Set<string>(), pts: ScatterPoint[] = [];
     for (const plan of plans) { const shelf = resolveShelf(plan, shelfSide); if (!shelf) continue;
       for (const item of shelf.items) { const prod = getProductForItem(item, catalogue); if (!prod || seen.has(prod.id)) continue; seen.add(prod.id);
-        const rrp = prod.rrp ?? 0, margin = prod.operatingMarginGbp ?? 0;
-        if (rrp <= 0 && margin === 0) continue;
-        pts.push({ sku: prod.sku, name: prod.name, category: prod.category || 'Uncategorised', subCategory: prod.subCategory || '', rrp, margin });
+        const rrp = prod.rrp ?? 0, margin = prod.operatingMarginGbp ?? 0, revenue = prod.revenue ?? 0;
+        if (rrp <= 0 && margin === 0 && revenue === 0) continue;
+        pts.push({ sku: prod.sku, name: prod.name, category: prod.category || 'Uncategorised', subCategory: prod.subCategory || '', rrp, margin, revenue });
       }
     } return pts;
   }, [plans, catalogue, shelfSide]);
@@ -612,7 +619,9 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
     } return m;
   }, [categories, catColors]);
 
-  const { logX, logY, dotSize, contours } = config;
+  const { logX, logY, dotSize, contours, xAxis: xField } = config;
+  const xAccessor = (d: ScatterPoint) => xField === 'revenue' ? d.revenue : d.margin;
+  const xLabel = xField === 'revenue' ? 'Revenue (£)' : 'Operating Margin (£)';
   const maxXN = config.maxX ? Number(config.maxX) : undefined;
   const maxYN = config.maxY ? Number(config.maxY) : undefined;
 
@@ -623,14 +632,14 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || points.length === 0) return;
 
-    const xE = d3.extent(points, (p) => p.margin) as [number, number];
+    const xE = d3.extent(points, xAccessor) as [number, number];
     const yE = d3.extent(points, (p) => p.rrp) as [number, number];
     const xMax = (maxXN != null && maxXN > 0) ? maxXN : xE[1];
     const yMax = (maxYN != null && maxYN > 0) ? maxYN : yE[1];
 
     let xScale: d3.ScaleLogarithmic<number, number> | d3.ScaleLinear<number, number>;
     let yScale: d3.ScaleLogarithmic<number, number> | d3.ScaleLinear<number, number>;
-    if (logX) { const lo = Math.max(1, Math.min(...points.map((p) => p.margin).filter((v) => v > 0))); xScale = d3.scaleLog().domain([lo * 0.8, xMax * 1.05]).range([0, iW]).clamp(true); }
+    if (logX) { const lo = Math.max(1, Math.min(...points.map(xAccessor).filter((v) => v > 0))); xScale = d3.scaleLog().domain([lo * 0.8, xMax * 1.05]).range([0, iW]).clamp(true); }
     else { const p = (xMax - xE[0]) * 0.05 || 1; xScale = d3.scaleLinear().domain([xE[0] - p, xMax + p]).range([0, iW]); }
     if (logY) { const lo = Math.max(0.01, Math.min(...points.map((p) => p.rrp).filter((v) => v > 0))); yScale = d3.scaleLog().domain([lo * 0.8, yMax * 1.05]).range([iH, 0]).clamp(true); }
     else { const p = (yMax - yE[0]) * 0.05 || 1; yScale = d3.scaleLinear().domain([yE[0] - p, yMax + p]).range([iH, 0]); }
@@ -640,13 +649,13 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
     const xAxisG = g.append('g').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xScale).ticks(Math.floor(iW / 100)).tickFormat(fmtK));
     xAxisG.selectAll('text').attr('font-size', '8px').attr('text-anchor', 'end').attr('transform', 'rotate(-45)').attr('dx', '-4px').attr('dy', '4px');
     g.append('g').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickFormat((d) => `£${d3.format(',.2f')(d as number)}`)).selectAll('text').attr('font-size', '8px');
-    g.append('text').attr('x', iW / 2).attr('y', iH + 36).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', '#666').text(`Operating Margin (£)${logX ? ' — log' : ''}`);
+    g.append('text').attr('x', iW / 2).attr('y', iH + 36).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', '#666').text(`${xLabel}${logX ? ' — log' : ''}`);
     g.append('text').attr('x', -iH / 2).attr('y', -44).attr('text-anchor', 'middle').attr('transform', 'rotate(-90)').attr('font-size', '9px').attr('fill', '#666').text(`RRP (£)${logY ? ' — log' : ''}`);
     g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xScale).ticks(Math.floor(iW / 100)).tickSize(-iH).tickFormat(() => '')).selectAll('line').attr('stroke', '#eee');
     g.append('g').attr('class', 'gy').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickSize(-iW).tickFormat(() => '')).selectAll('line').attr('stroke', '#eee');
     g.selectAll('.gx .domain, .gy .domain').remove();
 
-    const vis = points.filter((p) => { if (hiddenCats.has(p.category)) return false; if (logX && p.margin <= 0) return false; if (logY && p.rrp <= 0) return false; return true; });
+    const vis = points.filter((p) => { if (hiddenCats.has(p.category)) return false; if (logX && xAccessor(p) <= 0) return false; if (logY && p.rrp <= 0) return false; return true; });
 
     // Per-category density contours
     if (contours && vis.length >= 3) {
@@ -659,7 +668,7 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
         const catColor = colorMap.get(cat) ?? '#999';
         const bandwidth = Math.max(iW, iH) * 0.06;
         const density = d3.contourDensity<ScatterPoint>()
-          .x((d) => xScale(d.margin))
+          .x((d) => xScale(xAccessor(d)))
           .y((d) => yScale(d.rrp))
           .size([iW, iH])
           .bandwidth(bandwidth)
@@ -678,10 +687,10 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
     }
 
     g.selectAll('circle').data(vis).join('circle')
-      .attr('cx', (d) => xScale(d.margin)).attr('cy', (d) => yScale(d.rrp)).attr('r', dotSize)
+      .attr('cx', (d) => xScale(xAccessor(d))).attr('cy', (d) => yScale(d.rrp)).attr('r', dotSize)
       .attr('fill', (d) => { const k = d.subCategory ? `${d.category}::${d.subCategory}` : d.category; return colorMap.get(k) ?? colorMap.get(d.category) ?? '#999'; })
       .attr('fill-opacity', 0.75).attr('stroke', (d) => colorMap.get(d.category) ?? '#999').attr('stroke-width', 1).style('cursor', 'pointer')
-      .on('mouseenter', function (ev, d) { d3.select(this).attr('r', dotSize + 2).attr('fill-opacity', 1).attr('stroke-width', 2); const r = wrapperRef.current?.getBoundingClientRect(); if (r) setTooltip({ x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8, label: `${d.sku} — ${d.name}`, value: `RRP: £${d.rrp.toFixed(2)} | OM: £${d.margin.toLocaleString()}`, depth: d.subCategory ? `${d.category} / ${d.subCategory}` : d.category }); })
+      .on('mouseenter', function (ev, d) { d3.select(this).attr('r', dotSize + 2).attr('fill-opacity', 1).attr('stroke-width', 2); const r = wrapperRef.current?.getBoundingClientRect(); if (r) setTooltip({ x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8, label: `${d.sku} — ${d.name}`, value: `RRP: £${d.rrp.toFixed(2)} | ${xField === 'revenue' ? 'Rev' : 'OM'}: ${fmtGbp(xAccessor(d))}`, depth: d.subCategory ? `${d.category} / ${d.subCategory}` : d.category }); })
       .on('mousemove', function (ev) { const r = wrapperRef.current?.getBoundingClientRect(); if (r) setTooltip((p) => p ? { ...p, x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8 } : null); })
       .on('mouseleave', function () { d3.select(this).attr('r', dotSize).attr('fill-opacity', 0.75).attr('stroke-width', 1); setTooltip(null); });
 
@@ -699,7 +708,7 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
       row.on('click', () => onToggleCat(cat));
       ly += 16;
     }
-  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, onToggleCat]);
+  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, onToggleCat, xField, xAccessor, xLabel]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
@@ -713,7 +722,7 @@ function fmtGbp(v: number): string {
 }
 
 function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
-  points: { rrp: number; margin: number; category: string }[];
+  points: { rrp: number; margin: number; revenue: number; category: string }[];
   growthPct: number;
   onGrowthChange: (v: number) => void;
   catColors: Map<string, string>;
@@ -740,6 +749,8 @@ function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
   const avgRrp = points.reduce((s, p) => s + p.rrp, 0) / n;
   const avgOm = points.reduce((s, p) => s + p.margin, 0) / n;
   const totalOm = points.reduce((s, p) => s + p.margin, 0);
+  const avgRev = points.reduce((s, p) => s + p.revenue, 0) / n;
+  const totalRev = points.reduce((s, p) => s + p.revenue, 0);
 
   const catMap = new Map<string, { total: number; count: number }>();
   for (const p of points) {
@@ -752,6 +763,8 @@ function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
       <p className="analyse-stats-title">Key Stats</p>
       <div className="analyse-stat-row"><span className="analyse-stat-label">SKUs shown</span><span className="analyse-stat-value">{n}</span></div>
       <div className="analyse-stat-row"><span className="analyse-stat-label">Avg RRP</span><span className="analyse-stat-value">£{avgRrp.toFixed(2)}</span></div>
+      <div className="analyse-stat-row"><span className="analyse-stat-label">Avg Revenue / SKU</span><span className="analyse-stat-value">{fmtGbp(avgRev)}</span></div>
+      <div className="analyse-stat-row"><span className="analyse-stat-label">Total Revenue</span><span className="analyse-stat-value">{fmtGbp(totalRev)}</span></div>
       <div className="analyse-stat-row"><span className="analyse-stat-label">Avg OM (£) / SKU</span><span className="analyse-stat-value">{fmtGbp(avgOm)}</span></div>
       <div className="analyse-stat-row"><span className="analyse-stat-label">Total OM (£)</span><span className="analyse-stat-value">{fmtGbp(totalOm)}</span></div>
 
