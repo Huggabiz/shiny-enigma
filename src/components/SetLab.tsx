@@ -7,7 +7,7 @@ import {
 import { useProjectStore } from '../store/useProjectStore';
 import { Catalogue } from './Catalogue';
 import { EditableTitle } from './EditableTitle';
-import { SlideCanvasControls } from './SlideCanvasControls';
+import { SlideCanvasControls, fitSlideToWidth } from './SlideCanvasControls';
 import { CloseIcon } from './Icons';
 import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH } from '../utils/matrixLayout';
 import { anonDisplay } from '../utils/anonymise';
@@ -83,7 +83,7 @@ export function SetLab() {
     project, addSetBoard, removeSetBoard, renameSetBoard, setActiveSetBoard,
     addSetBoardItem, removeSetBoardItem, updateSetBoardItem,
     updateSetBoardMatrix, setSetBoardMatrixAssignment,
-    slideBaseScale, slideBaseScaleMode, setSlideBaseScale, cardFormat,
+    slideBaseScale, slideBaseScaleMode, setSlideBaseScale, setSlideBaseScaleMode, cardFormat,
   } = useProjectStore();
 
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
@@ -115,6 +115,19 @@ export function SetLab() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [activeBoard?.id]);
+
+  // Board opened/created/switched: start in auto-size mode and fit the
+  // slide to the viewport, matching the range view's convention. Two
+  // RAFs let the new board's DOM mount before measuring.
+  const activeBoardId = activeBoard?.id;
+  useEffect(() => {
+    if (!activeBoardId) return;
+    setSlideBaseScaleMode('auto');
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => fitSlideToWidth('.range-view-scroll'));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activeBoardId, setSlideBaseScaleMode]);
 
   const uiScale = slideBaseScale;
   const scaledRowHeaderW = Math.round(ROW_HEADER_WIDTH * uiScale);

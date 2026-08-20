@@ -164,12 +164,14 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  /* Fit the container to its cards — never stretch to the cell or to a
-     long name. The header name ellipsizes (capped below) so the widest
-     content is always the card row. */
+  /* Fit the container to its cards — never stretch to the cell. The
+     header is width-neutral (see .slab-set-header) so the card row is
+     the only thing that sets the width. */
   width: fit-content;
   max-width: 100%;
   align-self: flex-start;
+  /* Empty containers still need a sensible footprint to drop into. */
+  min-width: calc(var(--matrix-card-width, 80px) + 10px);
 }
 
 .slab-set.kind-set {
@@ -190,13 +192,21 @@
 
 .slab-set-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: calc(4px * var(--ui-scale, 1));
   /* Extra bottom padding gives the title a little breathing room
      above the SKU cards. */
   padding: 0 calc(2px * var(--ui-scale, 1)) calc(5px * var(--ui-scale, 1));
   cursor: grab;
   position: relative;
+  /* width:0 + min-width:100% — the header contributes NOTHING to the
+     container's intrinsic width, so the SKU cards alone dictate how
+     wide the container is (a long name can never leave empty space
+     beside a single card). The header then stretches to whatever
+     width the cards produced. */
+  width: 0;
+  min-width: 100%;
+  box-sizing: border-box;
 }
 
 .slab-set-header:active {
@@ -209,13 +219,17 @@
   font-size: calc(9px * var(--ui-scale, 1));
   font-weight: 700;
   color: #1a1a2e;
-  /* Never crop the name: it wraps onto extra lines instead. The
-     max-width caps its intrinsic contribution so a long name still
-     can't widen the container far past the card row. */
-  white-space: normal;
-  overflow-wrap: break-word;
   line-height: 1.25;
-  max-width: calc(var(--matrix-card-width, 80px) * 1.6);
+  /* Uniform two-line block: every container header is exactly two
+     text lines tall whether the name needs one or two, so
+     neighbouring containers stay level. Names longer than two lines
+     ellipsize (full name in the hover tooltip). */
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(9px * 1.25 * 2 * var(--ui-scale, 1));
 }
 
 .slab-set-kind {
@@ -269,12 +283,20 @@
   color: #888;
   text-align: right;
   padding-top: calc(2px * var(--ui-scale, 1));
+  /* Width-neutral like the header — never widens the container. */
+  width: 0;
+  min-width: 100%;
+  box-sizing: border-box;
 }
 
 /* ---------- Quantity stack visual ---------- */
 
 .slab-stack {
   position: relative;
+  /* Each stack is its own stacking context so shadow layers and the
+     lifted top card can never paint over neighbouring cards — the
+     ordering stays local to this stack. */
+  isolation: isolate;
 }
 
 .slab-stack-layer {
@@ -286,12 +308,7 @@
      stacked shadow cards read as more of the same card. */
   border: 1.5px solid #e0e0e0;
   border-radius: 6px;
-  z-index: 0;
-}
-
-.slab-stack .matrix-card {
-  position: relative;
-  z-index: 1;
+  z-index: -1;
 }
 
 /* Bottom-right so it never covers the card's hover × (top-right). It
