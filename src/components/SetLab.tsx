@@ -9,7 +9,7 @@ import { Catalogue } from './Catalogue';
 import { EditableTitle } from './EditableTitle';
 import { SlideCanvasControls, fitSlideToWidth } from './SlideCanvasControls';
 import { CloseIcon } from './Icons';
-import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH } from '../utils/matrixLayout';
+import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH, TIER_LADDER } from '../utils/matrixLayout';
 import { anonDisplay } from '../utils/anonymise';
 import type { Product, SetBoard, SetBoardItem, SetItemKind, MatrixLayout } from '../types';
 import './SetLab.css';
@@ -188,6 +188,29 @@ export function SetLab() {
   // Fit-driven auto-tier — same stable-baseline loop as RangeDesign
   // (see the long comment there). The cached baseline stops the
   // measure/re-measure feedback ping-pong on borderline layouts.
+  //
+  // On top of the estimate-based recommendation, the Set Lab adds a
+  // real-DOM overflow check: container chrome (header/footer/padding)
+  // isn't visible to the card-count estimator — the solver can satisfy
+  // a virtual-card reserve by adding a side-by-side slot, reserving no
+  // extra height — so after each paint we look for cells that actually
+  // clip and bump one extra ladder tier until nothing overflows.
+  // `overflowBumps` resets whenever the board's content signature
+  // changes, so removals let the scale settle back down without ever
+  // oscillating within one signature.
+  const [overflowBumps, setOverflowBumps] = useState(0);
+  const contentSignature = useMemo(() =>
+    `${activeBoard?.id}|${layout.xLabels.length}x${layout.yLabels.length}|` +
+    (activeBoard?.items.map((i) => `${i.id}:${i.components.reduce((s, c) => s + c.quantity, 0)}`).join(',') ?? ''),
+    [activeBoard?.id, activeBoard?.items, layout.xLabels.length, layout.yLabels.length]);
+  const lastSignatureRef = useRef(contentSignature);
+  useEffect(() => {
+    if (lastSignatureRef.current !== contentSignature) {
+      lastSignatureRef.current = contentSignature;
+      setOverflowBumps(0);
+    }
+  }, [contentSignature]);
+
   const baseAvailRef = useRef<{ baseW: number; baseH: number; numCols: number; numRows: number } | null>(null);
   useEffect(() => {
     if (slideBaseScaleMode !== 'auto') return;
@@ -204,8 +227,31 @@ export function SetLab() {
     }
     const { baseW, baseH } = baseAvailRef.current;
     const recommended = computeMatrixAutoTier(cellCounts, cardFormat, baseW, baseH, uiScale);
-    if (recommended !== uiScale) setSlideBaseScale(recommended);
-  }, [cellCounts, availArea, cardFormat, uiScale, slideBaseScaleMode, setSlideBaseScale]);
+    const recIdx = TIER_LADDER.findIndex((t) => t >= recommended);
+    const targetIdx = Math.min((recIdx < 0 ? TIER_LADDER.length - 1 : recIdx) + overflowBumps, TIER_LADDER.length - 1);
+    const target = TIER_LADDER[targetIdx];
+    if (target !== uiScale) setSlideBaseScale(target);
+  }, [cellCounts, availArea, cardFormat, uiScale, slideBaseScaleMode, setSlideBaseScale, overflowBumps]);
+
+  // Post-paint overflow probe. Runs after the layout renders at the
+  // current tier; any cell whose content genuinely clips triggers one
+  // more bump (capped at the ladder top).
+  useEffect(() => {
+    if (slideBaseScaleMode !== 'auto') return;
+    if (overflowBumps >= TIER_LADDER.length - 1) return;
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const cells = document.querySelectorAll<HTMLElement>('.set-lab .matrix-cell');
+        for (const el of cells) {
+          if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) {
+            setOverflowBumps((b) => Math.min(b + 1, TIER_LADDER.length - 1));
+            return;
+          }
+        }
+      });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [columnWidths, rowHeights, uiScale, overflowBumps, slideBaseScaleMode, contentSignature]);
 
   const gridCols = `${scaledRowHeaderW}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${scaledAddBtnW}px`;
 
