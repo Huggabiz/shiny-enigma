@@ -718,6 +718,23 @@ function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
   onGrowthChange: (v: number) => void;
   catColors: Map<string, string>;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
+  const handleCopy = useCallback(async () => {
+    if (!panelRef.current) return;
+    try {
+      setCopyStatus('...');
+      const canvas = await html2canvas(panelRef.current, { backgroundColor: '#fafafa', scale: 2 });
+      canvas.toBlob(async (blob) => {
+        if (!blob) { setCopyStatus('Failed'); return; }
+        try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); setCopyStatus('Copied!'); }
+        catch { setCopyStatus('Failed'); }
+        setTimeout(() => setCopyStatus(null), 1500);
+      }, 'image/png');
+    } catch { setCopyStatus('Failed'); setTimeout(() => setCopyStatus(null), 1500); }
+  }, []);
+
   if (points.length === 0) return null;
   const n = points.length;
   const avgRrp = points.reduce((s, p) => s + p.rrp, 0) / n;
@@ -731,7 +748,7 @@ function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
   }
 
   return (
-    <div className="analyse-stats-panel">
+    <div className="analyse-stats-panel" ref={panelRef}>
       <p className="analyse-stats-title">Key Stats</p>
       <div className="analyse-stat-row"><span className="analyse-stat-label">SKUs shown</span><span className="analyse-stat-value">{n}</span></div>
       <div className="analyse-stat-row"><span className="analyse-stat-label">Avg RRP</span><span className="analyse-stat-value">£{avgRrp.toFixed(2)}</span></div>
@@ -768,6 +785,7 @@ function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
           })}
         </div>
       </div>
+      <button className="analyse-snip-btn" style={{ marginTop: 'auto', alignSelf: 'stretch' }} onClick={handleCopy}>{copyStatus ?? 'Copy stats'}</button>
     </div>
   );
 }
