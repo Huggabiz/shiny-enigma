@@ -731,7 +731,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!project) return;
     const boards = project.setBoards ?? [];
     const id = `setboard-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const board: import('../types').SetBoard = { id, name, items: [], matrixLayout: { title: name, xLabels: ['Column 1'], yLabels: ['Row 1'], assignments: [] } };
+    // Same starting matrix as a blank range plan (DEFAULT_MATRIX_LAYOUT).
+    const board: import('../types').SetBoard = { id, name, items: [], matrixLayout: { title: name, xLabels: ['Entry', 'Mid', 'Premium'], yLabels: ['Subset 1', 'Subset 2'], assignments: [] } };
     set({ project: { ...project, setBoards: [...boards, board], activeSetBoardId: id, updatedAt: new Date().toISOString() } });
   },
 

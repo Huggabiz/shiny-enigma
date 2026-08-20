@@ -1,25 +1,37 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
-  DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors,
-  useDroppable, useDraggable, DragOverlay,
+  DndContext, DragOverlay, closestCenter, PointerSensor, TouchSensor,
+  useSensor, useSensors, useDroppable, useDraggable,
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
 import { useProjectStore } from '../store/useProjectStore';
 import { Catalogue } from './Catalogue';
-import { ProductCard } from './ProductCard';
+import { EditableTitle } from './EditableTitle';
 import { SlideCanvasControls } from './SlideCanvasControls';
-import type { Product, SetBoard, SetBoardItem, SetItemKind } from '../types';
+import { CloseIcon } from './Icons';
+import { BASE_GAP, computeMatrixLayout, MAX_CARD_WIDTH } from '../utils/matrixLayout';
+import { anonDisplay } from '../utils/anonymise';
+import type { Product, SetBoard, SetBoardItem, SetItemKind, MatrixLayout } from '../types';
 import './SetLab.css';
+
+// Same chrome constants as RangeDesign so the matrix reads identically.
+const ROW_HEADER_WIDTH = 60;
+const ADD_BTN_WIDTH = 28;
+const HEADER_ROW_HEIGHT = 28;
+const ADD_ROW_HEIGHT = 28;
 
 export function SetLab() {
   const {
     project, addSetBoard, removeSetBoard, renameSetBoard, setActiveSetBoard,
     addSetBoardItem, removeSetBoardItem, updateSetBoardItem,
     updateSetBoardMatrix, setSetBoardMatrixAssignment,
-    slideBaseScale, slideZoom,
+    slideBaseScale, cardFormat,
   } = useProjectStore();
 
-  const [dragOverlay, setDragOverlay] = useState<string | null>(null);
+  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
+  const [editingAxis, setEditingAxis] = useState<{ axis: 'x' | 'y'; index: number } | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [wrapperSize, setWrapperSize] = useState({ w: 0, h: 0 });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -27,154 +39,214 @@ export function SetLab() {
   );
 
   const boards = project?.setBoards ?? [];
-  const activeBoard = boards.find((b) => b.id === project?.activeSetBoardId) ?? null;
+  const activeBoard = boards.find((b) => b.id === project?.activeSetBoardId) ?? boards[0] ?? null;
   const catalogue = project?.catalogue ?? [];
 
-  const ml = activeBoard?.matrixLayout ?? { title: '', xLabels: ['Column 1'], yLabels: ['Row 1'], assignments: [] };
+  const layout: MatrixLayout = useMemo(() =>
+    activeBoard?.matrixLayout || { title: activeBoard?.name || '', xLabels: [], yLabels: [], assignments: [] },
+    [activeBoard?.matrixLayout, activeBoard?.name],
+  );
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setWrapperSize({ w: entry.contentRect.width, h: entry.contentRect.height })
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [activeBoard?.id]);
+
+  const uiScale = slideBaseScale;
+  const scaledRowHeaderW = Math.round(ROW_HEADER_WIDTH * uiScale);
+  const scaledAddBtnW = Math.round(ADD_BTN_WIDTH * uiScale);
+  const scaledHeaderRowH = Math.round(HEADER_ROW_HEIGHT * uiScale);
+  const scaledAddRowH = Math.round(ADD_ROW_HEIGHT * uiScale);
+
+  // Per-cell card counts drive the same layout solver as RangeDesign.
+  // A set container counts as its number of distinct component cards
+  // (min 1 so an empty container still reserves a slot).
+  const cellCounts = useMemo(() => {
+    const numCols = layout.xLabels.length;
+    const numRows = layout.yLabels.length;
+    if (numCols === 0 || numRows === 0 || !activeBoard) return [] as number[][];
+    const counts: number[][] = [];
+    for (let row = 0; row < numRows; row++) {
+      counts.push([]);
+      for (let col = 0; col < numCols; col++) {
+        let n = 0;
+        for (const a of layout.assignments) {
+          if (a.row !== row || a.col !== col) continue;
+          const item = activeBoard.items.find((i) => i.id === a.itemId);
+          n += Math.max(1, item?.components.length ?? 1);
+        }
+        counts[row].push(n);
+      }
+    }
+    return counts;
+  }, [layout, activeBoard]);
+
+  const { columnWidths, rowHeights, cardWidth, cardHeight } = useMemo(() => {
+    const numCols = layout.xLabels.length;
+    const numRows = layout.yLabels.length;
+    if (numCols === 0 || numRows === 0 || wrapperSize.w === 0 || wrapperSize.h === 0) {
+      return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH, cardHeight: MAX_CARD_WIDTH * 1.4 };
+    }
+    const scaledGap = Math.ceil(BASE_GAP * uiScale);
+    const availW = wrapperSize.w - scaledRowHeaderW - scaledAddBtnW - (numCols + 1) * scaledGap;
+    const availH = wrapperSize.h - scaledHeaderRowH - scaledAddRowH - (numRows + 1) * scaledGap;
+    if (availW <= 0 || availH <= 0) {
+      return { columnWidths: [], rowHeights: [], cardWidth: MAX_CARD_WIDTH, cardHeight: MAX_CARD_WIDTH * 1.4 };
+    }
+    const result = computeMatrixLayout(cellCounts, cardFormat, availW, availH, uiScale);
+    return { columnWidths: result.colWidths, rowHeights: result.rowHeights, cardWidth: result.cardW, cardHeight: result.cardH };
+  }, [cellCounts, layout.xLabels, layout.yLabels, wrapperSize, cardFormat, uiScale, scaledRowHeaderW, scaledAddBtnW, scaledHeaderRowH, scaledAddRowH]);
+
+  const gridCols = `${scaledRowHeaderW}px ${columnWidths.map((w) => `${w}px`).join(' ')} ${scaledAddBtnW}px`;
 
   const cellMap = useMemo(() => {
     const map = new Map<string, string[]>();
-    for (const a of ml.assignments) {
+    for (const a of layout.assignments) {
       const key = `${a.row}-${a.col}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(a.itemId);
+      const arr = map.get(key) || [];
+      arr.push(a.itemId);
+      map.set(key, arr);
     }
     return map;
-  }, [ml.assignments]);
+  }, [layout.assignments]);
 
   const unassigned = useMemo(() => {
     if (!activeBoard) return [];
-    const assigned = new Set(ml.assignments.map((a) => a.itemId));
+    const assigned = new Set(layout.assignments.map((a) => a.itemId));
     return activeBoard.items.filter((i) => !assigned.has(i.id));
-  }, [activeBoard, ml.assignments]);
+  }, [activeBoard, layout.assignments]);
 
   const handleNewBoard = () => {
     const name = prompt('Board name:');
     if (name?.trim()) addSetBoard(name.trim());
   };
 
-  const handleNewItem = (kind: SetItemKind) => {
+  const handleNewItem = (kind: SetItemKind, row?: number, col?: number) => {
     if (!activeBoard) return;
     const name = prompt(`${kind === 'set' ? 'Set' : 'Bundle'} name:`);
     if (!name?.trim()) return;
     const id = `sbi-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     addSetBoardItem(activeBoard.id, { id, name: name.trim(), kind, components: [], position: activeBoard.items.length });
+    if (row != null && col != null) {
+      setTimeout(() => setSetBoardMatrixAssignment(activeBoard.id, id, row, col), 0);
+    }
   };
 
   const handleDragStart = (event: DragStartEvent) => {
     const id = String(event.active.id);
     if (id.startsWith('catalogue-')) {
       const data = event.active.data.current as { product: Product };
-      setDragOverlay(data.product.name);
-    } else if (id.startsWith('slab-item-')) {
-      const itemId = id.replace('slab-item-', '');
-      const item = activeBoard?.items.find((i) => i.id === itemId);
-      setDragOverlay(item?.name ?? 'Item');
+      if (data?.product) setActiveProduct(data.product);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    setDragOverlay(null);
+    setActiveProduct(null);
     if (!activeBoard) return;
     const { active, over } = event;
     if (!over) return;
-
     const activeId = String(active.id);
     const overId = String(over.id);
 
+    // Catalogue SKU → set container: add as component (repeat drop = qty+1)
     if (activeId.startsWith('catalogue-') && overId.startsWith('slab-card-')) {
       const data = active.data.current as { product: Product };
+      if (!data?.product) return;
       const targetItemId = overId.replace('slab-card-', '');
       const item = activeBoard.items.find((i) => i.id === targetItemId);
       if (!item) return;
       const existing = item.components.find((c) => c.productId === data.product.id);
-      if (existing) {
-        updateSetBoardItem(activeBoard.id, targetItemId, {
-          components: item.components.map((c) => c.productId === data.product.id ? { ...c, quantity: c.quantity + 1 } : c),
-        });
-      } else {
-        updateSetBoardItem(activeBoard.id, targetItemId, {
-          components: [...item.components, { productId: data.product.id, quantity: 1 }],
-        });
-      }
+      updateSetBoardItem(activeBoard.id, targetItemId, {
+        components: existing
+          ? item.components.map((c) => c.productId === data.product.id ? { ...c, quantity: c.quantity + 1 } : c)
+          : [...item.components, { productId: data.product.id, quantity: 1 }],
+      });
       return;
     }
 
-    if (activeId.startsWith('catalogue-') && overId.startsWith('slab-cell-')) {
+    const cellMatch = overId.match(/^matrix-cell-(\d+)-(\d+)$/);
+    if (!cellMatch) return;
+    const row = parseInt(cellMatch[1]);
+    const col = parseInt(cellMatch[2]);
+
+    // Catalogue SKU → empty cell area: create a new set seeded with the SKU
+    if (activeId.startsWith('catalogue-')) {
       const data = active.data.current as { product: Product };
-      const parts = overId.split('-');
-      const row = Number(parts[2]), col = Number(parts[3]);
+      if (!data?.product) return;
       const id = `sbi-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      const newItem: SetBoardItem = {
+      addSetBoardItem(activeBoard.id, {
         id, name: data.product.name, kind: 'set',
         components: [{ productId: data.product.id, quantity: 1 }],
         position: activeBoard.items.length,
-      };
-      addSetBoardItem(activeBoard.id, newItem);
-      setSetBoardMatrixAssignment(activeBoard.id, id, row, col);
+      });
+      setTimeout(() => setSetBoardMatrixAssignment(activeBoard.id, id, row, col), 0);
       return;
     }
 
-    if (activeId.startsWith('slab-item-') && overId.startsWith('slab-cell-')) {
+    // Set container moved between cells
+    if (activeId.startsWith('slab-item-')) {
       const itemId = activeId.replace('slab-item-', '');
-      const parts = overId.split('-');
-      setSetBoardMatrixAssignment(activeBoard.id, itemId, Number(parts[2]), Number(parts[3]));
-      return;
+      setSetBoardMatrixAssignment(activeBoard.id, itemId, row, col);
     }
   };
 
-  const handleAddRow = () => {
+  const addLabel = useCallback((axis: 'x' | 'y') => {
     if (!activeBoard) return;
-    const label = prompt('Row label:') || `Row ${ml.yLabels.length + 1}`;
-    updateSetBoardMatrix(activeBoard.id, { yLabels: [...ml.yLabels, label] });
-  };
+    const text = prompt(`New ${axis === 'x' ? 'column' : 'row'} label:`);
+    if (!text) return;
+    if (axis === 'x') updateSetBoardMatrix(activeBoard.id, { xLabels: [...layout.xLabels, text] });
+    else updateSetBoardMatrix(activeBoard.id, { yLabels: [...layout.yLabels, text] });
+  }, [activeBoard, layout, updateSetBoardMatrix]);
 
-  const handleAddCol = () => {
+  const removeLabel = useCallback((axis: 'x' | 'y', index: number) => {
     if (!activeBoard) return;
-    const label = prompt('Column label:') || `Col ${ml.xLabels.length + 1}`;
-    updateSetBoardMatrix(activeBoard.id, { xLabels: [...ml.xLabels, label] });
-  };
+    if (axis === 'x') {
+      updateSetBoardMatrix(activeBoard.id, {
+        xLabels: layout.xLabels.filter((_, i) => i !== index),
+        assignments: layout.assignments.filter((a) => a.col !== index).map((a) => a.col > index ? { ...a, col: a.col - 1 } : a),
+      });
+    } else {
+      updateSetBoardMatrix(activeBoard.id, {
+        yLabels: layout.yLabels.filter((_, i) => i !== index),
+        assignments: layout.assignments.filter((a) => a.row !== index).map((a) => a.row > index ? { ...a, row: a.row - 1 } : a),
+      });
+    }
+  }, [activeBoard, layout, updateSetBoardMatrix]);
 
-  // Matrix wrapper measurement for card sizing
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const [wrapperW, setWrapperW] = useState(800);
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    const obs = new ResizeObserver(([e]) => setWrapperW(e.contentRect.width));
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [activeBoard?.id]);
-
-  const ROW_HEADER_W = 60;
-  const ADD_BTN_W = 28;
-  const colCount = ml.xLabels.length;
-  const availW = wrapperW - ROW_HEADER_W - ADD_BTN_W - 16;
-  const colW = colCount > 0 ? Math.floor(availW / colCount) : 200;
-  const cardW = Math.max(60, Math.min(colW - 8, 75));
+  const updateLabel = useCallback((axis: 'x' | 'y', index: number, text: string) => {
+    if (!activeBoard) return;
+    if (axis === 'x') updateSetBoardMatrix(activeBoard.id, { xLabels: layout.xLabels.map((l, i) => i === index ? text : l) });
+    else updateSetBoardMatrix(activeBoard.id, { yLabels: layout.yLabels.map((l, i) => i === index ? text : l) });
+    setEditingAxis(null);
+  }, [activeBoard, layout, updateSetBoardMatrix]);
 
   if (!project) return null;
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="set-lab">
-        {/* Board sidebar */}
+    <div className="range-design set-lab">
+      <DndContext sensors={sensors} collisionDetection={closestCenter}
+        onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+
+        {/* Board sidebar — plan-tree-style management, separate from range plans */}
         <div className="slab-sidebar">
           <div className="slab-sidebar-header">
-            <h3>Boards</h3>
-            <button className="slab-add-btn" onClick={handleNewBoard}>+ Board</button>
+            <h3>Set Boards</h3>
+            <button className="slab-add-btn" onClick={handleNewBoard}>+</button>
           </div>
           <div className="slab-board-list">
             {boards.map((b) => (
-              <div
-                key={b.id}
+              <div key={b.id}
                 className={`slab-board-item ${b.id === activeBoard?.id ? 'active' : ''}`}
                 onClick={() => setActiveSetBoard(b.id)}
                 onDoubleClick={() => {
                   const name = prompt('Rename board:', b.name);
                   if (name?.trim()) renameSetBoard(b.id, name.trim());
-                }}
-              >
+                }}>
                 <span className="slab-board-name">{b.name}</span>
                 <span className="slab-board-count">{b.items.length}</span>
                 <button className="slab-board-delete" onClick={(e) => {
@@ -183,177 +255,168 @@ export function SetLab() {
                 }}>×</button>
               </div>
             ))}
-            {boards.length === 0 && <div className="slab-drop-hint">No boards yet</div>}
+            {boards.length === 0 && <div className="slab-empty-hint">Create a board to begin</div>}
           </div>
         </div>
 
-        {/* Main area */}
-        <div className="slab-main">
+        <div className="range-design-canvas">
+          <div className="range-design-title-bar">
+            <div className="range-stage-selector" role="tablist">
+              <button className="slab-add-btn" onClick={() => handleNewItem('set')} title="Add a new empty set container">+ Set</button>
+              <button className="slab-add-btn bundle" onClick={() => handleNewItem('bundle')} title="Add a new empty bundle container">+ Bundle</button>
+            </div>
+            <div className="range-design-canvas-controls">
+              <SlideCanvasControls scrollAreaSelector=".range-view-scroll" />
+            </div>
+          </div>
+
           {activeBoard ? (
-            <>
-              <div className="slab-toolbar">
-                <h2>{activeBoard.name}</h2>
-                <div className="slab-toolbar-actions">
-                  <button className="slab-add-btn" onClick={() => handleNewItem('set')}>+ Set</button>
-                  <button className="slab-add-btn" style={{ background: '#f57c00' }} onClick={() => handleNewItem('bundle')}>+ Bundle</button>
-                </div>
-                <div style={{ marginLeft: 'auto' }}>
-                  <SlideCanvasControls />
-                </div>
-              </div>
-              <div className="slab-canvas">
-                <div className="slab-matrix-scroll" style={{ overflow: 'auto', flex: 1 }}>
-                  <div className="matrix-16-9" style={{ transform: `scale(${(slideBaseScale ?? 1) * (slideZoom ?? 1)})`, transformOrigin: 'top left' }}>
-                    <div ref={wrapperRef} className="slab-matrix-wrapper">
-                      {/* Column headers */}
-                      <div className="range-matrix-header-row" style={{ marginLeft: ROW_HEADER_W, display: 'flex', gap: 2 }}>
-                        {ml.xLabels.map((label, ci) => (
-                          <div
-                            key={ci}
-                            className="range-col-label"
-                            style={{ width: colW, textAlign: 'center' }}
-                            onDoubleClick={() => {
-                              const n = prompt('Column label:', label);
-                              if (n != null) { const labels = [...ml.xLabels]; labels[ci] = n; updateSetBoardMatrix(activeBoard.id, { xLabels: labels }); }
-                            }}
-                          >
-                            {label}
+            <div className="slide-scroll-area range-view-scroll">
+              <div className="slide-scroll-spacer">
+                <div className="slide-canvas-wrapper">
+                  <div className="matrix-16-9">
+                    <div className="slide-title">
+                      <EditableTitle
+                        className="range-design-title"
+                        value={activeBoard.name}
+                        onSave={(next) => { if (next.trim()) renameSetBoard(activeBoard.id, next.trim()); }}
+                        trailing={<span className="stage-badge">Set Board</span>}
+                      />
+                    </div>
+                    <div className="matrix-wrapper" ref={wrapperRef}>
+                      <div className="matrix-header-row" style={{ gridTemplateColumns: gridCols }}>
+                        <div />
+                        {layout.xLabels.map((label, i) => (
+                          <div key={i} className="matrix-col-header" onDoubleClick={() => setEditingAxis({ axis: 'x', index: i })}>
+                            {editingAxis?.axis === 'x' && editingAxis.index === i ? (
+                              <input className="matrix-label-input" defaultValue={label} autoFocus
+                                onBlur={(e) => updateLabel('x', i, e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && updateLabel('x', i, (e.target as HTMLInputElement).value)} />
+                            ) : <span>{label}</span>}
+                            <button className="matrix-label-remove" onClick={() => removeLabel('x', i)}><CloseIcon size={7} color="#fff" /></button>
                           </div>
                         ))}
-                        <button className="range-add-col-btn" onClick={handleAddCol} title="Add column">+</button>
+                        <button className="matrix-add-btn" onClick={() => addLabel('x')}>+</button>
                       </div>
 
-                      {/* Rows */}
-                      {ml.yLabels.map((rowLabel, ri) => (
-                        <div key={ri} className="range-matrix-row" style={{ display: 'flex', gap: 2, marginBottom: 2 }}>
-                          <div
-                            className="range-row-label"
-                            style={{ width: ROW_HEADER_W }}
-                            onDoubleClick={() => {
-                              const n = prompt('Row label:', rowLabel);
-                              if (n != null) { const labels = [...ml.yLabels]; labels[ri] = n; updateSetBoardMatrix(activeBoard.id, { yLabels: labels }); }
-                            }}
-                          >
-                            {rowLabel}
+                      {layout.yLabels.map((yLabel, row) => (
+                        <div key={row} className="matrix-row"
+                          style={{ gridTemplateColumns: gridCols, height: `${rowHeights[row] || 80}px` }}>
+                          <div className="matrix-row-header" onDoubleClick={() => setEditingAxis({ axis: 'y', index: row })}>
+                            {editingAxis?.axis === 'y' && editingAxis.index === row ? (
+                              <input className="matrix-label-input" defaultValue={yLabel} autoFocus
+                                onBlur={(e) => updateLabel('y', row, e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && updateLabel('y', row, (e.target as HTMLInputElement).value)} />
+                            ) : <span>{yLabel}</span>}
+                            <button className="matrix-label-remove" onClick={() => removeLabel('y', row)}><CloseIcon size={7} color="#fff" /></button>
                           </div>
-                          {ml.xLabels.map((_, ci) => (
-                            <SetLabCell
-                              key={`${ri}-${ci}`}
-                              row={ri} col={ci}
-                              width={colW}
-                              cardWidth={cardW}
-                              itemIds={cellMap.get(`${ri}-${ci}`) ?? []}
-                              board={activeBoard}
-                              catalogue={catalogue}
+                          {layout.xLabels.map((_, col) => (
+                            <SetLabCell key={`${row}-${col}`} row={row} col={col}
+                              itemIds={cellMap.get(`${row}-${col}`) || []}
+                              board={activeBoard} catalogue={catalogue}
+                              cardWidth={cardWidth} cardHeight={cardHeight}
+                              cellHeight={rowHeights[row] || 80}
                               onRemoveItem={(id) => removeSetBoardItem(activeBoard.id, id)}
                               onUpdateItem={(id, patch) => updateSetBoardItem(activeBoard.id, id, patch)}
                               onRemoveComponent={(itemId, prodId) => {
                                 const item = activeBoard.items.find((i) => i.id === itemId);
                                 if (!item) return;
+                                const comp = item.components.find((c) => c.productId === prodId);
+                                if (!comp) return;
                                 updateSetBoardItem(activeBoard.id, itemId, {
-                                  components: item.components.filter((c) => c.productId !== prodId),
+                                  components: comp.quantity > 1
+                                    ? item.components.map((c) => c.productId === prodId ? { ...c, quantity: c.quantity - 1 } : c)
+                                    : item.components.filter((c) => c.productId !== prodId),
                                 });
-                              }}
-                            />
+                              }} />
                           ))}
+                          <div />
                         </div>
                       ))}
-                      <div style={{ marginLeft: ROW_HEADER_W }}>
-                        <button className="range-add-row-btn" onClick={handleAddRow} title="Add row">+ Row</button>
+
+                      <div className="matrix-add-row">
+                        <button className="matrix-add-btn wide" onClick={() => addLabel('y')}>+ Row</button>
                       </div>
                     </div>
-
-                    {/* Unassigned tray */}
-                    {unassigned.length > 0 && (
-                      <div style={{ padding: '12px 16px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#888', textTransform: 'uppercase', marginBottom: 6 }}>Unassigned</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {unassigned.map((item) => <UnassignedItem key={item.id} item={item} />)}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
-
-                {/* Catalogue panel */}
-                <div className="slab-catalogue">
-                  <Catalogue
-                    products={catalogue}
-                    onImport={() => {}}
-                    currentProductIds={new Set()}
-                    futureProductIds={new Set()}
-                    dropZoneId="slab-catalogue-drop"
-                  />
-                </div>
               </div>
-            </>
+            </div>
           ) : (
-            <div className="slab-empty">
-              <div>
-                <p style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>Set & Bundle Lab</p>
-                <p>Create a board from the sidebar to start experimenting with product sets and bundles.</p>
+            <div className="slab-empty-canvas">Create a board from the sidebar to start experimenting with sets and bundles.</div>
+          )}
+
+          {activeBoard && unassigned.length > 0 && (
+            <div className="unassigned-tray">
+              <span className="unassigned-label">On board but not placed in matrix ({unassigned.length}):</span>
+              <div className="unassigned-items">
+                {unassigned.map((item) => (
+                  <UnassignedSetDraggable key={item.id} item={item}
+                    onRemove={() => removeSetBoardItem(activeBoard.id, item.id)} />
+                ))}
               </div>
             </div>
           )}
         </div>
-      </div>
 
-      <DragOverlay>
-        {dragOverlay && (
-          <div style={{ padding: '6px 12px', background: '#1976d2', color: '#fff', borderRadius: 6, fontSize: 11, fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}>
-            {dragOverlay}
-          </div>
-        )}
-      </DragOverlay>
-    </DndContext>
-  );
-}
+        <div className="right-column">
+          <Catalogue products={catalogue} onImport={() => {}}
+            currentProductIds={new Set()} futureProductIds={new Set()}
+            dropZoneId="slab-catalogue-drop" />
+        </div>
 
-// ---------- Matrix Cell ----------
-
-function SetLabCell({ row, col, width, cardWidth, itemIds, board, catalogue, onRemoveItem, onUpdateItem, onRemoveComponent }: {
-  row: number; col: number; width: number; cardWidth: number;
-  itemIds: string[];
-  board: SetBoard;
-  catalogue: Product[];
-  onRemoveItem: (id: string) => void;
-  onUpdateItem: (id: string, patch: Partial<SetBoardItem>) => void;
-  onRemoveComponent: (itemId: string, productId: string) => void;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: `slab-cell-${row}-${col}` });
-  const items = itemIds.map((id) => board.items.find((i) => i.id === id)).filter((i): i is SetBoardItem => !!i);
-
-  return (
-    <div ref={setNodeRef} className={`slab-cell ${isOver ? 'drop-over' : ''}`} style={{ width, minHeight: 120 }}>
-      {items.map((item) => (
-        <SetCard
-          key={item.id}
-          item={item}
-          catalogue={catalogue}
-          cardWidth={cardWidth}
-          onRemove={() => onRemoveItem(item.id)}
-          onRename={() => { const n = prompt('Rename:', item.name); if (n?.trim()) onUpdateItem(item.id, { name: n.trim() }); }}
-          onToggleKind={() => onUpdateItem(item.id, { kind: item.kind === 'set' ? 'bundle' : 'set' })}
-          onRemoveComponent={(prodId) => onRemoveComponent(item.id, prodId)}
-        />
-      ))}
-      {items.length === 0 && <div className="slab-drop-hint">Drop here</div>}
+        <DragOverlay>
+          {activeProduct && (
+            <div className="matrix-drag-preview">{anonDisplay(activeProduct, catalogue).name}</div>
+          )}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 }
 
-// ---------- Set Card with real ProductCards inside ----------
+// ---------- Matrix cell (droppable, same visual as RangeDesign) ----------
 
-function SetCard({ item, catalogue, cardWidth, onRemove, onRename, onToggleKind, onRemoveComponent }: {
-  item: SetBoardItem;
-  catalogue: Product[];
-  cardWidth: number;
-  onRemove: () => void;
-  onRename: () => void;
-  onToggleKind: () => void;
+function SetLabCell({ row, col, itemIds, board, catalogue, cardWidth, cardHeight, cellHeight, onRemoveItem, onUpdateItem, onRemoveComponent }: {
+  row: number; col: number; itemIds: string[];
+  board: SetBoard; catalogue: Product[];
+  cardWidth: number; cardHeight: number; cellHeight: number;
+  onRemoveItem: (id: string) => void;
+  onUpdateItem: (id: string, patch: Partial<SetBoardItem>) => void;
+  onRemoveComponent: (itemId: string, productId: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `matrix-cell-${row}-${col}` });
+  const items = itemIds.map((id) => board.items.find((i) => i.id === id)).filter((i): i is SetBoardItem => !!i);
+
+  return (
+    <div ref={setNodeRef} className={`matrix-cell ${isOver ? 'cell-over' : ''}`}
+      style={{
+        '--matrix-card-width': `${Math.floor(cardWidth)}px`,
+        '--matrix-card-height': `${Math.floor(cardHeight)}px`,
+        height: `${cellHeight}px`,
+      } as React.CSSProperties}>
+      {items.map((item) => (
+        <SetContainer key={item.id} item={item} catalogue={catalogue}
+          onRemove={() => onRemoveItem(item.id)}
+          onRename={() => { const n = prompt('Rename:', item.name); if (n?.trim()) onUpdateItem(item.id, { name: n.trim() }); }}
+          onToggleKind={() => onUpdateItem(item.id, { kind: item.kind === 'set' ? 'bundle' : 'set' })}
+          onRemoveComponent={(prodId) => onRemoveComponent(item.id, prodId)} />
+      ))}
+    </div>
+  );
+}
+
+// ---------- Set/Bundle container — draggable + droppable, holds matrix-cards ----------
+
+function SetContainer({ item, catalogue, onRemove, onRename, onToggleKind, onRemoveComponent }: {
+  item: SetBoardItem; catalogue: Product[];
+  onRemove: () => void; onRename: () => void; onToggleKind: () => void;
   onRemoveComponent: (productId: string) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `slab-card-${item.id}` });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: `slab-card-${item.id}` });
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: `slab-item-${item.id}`, data: { itemId: item.id },
+  });
 
   const totalRrp = item.components.reduce((sum, c) => {
     const prod = catalogue.find((p) => p.id === c.productId);
@@ -362,76 +425,100 @@ function SetCard({ item, catalogue, cardWidth, onRemove, onRename, onToggleKind,
   const totalQty = item.components.reduce((s, c) => s + c.quantity, 0);
 
   return (
-    <div ref={setNodeRef} className={`slab-set-card kind-${item.kind} ${isOver ? 'drop-over' : ''}`}>
-      <div className="slab-set-card-header">
-        <span className="slab-set-card-name" onDoubleClick={(e) => { e.stopPropagation(); onRename(); }}>{item.name}</span>
-        <span className={`slab-set-card-kind ${item.kind}`} onClick={(e) => { e.stopPropagation(); onToggleKind(); }} style={{ cursor: 'pointer' }} title="Click to toggle Set/Bundle">{item.kind}</span>
-        <button className="slab-set-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }}>×</button>
+    <div ref={setDropRef}
+      className={`slab-set kind-${item.kind} ${isOver ? 'drop-over' : ''} ${isDragging ? 'dragging' : ''}`}>
+      <div className="slab-set-header" ref={setDragRef} {...attributes} {...listeners}>
+        <span className="slab-set-name" onDoubleClick={(e) => { e.stopPropagation(); onRename(); }} title={item.name}>{item.name}</span>
+        <span className={`slab-set-kind ${item.kind}`}
+          onClick={(e) => { e.stopPropagation(); onToggleKind(); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          title="Click to toggle Set / Bundle">{item.kind}</span>
+        <button className="matrix-card-remove slab-set-remove"
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          onPointerDown={(e) => e.stopPropagation()}>
+          <CloseIcon size={8} color="#fff" />
+        </button>
       </div>
-
-      {/* Product cards inside the container */}
-      {item.components.length > 0 ? (
-        <div className="slab-component-cards">
-          {item.components.map((c) => {
-            const prod = catalogue.find((p) => p.id === c.productId);
-            if (!prod) return null;
-            // Build a minimal ShelfItem-like object for ProductCard
-            const fakeItem = { id: `${item.id}-${c.productId}`, productId: prod.id, position: 0, isPlaceholder: false as const };
-            return (
-              <div key={c.productId} className="slab-component-wrapper">
-                {c.quantity > 1 && (
-                  <div className="slab-qty-badge">×{c.quantity}</div>
-                )}
-                <div style={{ width: cardWidth }}>
-                  <ProductCard
-                    item={fakeItem}
-                    product={prod}
-                    cardWidth={cardWidth}
-                    overlay
-                    stageKey="current"
-                  />
-                </div>
-                <button className="slab-component-x" onClick={(e) => { e.stopPropagation(); onRemoveComponent(c.productId); }}>×</button>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="slab-drop-hint">Drag SKUs here</div>
-      )}
-
+      <div className="slab-set-body">
+        {item.components.length === 0 && <div className="slab-set-drop-hint">drag SKUs in</div>}
+        {item.components.map((c) => {
+          const product = catalogue.find((p) => p.id === c.productId);
+          if (!product) return null;
+          return (
+            <SetComponentCard key={c.productId} product={product} quantity={c.quantity}
+              catalogue={catalogue} onRemove={() => onRemoveComponent(c.productId)} />
+          );
+        })}
+      </div>
       {totalQty > 0 && (
-        <div className="slab-set-card-footer">
-          {totalQty} item{totalQty !== 1 ? 's' : ''} · RRP £{totalRrp.toFixed(2)}
-        </div>
+        <div className="slab-set-footer">{totalQty} item{totalQty !== 1 ? 's' : ''} · £{totalRrp.toFixed(2)}</div>
       )}
     </div>
   );
 }
 
-// ---------- Unassigned item ----------
+// ---------- Component card — exact matrix-card markup from RangeDesign ----------
 
-function UnassignedItem({ item }: { item: SetBoardItem }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `slab-item-${item.id}`,
-    data: { type: 'set-item', item },
-  });
+function SetComponentCard({ product, quantity, catalogue, onRemove }: {
+  product: Product; quantity: number; catalogue: Product[]; onRemove: () => void;
+}) {
+  const cardFormat = useProjectStore((s) => s.cardFormat);
+  const anon = anonDisplay(product, catalogue);
+  const displayName = anon.name;
+  const isDev = product.source === 'dev';
+
+  // Stack visual: quantity > 1 renders offset "shadow" layers behind the card.
+  const stackLayers = Math.min(quantity - 1, 2);
 
   return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      style={{
-        padding: '4px 10px',
-        background: item.kind === 'set' ? '#e3f2fd' : '#fff3e0',
-        border: `1px solid ${item.kind === 'set' ? '#bbdefb' : '#ffe0b2'}`,
-        borderRadius: 4, fontSize: 11, fontWeight: 600,
-        color: item.kind === 'set' ? '#1976d2' : '#f57c00',
-        cursor: 'grab', opacity: isDragging ? 0.4 : 1,
-      }}
-    >
-      {item.name}
+    <div className="slab-stack" style={{ marginRight: stackLayers * 4, marginBottom: stackLayers * 3 }}>
+      {Array.from({ length: stackLayers }).map((_, i) => (
+        <div key={i} className="slab-stack-layer" style={{ top: (i + 1) * 3, left: (i + 1) * 4 }} />
+      ))}
+      <div className={`matrix-card ${isDev ? 'dev-product' : ''}`}>
+        <button className="matrix-card-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }} title={quantity > 1 ? 'Remove one' : 'Remove'}>
+          <CloseIcon size={8} color="#fff" />
+        </button>
+        {isDev && <div className="matrix-card-dev-badge">DEV</div>}
+        {quantity > 1 && <div className="slab-stack-qty">×{quantity}</div>}
+        <div className="matrix-card-content">
+          {cardFormat.showImage && (
+            <div className="matrix-card-image">
+              {anon.imageUrl ? (
+                <img src={anon.imageUrl} alt={displayName} />
+              ) : (
+                <div className="matrix-card-image-ph">{displayName.charAt(0)}</div>
+              )}
+            </div>
+          )}
+          {cardFormat.showName && <div className="matrix-card-name" title={displayName}>{displayName}</div>}
+          {cardFormat.showSku && <div className="matrix-card-sku">{product.sku || '—'}</div>}
+          {cardFormat.showRrp && <div className="matrix-card-rrp">{product.rrp ? `£${product.rrp}` : '—'}</div>}
+          {cardFormat.showUsRrp && product.usRrp !== undefined && <div className="matrix-card-rrp matrix-card-us">${product.usRrp}</div>}
+          {cardFormat.showEuRrp && product.euRrp !== undefined && <div className="matrix-card-rrp matrix-card-eu">€{product.euRrp}</div>}
+          {cardFormat.showAusRrp && product.ausRrp !== undefined && <div className="matrix-card-rrp matrix-card-aus">A${product.ausRrp}</div>}
+          {cardFormat.showVolume && <div className="matrix-card-vol">Vol: {product.volume ? product.volume.toLocaleString() : '—'}</div>}
+          {cardFormat.showRevenue && product.revenue !== undefined && product.revenue > 0 && (
+            <div className="matrix-card-rev">Rev: {product.revenue.toLocaleString()}</div>
+          )}
+          {cardFormat.showCategory && product.category && <div className="matrix-card-category">{product.category}</div>}
+        </div>
+      </div>
     </div>
+  );
+}
+
+// ---------- Unassigned tray chip ----------
+
+function UnassignedSetDraggable({ item, onRemove }: { item: SetBoardItem; onRemove: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `slab-item-${item.id}`, data: { itemId: item.id },
+  });
+  return (
+    <span ref={setNodeRef} className={`unassigned-item draggable ${isDragging ? 'dragging' : ''}`}
+      {...attributes} {...listeners}>
+      {item.name} <em style={{ opacity: 0.6, fontStyle: 'normal', fontSize: 9 }}>({item.kind})</em>
+      <button className="unassigned-remove" onClick={(e) => { e.stopPropagation(); onRemove(); }} title="Delete">×</button>
+    </span>
   );
 }

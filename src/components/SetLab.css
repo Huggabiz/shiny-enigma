@@ -1,14 +1,12 @@
-.set-lab {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-  min-width: 0;
-}
+/* Set & Bundle Lab — reuses the RangeDesign matrix CSS wholesale
+   (.range-design, .matrix-16-9, .matrix-wrapper, .matrix-cell,
+   .matrix-card, .unassigned-tray, ...). This file only adds the
+   board sidebar and the set/bundle container chrome. */
 
 /* ---------- Board sidebar ---------- */
 
 .slab-sidebar {
-  width: 220px;
+  width: 200px;
   flex-shrink: 0;
   background: #fafafa;
   border-right: 1px solid #e0e0e0;
@@ -46,6 +44,14 @@
 
 .slab-add-btn:hover {
   background: #1565c0;
+}
+
+.slab-add-btn.bundle {
+  background: #f57c00;
+}
+
+.slab-add-btn.bundle:hover {
+  background: #ef6c00;
 }
 
 .slab-board-list {
@@ -112,224 +118,159 @@
   color: #c62828;
 }
 
-/* ---------- Main area ---------- */
-
-.slab-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-width: 0;
-}
-
-.slab-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
-}
-
-.slab-toolbar h2 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a1a2e;
-}
-
-.slab-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.slab-canvas {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-  min-height: 0;
-}
-
-.slab-matrix-scroll {
-  flex: 1;
-  overflow: auto;
-  min-width: 0;
-}
-
-.slab-matrix-wrapper {
-  padding: 16px;
-  min-width: fit-content;
-}
-
-/* ---------- Matrix cells ---------- */
-
-.slab-cell {
-  background: #fafafa;
-  border: 1px dashed #ddd;
-  border-radius: 4px;
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  transition: background 0.1s;
-}
-
-.slab-cell.drop-over {
-  background: #e3f2fd;
-  border-color: #1976d2;
-  border-style: solid;
-}
-
-/* ---------- Set/Bundle card ---------- */
-
-.slab-set-card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 6px;
+.slab-empty-hint {
+  padding: 16px 14px;
   font-size: 11px;
-}
-
-.slab-set-card.kind-set {
-  border-left: 3px solid #1976d2;
-}
-
-.slab-set-card.kind-bundle {
-  border-left: 3px solid #f57c00;
-}
-
-.slab-set-card.drop-over {
-  box-shadow: 0 0 0 2px #1976d2;
-}
-
-.slab-set-card-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.slab-set-card-name {
-  font-weight: 700;
-  font-size: 10px;
-  color: #1a1a2e;
-  flex: 1;
-  min-width: 0;
-  cursor: pointer;
-}
-
-.slab-set-card-kind {
-  font-size: 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  padding: 1px 5px;
-  border-radius: 3px;
-  color: #fff;
-}
-
-.slab-set-card-kind.set {
-  background: #1976d2;
-}
-
-.slab-set-card-kind.bundle {
-  background: #f57c00;
-}
-
-.slab-set-card-remove {
-  width: 14px;
-  height: 14px;
-  border: none;
-  background: transparent;
-  color: #ccc;
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0;
-  line-height: 1;
-}
-
-.slab-set-card-remove:hover {
-  color: #c62828;
-}
-
-/* Product cards inside set containers */
-.slab-component-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.slab-component-wrapper {
-  position: relative;
-}
-
-.slab-qty-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  z-index: 2;
-  background: #1976d2;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 1px 4px;
-  border-radius: 8px;
-  line-height: 1.2;
-}
-
-.slab-component-x {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  z-index: 2;
-  width: 14px;
-  height: 14px;
-  border: none;
-  background: rgba(0, 0, 0, 0.4);
-  color: #fff;
-  border-radius: 50%;
-  font-size: 10px;
-  line-height: 1;
-  padding: 0;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-
-.slab-component-wrapper:hover .slab-component-x {
-  opacity: 1;
-}
-
-.slab-set-card-footer {
-  margin-top: 4px;
-  font-size: 9px;
-  color: #888;
-  text-align: right;
-}
-
-.slab-drop-hint {
-  font-size: 9px;
-  color: #bbb;
-  text-align: center;
-  padding: 8px;
+  color: #999;
   font-style: italic;
 }
 
-.slab-empty {
+.slab-empty-canvas {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
   color: #888;
   font-size: 13px;
   padding: 40px;
+  text-align: center;
 }
 
-.slab-catalogue {
-  width: 280px;
-  flex-shrink: 0;
-  border-left: 1px solid #e0e0e0;
+/* ---------- Set / Bundle container inside matrix cells ---------- */
+
+.slab-set {
+  background: #fff;
+  border: 1px solid #cfd8dc;
+  border-radius: calc(6px * var(--ui-scale, 1));
+  padding: calc(3px * var(--ui-scale, 1));
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+}
+
+.slab-set.kind-set {
+  border-left: calc(3px * var(--ui-scale, 1)) solid #1976d2;
+}
+
+.slab-set.kind-bundle {
+  border-left: calc(3px * var(--ui-scale, 1)) solid #f57c00;
+}
+
+.slab-set.drop-over {
+  box-shadow: 0 0 0 2px #1976d2;
+}
+
+.slab-set.dragging {
+  opacity: 0.5;
+}
+
+.slab-set-header {
+  display: flex;
+  align-items: center;
+  gap: calc(4px * var(--ui-scale, 1));
+  padding: 0 calc(2px * var(--ui-scale, 1)) calc(2px * var(--ui-scale, 1));
+  cursor: grab;
+  position: relative;
+}
+
+.slab-set-header:active {
+  cursor: grabbing;
+}
+
+.slab-set-name {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(9px * var(--ui-scale, 1));
+  font-weight: 700;
+  color: #1a1a2e;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slab-set-kind {
+  font-size: calc(7px * var(--ui-scale, 1));
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: calc(1px * var(--ui-scale, 1)) calc(4px * var(--ui-scale, 1));
+  border-radius: calc(3px * var(--ui-scale, 1));
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.slab-set-kind.set {
+  background: #1976d2;
+}
+
+.slab-set-kind.bundle {
+  background: #f57c00;
+}
+
+/* Reposition the reused .matrix-card-remove inside the set header —
+   static in the header flow instead of absolute on a card corner. */
+.slab-set-remove {
+  position: static;
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.slab-set:hover .slab-set-remove {
+  opacity: 1;
+}
+
+.slab-set-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(3px * var(--ui-scale, 1));
+  align-items: flex-start;
+}
+
+.slab-set-drop-hint {
+  font-size: calc(8px * var(--ui-scale, 1));
+  color: #bbb;
+  font-style: italic;
+  padding: calc(6px * var(--ui-scale, 1));
+}
+
+.slab-set-footer {
+  font-size: calc(8px * var(--ui-scale, 1));
+  color: #888;
+  text-align: right;
+  padding-top: calc(2px * var(--ui-scale, 1));
+}
+
+/* ---------- Quantity stack visual ---------- */
+
+.slab-stack {
+  position: relative;
+}
+
+.slab-stack-layer {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border: 1px solid #d0d0d0;
+  border-radius: calc(6px * var(--ui-scale, 1));
+  z-index: 0;
+}
+
+.slab-stack .matrix-card {
+  position: relative;
+  z-index: 1;
+}
+
+.slab-stack-qty {
+  position: absolute;
+  top: calc(-4px * var(--ui-scale, 1));
+  right: calc(-4px * var(--ui-scale, 1));
+  z-index: 3;
+  background: #1a1a2e;
+  color: #fff;
+  font-size: calc(8px * var(--ui-scale, 1));
+  font-weight: 700;
+  padding: calc(1px * var(--ui-scale, 1)) calc(4px * var(--ui-scale, 1));
+  border-radius: calc(8px * var(--ui-scale, 1));
+  line-height: 1.3;
 }
