@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
-  DndContext, DragOverlay, closestCenter, PointerSensor, TouchSensor,
+  DndContext, DragOverlay, pointerWithin, rectIntersection, PointerSensor, TouchSensor,
   useSensor, useSensors, useDroppable, useDraggable,
-  type DragEndEvent, type DragStartEvent,
+  type CollisionDetection, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
 import { useProjectStore } from '../store/useProjectStore';
 import { Catalogue } from './Catalogue';
@@ -20,6 +20,64 @@ const ADD_BTN_WIDTH = 28;
 const HEADER_ROW_HEIGHT = 28;
 const ADD_ROW_HEIGHT = 28;
 
+/** Pointer-based collision detection: a drop only targets a set
+ * container when the pointer is actually inside it — otherwise the
+ * cell under the pointer wins. closestCenter was routing cell drops
+ * into nearby containers because a small container's centre can be
+ * the closest centre even when the pointer is over empty cell space. */
+const setLabCollision: CollisionDetection = (args) => {
+  const within = pointerWithin(args);
+  if (within.length > 0) {
+    const containerHit = within.filter((c) => String(c.id).startsWith('slab-card-'));
+    if (containerHit.length > 0) return containerHit;
+    const cellHit = within.filter((c) => String(c.id).startsWith('matrix-cell-'));
+    if (cellHit.length > 0) return cellHit;
+    return within;
+  }
+  return rectIntersection(args);
+};
+
+/** Modal name input — replaces window.prompt for creating/renaming
+ * boards, sets, bundles, and axis labels. */
+interface NameDialogState {
+  title: string;
+  initial?: string;
+  submitLabel?: string;
+  onSubmit: (value: string) => void;
+}
+
+function NameDialog({ state, onClose }: { state: NameDialogState; onClose: () => void }) {
+  const [value, setValue] = useState(state.initial ?? '');
+  const submit = () => {
+    const v = value.trim();
+    if (!v) return;
+    state.onSubmit(v);
+    onClose();
+  };
+  return (
+    <div className="slab-dialog-overlay" onClick={onClose}>
+      <div className="slab-dialog" onClick={(e) => e.stopPropagation()}>
+        <h3>{state.title}</h3>
+        <input
+          className="slab-dialog-input"
+          value={value}
+          autoFocus
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') submit();
+            if (e.key === 'Escape') onClose();
+          }}
+          placeholder="Name"
+        />
+        <div className="slab-dialog-actions">
+          <button className="slab-dialog-btn cancel" onClick={onClose}>Cancel</button>
+          <button className="slab-dialog-btn primary" onClick={submit} disabled={!value.trim()}>{state.submitLabel ?? 'Save'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SetLab() {
   const {
     project, addSetBoard, removeSetBoard, renameSetBoard, setActiveSetBoard,
@@ -30,6 +88,7 @@ export function SetLab() {
 
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [editingAxis, setEditingAxis] = useState<{ axis: 'x' | 'y'; index: number } | null>(null);
+  const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [wrapperSize, setWrapperSize] = useState({ w: 0, h: 0 });
 
@@ -78,7 +137,11 @@ export function SetLab() {
         for (const a of layout.assignments) {
           if (a.row !== row || a.col !== col) continue;
           const item = activeBoard.items.find((i) => i.id === a.itemId);
-          n += Math.max(1, item?.components.length ?? 1);
+          // +1 virtual card per container reserves space for its chrome
+          // (header, footer, padding) so the auto-tier resizes before
+          // content ever clips against the cell edge — the same
+          // reserve-then-fit approach the range view relies on.
+          n += (item?.components.length ?? 0) + 1;
         }
         counts[row].push(n);
       }
@@ -151,8 +214,11 @@ export function SetLab() {
   }, [activeBoard, layout.assignments]);
 
   const handleNewBoard = () => {
-    const name = prompt('Board name:');
-    if (name?.trim()) addSetBoard(name.trim());
+    setNameDialog({
+      title: 'New board',
+      submitLabel: 'Create',
+      onSubmit: (name) => addSetBoard(name),
+    });
   };
 
   // Cell-hover creation — mirrors the placeholder-add mechanic in the
@@ -160,11 +226,17 @@ export function SetLab() {
   // directly in that cell.
   const handleNewItem = useCallback((kind: SetItemKind, row: number, col: number) => {
     if (!activeBoard) return;
-    const name = prompt(`${kind === 'set' ? 'Set' : 'Bundle'} name:`);
-    if (!name?.trim()) return;
-    const id = `sbi-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    addSetBoardItem(activeBoard.id, { id, name: name.trim(), kind, components: [], position: activeBoard.items.length });
-    setTimeout(() => setSetBoardMatrixAssignment(activeBoard.id, id, row, col), 0);
+    const boardId = activeBoard.id;
+    const position = activeBoard.items.length;
+    setNameDialog({
+      title: `New ${kind}`,
+      submitLabel: 'Create',
+      onSubmit: (name) => {
+        const id = `sbi-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        addSetBoardItem(boardId, { id, name, kind, components: [], position });
+        setTimeout(() => setSetBoardMatrixAssignment(boardId, id, row, col), 0);
+      },
+    });
   }, [activeBoard, addSetBoardItem, setSetBoardMatrixAssignment]);
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -227,10 +299,15 @@ export function SetLab() {
 
   const addLabel = useCallback((axis: 'x' | 'y') => {
     if (!activeBoard) return;
-    const text = prompt(`New ${axis === 'x' ? 'column' : 'row'} label:`);
-    if (!text) return;
-    if (axis === 'x') updateSetBoardMatrix(activeBoard.id, { xLabels: [...layout.xLabels, text] });
-    else updateSetBoardMatrix(activeBoard.id, { yLabels: [...layout.yLabels, text] });
+    const boardId = activeBoard.id;
+    setNameDialog({
+      title: `New ${axis === 'x' ? 'column' : 'row'}`,
+      submitLabel: 'Add',
+      onSubmit: (text) => {
+        if (axis === 'x') updateSetBoardMatrix(boardId, { xLabels: [...layout.xLabels, text] });
+        else updateSetBoardMatrix(boardId, { yLabels: [...layout.yLabels, text] });
+      },
+    });
   }, [activeBoard, layout, updateSetBoardMatrix]);
 
   const removeLabel = useCallback((axis: 'x' | 'y', index: number) => {
@@ -259,7 +336,7 @@ export function SetLab() {
 
   return (
     <div className="range-design set-lab">
-      <DndContext sensors={sensors} collisionDetection={closestCenter}
+      <DndContext sensors={sensors} collisionDetection={setLabCollision}
         onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
 
         {/* Board sidebar — plan-tree-style management, separate from range plans */}
@@ -274,8 +351,11 @@ export function SetLab() {
                 className={`slab-board-item ${b.id === activeBoard?.id ? 'active' : ''}`}
                 onClick={() => setActiveSetBoard(b.id)}
                 onDoubleClick={() => {
-                  const name = prompt('Rename board:', b.name);
-                  if (name?.trim()) renameSetBoard(b.id, name.trim());
+                  setNameDialog({
+                    title: 'Rename board',
+                    initial: b.name,
+                    onSubmit: (name) => renameSetBoard(b.id, name),
+                  });
                 }}>
                 <span className="slab-board-name">{b.name}</span>
                 <span className="slab-board-count">{b.items.length}</span>
@@ -343,6 +423,11 @@ export function SetLab() {
                               cardWidth={cardWidth} cardHeight={cardHeight}
                               cellHeight={rowHeights[row] || 80}
                               onAddItem={handleNewItem}
+                              onRenameItem={(item) => setNameDialog({
+                                title: `Rename ${item.kind}`,
+                                initial: item.name,
+                                onSubmit: (name) => updateSetBoardItem(activeBoard.id, item.id, { name }),
+                              })}
                               onRemoveItem={(id) => removeSetBoardItem(activeBoard.id, id)}
                               onUpdateItem={(id, patch) => updateSetBoardItem(activeBoard.id, id, patch)}
                               onRemoveComponent={(itemId, prodId) => {
@@ -398,19 +483,21 @@ export function SetLab() {
           )}
         </DragOverlay>
       </DndContext>
+      {nameDialog && <NameDialog state={nameDialog} onClose={() => setNameDialog(null)} />}
     </div>
   );
 }
 
 // ---------- Matrix cell (droppable, same visual as RangeDesign) ----------
 
-function SetLabCell({ row, col, itemIds, board, catalogue, cardWidth, cardHeight, cellHeight, onAddItem, onRemoveItem, onUpdateItem, onRemoveComponent }: {
+function SetLabCell({ row, col, itemIds, board, catalogue, cardWidth, cardHeight, cellHeight, onAddItem, onRemoveItem, onUpdateItem, onRenameItem, onRemoveComponent }: {
   row: number; col: number; itemIds: string[];
   board: SetBoard; catalogue: Product[];
   cardWidth: number; cardHeight: number; cellHeight: number;
   onAddItem: (kind: SetItemKind, row: number, col: number) => void;
   onRemoveItem: (id: string) => void;
   onUpdateItem: (id: string, patch: Partial<SetBoardItem>) => void;
+  onRenameItem: (item: SetBoardItem) => void;
   onRemoveComponent: (itemId: string, productId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `matrix-cell-${row}-${col}` });
@@ -428,7 +515,7 @@ function SetLabCell({ row, col, itemIds, board, catalogue, cardWidth, cardHeight
       {items.map((item) => (
         <SetContainer key={item.id} item={item} catalogue={catalogue}
           onRemove={() => onRemoveItem(item.id)}
-          onRename={() => { const n = prompt('Rename:', item.name); if (n?.trim()) onUpdateItem(item.id, { name: n.trim() }); }}
+          onRename={() => onRenameItem(item)}
           onToggleKind={() => onUpdateItem(item.id, { kind: item.kind === 'set' ? 'bundle' : 'set' })}
           onRemoveComponent={(prodId) => onRemoveComponent(item.id, prodId)} />
       ))}
@@ -465,17 +552,18 @@ function SetContainer({ item, catalogue, onRemove, onRename, onToggleKind, onRem
   return (
     <div ref={setDropRef}
       className={`slab-set kind-${item.kind} ${isOver ? 'drop-over' : ''} ${isDragging ? 'dragging' : ''}`}>
+      <button className="matrix-card-remove slab-set-remove"
+        onClick={(e) => { e.stopPropagation(); onRemove(); }}
+        onPointerDown={(e) => e.stopPropagation()}
+        title="Delete container">
+        <CloseIcon size={8} color="#fff" />
+      </button>
       <div className="slab-set-header" ref={setDragRef} {...attributes} {...listeners}>
         <span className="slab-set-name" onDoubleClick={(e) => { e.stopPropagation(); onRename(); }} title={item.name}>{item.name}</span>
         <span className={`slab-set-kind ${item.kind}`}
           onClick={(e) => { e.stopPropagation(); onToggleKind(); }}
           onPointerDown={(e) => e.stopPropagation()}
           title="Click to toggle Set / Bundle">{item.kind}</span>
-        <button className="matrix-card-remove slab-set-remove"
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          onPointerDown={(e) => e.stopPropagation()}>
-          <CloseIcon size={8} color="#fff" />
-        </button>
       </div>
       <div className="slab-set-body">
         {item.components.length === 0 && <div className="slab-set-drop-hint">drag SKUs in</div>}

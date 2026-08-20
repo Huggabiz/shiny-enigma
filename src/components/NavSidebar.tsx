@@ -116,7 +116,7 @@ export function NavSidebar({ activeView, onViewChange }: NavSidebarProps) {
             onClick={() => onViewChange('set-lab')}
             title="Set & Bundle Lab — experiment with product combinations"
           >
-            <span className="nav-icon">⊞</span>
+            <span className="nav-icon">🧩</span>
             <span className="nav-label">Sets</span>
           </button>
         </>
