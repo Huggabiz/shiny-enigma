@@ -270,3 +270,57 @@
 .format-dropdown {
   min-width: 180px;
 }
+
+/* ---------- Shared-file collaboration status ---------- */
+
+.toolbar-file-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.file-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.file-status.mine {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.file-status.other {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.file-status.readonly {
+  background: #eceff1;
+  color: #546e7a;
+}
+
+.file-status.limited {
+  background: #fff8e1;
+  color: #8d6e63;
+  margin-left: 8px;
+  cursor: help;
+}
+
+.toolbar-btn.small {
+  padding: 3px 9px;
+  font-size: 10px;
+}
+
+.toolbar-btn.small.primary {
+  background: #1976d2;
+  color: #fff;
+  border-color: #1976d2;
+}
+
+.toolbar-btn.small.primary:hover {
+  background: #1565c0;
+}

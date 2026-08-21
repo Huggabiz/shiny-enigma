@@ -538,8 +538,37 @@ export interface Project {
    * layout independent of range plans. */
   setBoards?: SetBoard[];
   activeSetBoardId?: string;
+  /** Shared-file collaboration metadata. Lives IN the saved JSON so
+   * every collaborator's copy of the app can see who has the file
+   * checked out and which revision it is. The lock is advisory —
+   * enforced by the app, not the filesystem — and is paired with the
+   * revision counter so a save that would clobber newer work warns
+   * first even if the lock was raced or overridden. */
+  fileMeta?: FileMeta;
   createdAt: string;
   updatedAt: string;
+}
+
+/** See Project.fileMeta. */
+export interface FileMeta {
+  /** Monotonically increasing save counter — optimistic-concurrency
+   * check. A save re-reads the file first and warns if the on-disk
+   * revision no longer matches the one that was loaded. */
+  revision: number;
+  lastSavedBy?: string;
+  lastSavedAt?: string;
+  /** Advisory check-out lock. Null/absent = not checked out. */
+  checkOut?: FileCheckOut | null;
+}
+
+export interface FileCheckOut {
+  userName: string;
+  /** Random per-browser-tab id — distinguishes the same person in two
+   * tabs and lets the app verify it won a check-out race. */
+  sessionId: string;
+  /** Refreshed by the heartbeat while checked out; locks whose
+   * timestamp is older than the stale threshold can be taken over. */
+  checkedOutAt: string;
 }
 
 // ---------- Set & Bundle Lab ----------

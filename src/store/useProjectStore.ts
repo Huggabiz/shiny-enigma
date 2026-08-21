@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat, SlideViewSize, PlanFolder, Lens } from '../types';
 import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan, getStages, DEFAULT_DEV_LENS, LENS_PALETTE } from '../types';
+import { clearSession as clearFileSession } from '../utils/fileSession';
 
 async function hashPassword(password: string): Promise<string> {
   const encoded = new TextEncoder().encode(password);
@@ -9,8 +10,12 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 function editLocked(get: () => ProjectStore): boolean {
-  const { project, isUnlocked, viewerMode } = get();
+  const { project, isUnlocked, viewerMode, fileSession } = get();
   if (viewerMode) return true;
+  // Shared-file sessions are read-only until checked out — the file
+  // was opened via a retained handle, so edits must go through the
+  // advisory check-out lock to avoid clobbering collaborators.
+  if (fileSession.active && fileSession.checkout !== 'mine') return true;
   return !!project?.lockHash && !isUnlocked;
 }
 
@@ -156,6 +161,24 @@ interface ProjectStore {
   clearAnalyseEntries: () => void;
   setAnalyseConfig: (patch: Record<string, unknown>) => void;
 
+  // Shared-file collaboration session — mirrors utils/fileSession
+  // module state (which owns the live file handle) so the UI
+  // re-renders when check-out status changes.
+  fileSession: {
+    supported: boolean;
+    /** True when a retained file handle backs this project. */
+    active: boolean;
+    fileName: string | null;
+    /** Revision loaded from (or last saved to) the file. */
+    loadedRevision: number;
+    checkout: 'none' | 'mine' | 'other';
+    checkedOutBy?: string;
+  };
+  setFileSession: (patch: Partial<ProjectStore['fileSession']>) => void;
+  /** Update project.fileMeta in place without a full loadProject
+   * (which would reset view state). */
+  setProjectFileMeta: (meta: import('../types').FileMeta) => void;
+
   // Set & Bundle Lab
   addSetBoard: (name: string) => void;
   removeSetBoard: (boardId: string) => void;
@@ -274,6 +297,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setDesignShelfId: (shelfId) => set({ designShelfId: shelfId }),
   setTransformStages: (fromKey, toKey) => set({ transformFromKey: fromKey, transformToKey: toKey }),
 
+  fileSession: {
+    supported: typeof window !== 'undefined' && 'showOpenFilePicker' in window && 'showSaveFilePicker' in window,
+    active: false,
+    fileName: null,
+    loadedRevision: 0,
+    checkout: 'none',
+  },
+  setFileSession: (patch) => set((s) => ({ fileSession: { ...s.fileSession, ...patch } })),
+  setProjectFileMeta: (meta) => {
+    const { project } = get();
+    if (!project) return;
+    set({ project: { ...project, fileMeta: meta } });
+  },
+
   slideBaseScale: 1,
   slideBaseScaleMode: 'auto',
   slideZoom: 1,
@@ -387,7 +424,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // ensure the built-in Dev lens always exists at index 0 so the UI
     // never has to special-case its presence.
     const ensured = ensureLenses(migrated);
-    set({ project: { ...ensured, editingLensId: null }, selectedItemId: null, linkMode: false, linkSource: null, isUnlocked: !ensured.lockHash });
+    // Loading always drops any retained file handle — the shared-open
+    // flow re-attaches its handle and session state AFTER calling this,
+    // so a legacy load or new project can never silently write over the
+    // previously-open shared file.
+    clearFileSession();
+    set({
+      project: { ...ensured, editingLensId: null }, selectedItemId: null, linkMode: false, linkSource: null, isUnlocked: !ensured.lockHash,
+      fileSession: { ...get().fileSession, active: false, fileName: null, loadedRevision: 0, checkout: 'none', checkedOutBy: undefined },
+    });
   },
 
   appendImport: (nextProject) => {

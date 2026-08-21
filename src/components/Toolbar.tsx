@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import { saveProject, saveRangeStructure, loadProjectFile } from '../utils/projectFile';
+import {
+  openViaPicker, setHandle, getHandle, readCurrent, writeCurrent, saveAsViaPicker,
+  readFileMeta, myCheckOut, isMyLock, lockIsStale, lockAgeLabel,
+  getUserName, setUserName, startHeartbeat, stopHeartbeat,
+} from '../utils/fileSession';
+import type { FileMeta, Project } from '../types';
 import { computeImportPlan, type ImportPlanPreview } from '../utils/importProject';
 import { exportToExcelEnriched } from '../utils/exportExcelEnriched';
 import { APP_VERSION } from '../version';
@@ -27,6 +33,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
     updateProjectName,
     isUnlocked, removeLock,
     viewerMode,
+    fileSession, setFileSession, setProjectFileMeta,
   } = useProjectStore();
   const [editingName, setEditingName] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -102,6 +109,193 @@ export function Toolbar({ activeView }: ToolbarProps) {
   const exportedAt = project?.exportedAt;
   const snapshotDate = exportedAt ? new Date(exportedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
 
+  // ---------- Shared-file collaboration (Chrome/Edge only) ----------
+  // See utils/fileSession.ts. The advisory check-out lock plus the
+  // revision counter give lock-then-verify pessimism with an
+  // optimistic-concurrency safety net for lock races / take-overs.
+
+  const [namePrompt, setNamePrompt] = useState<{ cont: () => void } | null>(null);
+
+  const ensureUserName = (cont: () => void) => {
+    if (getUserName()) cont();
+    else setNamePrompt({ cont });
+  };
+
+  // Heartbeat: refresh our lock timestamp on disk without touching the
+  // file's project content (unsaved in-memory edits must NOT leak out).
+  const heartbeatBeat = async () => {
+    try {
+      const cur = await readCurrent();
+      if (!cur) return;
+      const meta = readFileMeta(cur.data);
+      if (!isMyLock(meta.checkOut)) {
+        stopHeartbeat();
+        useProjectStore.getState().setFileSession({
+          checkout: meta.checkOut ? 'other' : 'none',
+          checkedOutBy: meta.checkOut?.userName,
+        });
+        return;
+      }
+      const refreshed: FileMeta = { ...meta, checkOut: myCheckOut() };
+      await writeCurrent(JSON.stringify({ ...cur.data, fileMeta: refreshed }, null, 2));
+    } catch (err) {
+      console.warn('Lock heartbeat failed', err);
+    }
+  };
+
+  const handleOpenShared = async () => {
+    try {
+      const res = await openViaPicker();
+      if (!res) return;
+      let data: Record<string, unknown>;
+      try { data = JSON.parse(res.text) as Record<string, unknown>; }
+      catch { alert('Failed to load project file. Please check the file format.'); return; }
+      if (data.type === 'range-structure') {
+        // Structure exports aren't collaborative files — legacy load.
+        const loaded = await loadProjectFile(res.file);
+        loadProject(loaded);
+        return;
+      }
+      loadProject(data as unknown as Project); // clears any previous session
+      setHandle(res.handle);
+      const meta = readFileMeta(data);
+      const lock = meta.checkOut ?? null;
+      const heldByOther = !!lock && !isMyLock(lock) && !lockIsStale(lock);
+      setFileSession({
+        active: true,
+        fileName: res.file.name,
+        loadedRevision: meta.revision,
+        checkout: heldByOther ? 'other' : 'none',
+        checkedOutBy: heldByOther ? lock!.userName : undefined,
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Failed to open project file.');
+    }
+  };
+
+  const handleCheckOut = () => ensureUserName(async () => {
+    try {
+      const cur = await readCurrent();
+      if (!cur) return;
+      let meta = readFileMeta(cur.data);
+      if (meta.revision !== fileSession.loadedRevision) {
+        const ok = confirm(
+          `This file was saved${meta.lastSavedBy ? ` by ${meta.lastSavedBy}` : ''} since you opened it ` +
+          `(revision ${meta.revision}, you loaded ${fileSession.loadedRevision}).\n\n` +
+          'The latest version must be loaded before checking out. Load it now?');
+        if (!ok) return;
+        // loadProject clears the module handle — capture and re-attach.
+        const h = getHandle();
+        loadProject(cur.data as unknown as Project);
+        if (h) setHandle(h);
+        meta = readFileMeta(cur.data);
+        setFileSession({ active: true, fileName: fileSession.fileName, loadedRevision: meta.revision, checkout: 'none' });
+      }
+      const lock = meta.checkOut ?? null;
+      if (lock && !isMyLock(lock)) {
+        if (!lockIsStale(lock)) {
+          alert(`Checked out by ${lock.userName} (${lockAgeLabel(lock)}). The file is read-only until they check it back in.`);
+          setFileSession({ checkout: 'other', checkedOutBy: lock.userName });
+          return;
+        }
+        const takeOver = confirm(
+          `The check-out by ${lock.userName} looks abandoned (last active ${lockAgeLabel(lock)}).\n\nTake over the check-out?`);
+        if (!takeOver) return;
+      }
+      // Write the lock onto the file's CURRENT content (not our
+      // in-memory copy), then verify we won any race.
+      const newMeta: FileMeta = { ...meta, checkOut: myCheckOut() };
+      await writeCurrent(JSON.stringify({ ...cur.data, fileMeta: newMeta }, null, 2));
+      await new Promise((r) => setTimeout(r, 600));
+      const verify = await readCurrent();
+      const vLock = verify ? readFileMeta(verify.data).checkOut : null;
+      if (isMyLock(vLock)) {
+        setProjectFileMeta(newMeta);
+        setFileSession({ checkout: 'mine', checkedOutBy: undefined });
+        startHeartbeat(heartbeatBeat);
+      } else {
+        alert(`Someone else checked out at the same moment${vLock ? ` (${vLock.userName})` : ''}. The file stays read-only for you.`);
+        setFileSession({ checkout: vLock ? 'other' : 'none', checkedOutBy: vLock?.userName ?? undefined });
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Check-out failed — could not read or write the file.');
+    }
+  });
+
+  // Shared save core: verify lock + revision against the disk, then
+  // write. keepLock=false checks the file back in.
+  const sharedSave = async (keepLock: boolean) => {
+    if (!project) return;
+    try {
+      const cur = await readCurrent();
+      if (!cur) return;
+      const meta = readFileMeta(cur.data);
+      if (!isMyLock(meta.checkOut)) {
+        const who = meta.checkOut?.userName;
+        const ok = confirm(
+          `Your check-out is no longer active${who ? ` — the file is now checked out by ${who}` : ''}.\n\n` +
+          'Saving may overwrite their work. Save anyway?');
+        if (!ok) return;
+      }
+      if (meta.revision !== fileSession.loadedRevision) {
+        const ok = confirm(
+          `Conflict: the file is at revision ${meta.revision}` +
+          `${meta.lastSavedBy ? ` (saved by ${meta.lastSavedBy})` : ''}, but you loaded revision ${fileSession.loadedRevision}.\n\n` +
+          'Saving will overwrite their changes. Continue?');
+        if (!ok) return;
+      }
+      const newMeta: FileMeta = {
+        revision: Math.max(meta.revision, fileSession.loadedRevision) + 1,
+        lastSavedBy: getUserName() ?? undefined,
+        lastSavedAt: new Date().toISOString(),
+        checkOut: keepLock ? myCheckOut() : null,
+      };
+      await writeCurrent(JSON.stringify({ ...project, fileMeta: newMeta, updatedAt: new Date().toISOString() }, null, 2));
+      setProjectFileMeta(newMeta);
+      setFileSession({ loadedRevision: newMeta.revision, checkout: keepLock ? 'mine' : 'none', checkedOutBy: undefined });
+      if (!keepLock) stopHeartbeat();
+    } catch (err) {
+      console.error(err);
+      alert('Save failed — could not write the file.');
+    }
+  };
+
+  const handleSharedSave = () => ensureUserName(() => { void sharedSave(true); });
+  const handleCheckIn = () => ensureUserName(() => { void sharedSave(false); });
+
+  // Save As on a supported browser: write a NEW file via the picker,
+  // retain its handle, and start a fresh checked-out session on it.
+  const handleSaveAs = () => {
+    if (!project) return;
+    if (!fileSession.supported) {
+      void saveProject(project).catch((err) => { console.error(err); alert('Failed to save project.'); });
+      return;
+    }
+    ensureUserName(async () => {
+      try {
+        const newMeta: FileMeta = {
+          revision: (project.fileMeta?.revision ?? 0) + 1,
+          lastSavedBy: getUserName() ?? undefined,
+          lastSavedAt: new Date().toISOString(),
+          checkOut: myCheckOut(),
+        };
+        const content = JSON.stringify({ ...project, fileMeta: newMeta, updatedAt: new Date().toISOString() }, null, 2);
+        const suggested = `${project.name.replace(/\s+/g, '_')}_project.json`;
+        const ok = await saveAsViaPicker(content, suggested);
+        if (!ok) return;
+        setProjectFileMeta(newMeta);
+        setFileSession({ active: true, fileName: suggested, loadedRevision: newMeta.revision, checkout: 'mine', checkedOutBy: undefined });
+        startHeartbeat(heartbeatBeat);
+      } catch (err) {
+        console.error(err);
+        alert('Failed to save project.');
+      }
+    });
+  };
+
+
   return (
     <>
     <div className={`toolbar ${viewerMode ? 'toolbar-viewer' : ''}`}>
@@ -133,6 +327,42 @@ export function Toolbar({ activeView }: ToolbarProps) {
         {isLocked && !viewerMode && (
           <span className="toolbar-lock-badge" onClick={() => setLockDialog('unlock')} title="Project is locked — click to unlock">
             🔒 Locked
+          </span>
+        )}
+        {/* Shared-file check-out status + actions */}
+        {project && !viewerMode && fileSession.active && (
+          <span className="toolbar-file-session">
+            {fileSession.checkout === 'mine' ? (
+              <>
+                <span className="file-status mine" title={`Checked out by you · ${fileSession.fileName ?? ''} · rev ${fileSession.loadedRevision}`}>
+                  ✓ Checked out by you
+                </span>
+                <button className="toolbar-btn small" onClick={handleSharedSave} title="Save to the open file (keeps your check-out)">Save</button>
+                <button className="toolbar-btn small" onClick={handleCheckIn} title="Save and release the file for others to edit">Check In</button>
+              </>
+            ) : fileSession.checkout === 'other' ? (
+              <>
+                <span className="file-status other" title="The file is checked out by someone else — read-only until they check in">
+                  🔒 {fileSession.checkedOutBy ?? 'Someone'} has this checked out
+                </span>
+                <button className="toolbar-btn small" onClick={handleCheckOut} title="Re-check the lock (offers take-over if it has gone stale)">Check Out</button>
+              </>
+            ) : (
+              <>
+                <span className="file-status readonly" title="Shared file — read-only until you check it out">
+                  Read-only
+                </span>
+                <button className="toolbar-btn small primary" onClick={handleCheckOut} title="Check the file out so you can edit it">Check Out</button>
+              </>
+            )}
+          </span>
+        )}
+        {project && !viewerMode && !fileSession.supported && (
+          <span
+            className="file-status limited"
+            title="This browser cannot keep a connection to the project file, so Save-in-place and check-out locking are unavailable. Use Chrome or Edge for shared-file collaboration."
+          >
+            ⚠ Solo mode
           </span>
         )}
         {viewerMode && (
@@ -207,12 +437,12 @@ export function Toolbar({ activeView }: ToolbarProps) {
                 </button>
                 {openMenu === 'save' && (
                   <div className="toolbar-dropdown" onMouseLeave={closeMenus}>
-                    <button onClick={async () => {
-                      closeMenus();
-                      if (!project) return;
-                      try { await saveProject(project); }
-                      catch (err) { console.error(err); alert('Failed to save project.'); }
-                    }}>Save Full Project</button>
+                    {fileSession.active && fileSession.checkout === 'mine' && (
+                      <button onClick={() => { closeMenus(); handleSharedSave(); }}>
+                        Save{fileSession.fileName ? ` (${fileSession.fileName})` : ''}
+                      </button>
+                    )}
+                    <button onClick={() => { closeMenus(); handleSaveAs(); }}>Save As…</button>
                     <button onClick={async () => {
                       closeMenus();
                     if (!project) return;
@@ -280,7 +510,15 @@ export function Toolbar({ activeView }: ToolbarProps) {
         {!viewerMode && (
           <>
             <input ref={loadRef} type="file" accept=".json" onChange={handleLoad} hidden />
-            <button className="toolbar-btn" onClick={() => loadRef.current?.click()}>Load</button>
+            <button
+              className="toolbar-btn"
+              onClick={() => { if (fileSession.supported) void handleOpenShared(); else loadRef.current?.click(); }}
+              title={fileSession.supported
+                ? 'Open a project file — keeps the file connected for Save and check-out'
+                : 'Load a project file (this browser cannot keep the file connected — use Chrome or Edge for Save and check-out)'}
+            >
+              Load
+            </button>
             <input ref={appendRef} type="file" accept=".json" onChange={handleAppend} hidden />
             <button
               className="toolbar-btn"
@@ -315,6 +553,12 @@ export function Toolbar({ activeView }: ToolbarProps) {
       {showHtmlExport && project && (
         <ExportHtmlDialog project={project} onClose={() => setShowHtmlExport(false)} />
       )}
+      {namePrompt && (
+        <UserNameDialog
+          onSave={(name) => { setUserName(name); const cont = namePrompt.cont; setNamePrompt(null); cont(); }}
+          onClose={() => setNamePrompt(null)}
+        />
+      )}
     </div>
     {viewerMode && snapshotDate && (
       <div className="viewer-snapshot-banner">
@@ -322,5 +566,34 @@ export function Toolbar({ activeView }: ToolbarProps) {
       </div>
     )}
     </>
+  );
+}
+
+/** One-time display-name prompt for shared-file check-out identity.
+ * Reuses the .slab-dialog modal styling (global CSS). */
+function UserNameDialog({ onSave, onClose }: { onSave: (name: string) => void; onClose: () => void }) {
+  const [value, setValue] = useState('');
+  const submit = () => { const v = value.trim(); if (v) onSave(v); };
+  return (
+    <div className="slab-dialog-overlay" onClick={onClose}>
+      <div className="slab-dialog" onClick={(e) => e.stopPropagation()}>
+        <h3>Your name</h3>
+        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#666' }}>
+          Shown to colleagues while you have the file checked out.
+        </p>
+        <input
+          className="slab-dialog-input"
+          value={value}
+          autoFocus
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') onClose(); }}
+          placeholder="e.g. Hugo"
+        />
+        <div className="slab-dialog-actions">
+          <button className="slab-dialog-btn cancel" onClick={onClose}>Cancel</button>
+          <button className="slab-dialog-btn primary" onClick={submit} disabled={!value.trim()}>Continue</button>
+        </div>
+      </div>
+    </div>
   );
 }
