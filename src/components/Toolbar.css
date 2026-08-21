@@ -324,3 +324,14 @@
 .toolbar-btn.small.primary:hover {
   background: #1565c0;
 }
+
+.file-status.saved-toast {
+  background: #2e7d32;
+  color: #fff;
+  animation: toast-pop 0.18s ease-out;
+}
+
+@keyframes toast-pop {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

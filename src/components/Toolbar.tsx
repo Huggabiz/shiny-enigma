@@ -121,6 +121,18 @@ export function Toolbar({ activeView }: ToolbarProps) {
     else setNamePrompt({ cont });
   };
 
+  // Transient confirmation ("Saved ✓ rev 12") + busy flag so the
+  // Save / Check-In buttons give affirmative feedback and can't
+  // double-fire while a write is in flight.
+  const [fileToast, setFileToast] = useState<string | null>(null);
+  const [fileBusy, setFileBusy] = useState(false);
+  const toastTimer = useRef<number | null>(null);
+  const flashToast = (msg: string) => {
+    if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+    setFileToast(msg);
+    toastTimer.current = window.setTimeout(() => setFileToast(null), 2500);
+  };
+
   // Heartbeat: refresh our lock timestamp on disk without touching the
   // file's project content (unsaved in-memory edits must NOT leak out).
   const heartbeatBeat = async () => {
@@ -227,7 +239,8 @@ export function Toolbar({ activeView }: ToolbarProps) {
   // Shared save core: verify lock + revision against the disk, then
   // write. keepLock=false checks the file back in.
   const sharedSave = async (keepLock: boolean) => {
-    if (!project) return;
+    if (!project || fileBusy) return;
+    setFileBusy(true);
     try {
       const cur = await readCurrent();
       if (!cur) return;
@@ -256,9 +269,12 @@ export function Toolbar({ activeView }: ToolbarProps) {
       setProjectFileMeta(newMeta);
       setFileSession({ loadedRevision: newMeta.revision, checkout: keepLock ? 'mine' : 'none', checkedOutBy: undefined });
       if (!keepLock) stopHeartbeat();
+      flashToast(keepLock ? `Saved ✓ (rev ${newMeta.revision})` : `Saved & checked in ✓ (rev ${newMeta.revision})`);
     } catch (err) {
       console.error(err);
       alert('Save failed — could not write the file.');
+    } finally {
+      setFileBusy(false);
     }
   };
 
@@ -337,8 +353,12 @@ export function Toolbar({ activeView }: ToolbarProps) {
                 <span className="file-status mine" title={`Checked out by you · ${fileSession.fileName ?? ''} · rev ${fileSession.loadedRevision}`}>
                   ✓ Checked out by you
                 </span>
-                <button className="toolbar-btn small" onClick={handleSharedSave} title="Save to the open file (keeps your check-out)">Save</button>
-                <button className="toolbar-btn small" onClick={handleCheckIn} title="Save and release the file for others to edit">Check In</button>
+                <button className="toolbar-btn small" disabled={fileBusy} onClick={handleSharedSave} title="Save to the open file (keeps your check-out)">
+                  {fileBusy ? 'Saving…' : 'Save'}
+                </button>
+                <button className="toolbar-btn small" disabled={fileBusy} onClick={handleCheckIn} title="Saves your changes AND releases the file for others to edit">
+                  Save & Check In
+                </button>
               </>
             ) : fileSession.checkout === 'other' ? (
               <>
@@ -355,6 +375,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
                 <button className="toolbar-btn small primary" onClick={handleCheckOut} title="Check the file out so you can edit it">Check Out</button>
               </>
             )}
+            {fileToast && <span className="file-status saved-toast">{fileToast}</span>}
           </span>
         )}
         {project && !viewerMode && !fileSession.supported && (
