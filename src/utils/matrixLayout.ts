@@ -119,6 +119,7 @@ export function estimateCardHeight(cf: CardFormat, cardW: number): number {
   if (cf.showRevenue) h += CARD_LINE_H;
   if (cf.showForecastRevenue) h += CARD_LINE_H;
   if (cf.showCategory) h += CARD_LINE_H;
+  if (cf.showLaunchSeason) h += CARD_LINE_H;
   // Clamp to the playing-card minimum. At the default toggle set the
   // minimum usually wins so cards keep a ~1:1.4 shape; with extra
   // fields on, content height takes over and cards grow past it.

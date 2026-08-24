@@ -59,6 +59,9 @@ export interface Product {
   forecastRevenue?: number; // next year's revenue (forecast)
   operatingMarginPct?: number;  // operating margin as a percentage
   operatingMarginGbp?: number;  // operating margin in £
+  /** Retail season the product launched (e.g. "AW26", "SS27", "MS25").
+   * Parsed to a comparative date by utils/launchSeason.ts. */
+  launchSeason?: string;
   imageUrl?: string;
   source?: 'live' | 'dev';
   // Keyed by horizon — 'default' for the immediate next future range.
@@ -87,6 +90,7 @@ export interface PlaceholderData {
   forecastRevenue?: number;
   operatingMarginPct?: number;
   operatingMarginGbp?: number;
+  launchSeason?: string;
   imageUrl?: string;
   source: 'live' | 'dev';
 }
@@ -689,6 +693,7 @@ export interface CardFormat {
   showOperatingMarginPct: boolean;
   showOperatingMarginGbp: boolean;
   showCategory: boolean;
+  showLaunchSeason: boolean;
 }
 
 export const DEFAULT_CARD_FORMAT: CardFormat = {
@@ -706,6 +711,7 @@ export const DEFAULT_CARD_FORMAT: CardFormat = {
   showOperatingMarginPct: false,
   showOperatingMarginGbp: false,
   showCategory: false,
+  showLaunchSeason: false,
 };
 
 // Column mapping for import flexibility
@@ -731,6 +737,7 @@ export interface ColumnMapping {
   forecastRevenue: string;
   operatingMarginPct: string;
   operatingMarginGbp: string;
+  launchSeason: string;
   imageUrl: string;
   source: string;
 }
@@ -757,6 +764,7 @@ export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
   forecastRevenue: 'Forecast Revenue',
   operatingMarginPct: 'Operating Margin %',
   operatingMarginGbp: 'Operating Margin £',
+  launchSeason: 'Launch Season',
   imageUrl: 'Image URL',
   source: 'Source',
 };

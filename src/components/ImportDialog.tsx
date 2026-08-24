@@ -108,6 +108,14 @@ const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: str
     required: false,
     aliases: ['operating margin (£)', 'operating margin £', 'op margin £', 'margin £', 'operating margin gbp', 'op margin gbp', 'margin gbp'],
   },
+  launchSeason: {
+    label: 'Launch Season',
+    hint: 'Season the product launched, e.g. AW26, SS27, MS25',
+    required: false,
+    // The source dataset calls this "Season Launch" — recognise both
+    // orderings plus common variants.
+    aliases: ['launch season', 'season launch', 'season launched', 'launch', 'first season', 'intro season', 'introduction season', 'launch period'],
+  },
   imageUrl: { label: 'Image URL', hint: 'Web URL to product image', required: false, aliases: ['image', 'image url', 'imageurl', 'img', 'picture', 'photo'] },
   source: { label: 'Source', hint: 'Live or Dev — set Dev for in-development products', required: false, aliases: ['status', 'product status'] },
 };

@@ -96,6 +96,9 @@ export function parseSpreadsheet(
       forecastRevenue: numOrUndef(row[mapping.forecastRevenue]),
       operatingMarginPct: numOrUndef(row[mapping.operatingMarginPct]),
       operatingMarginGbp: numOrUndef(row[mapping.operatingMarginGbp]),
+      launchSeason: row[mapping.launchSeason] != null && String(row[mapping.launchSeason]).trim() !== ''
+        ? String(row[mapping.launchSeason]).trim()
+        : undefined,
       imageUrl: row[mapping.imageUrl] ? String(row[mapping.imageUrl]).trim() : undefined,
       source,
     };

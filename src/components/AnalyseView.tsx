@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import html2canvas from 'html2canvas';
 import { useProjectStore } from '../store/useProjectStore';
 import { getActivePlan, getStages } from '../types';
+import { launchAgeYears } from '../utils/launchSeason';
 import type { Lens, MatrixCellAssignment, Product, RangePlan, Shelf, ShelfItem } from '../types';
 import './AnalyseView.css';
 
@@ -191,10 +192,10 @@ interface ChartProps { plans: RangePlan[]; catalogue: Product[]; metric: Metric;
 
 // Per-sheet config state that persists across tab switches
 interface IcicleConfig { metric: Metric; aspMode: AspMode; showSegments: boolean; }
-interface ScatterConfig { logX: boolean; logY: boolean; maxX: string; maxY: string; dotSize: number; contours: boolean; xAxis: 'margin' | 'revenue'; }
+interface ScatterConfig { logX: boolean; logY: boolean; maxX: string; maxY: string; dotSize: number; contours: boolean; xAxis: 'margin' | 'revenue'; ageShade: boolean; }
 
 const DEFAULT_ICICLE: IcicleConfig = { metric: 'revenue', aspMode: 'standard', showSegments: true };
-const DEFAULT_SCATTER: ScatterConfig = { logX: false, logY: false, maxX: '', maxY: '', dotSize: 5, contours: false, xAxis: 'margin' };
+const DEFAULT_SCATTER: ScatterConfig = { logX: false, logY: false, maxX: '', maxY: '', dotSize: 5, contours: false, xAxis: 'margin', ageShade: true };
 
 export function AnalyseView() {
   const { project, clearAnalyseEntries, setAnalyseConfig } = useProjectStore();
@@ -435,6 +436,7 @@ export function AnalyseView() {
               </label>
               <div className="analyse-config-separator" />
               <label className="analyse-config-item"><input type="checkbox" checked={scatterConfig.contours} onChange={(e) => updateScatter({ contours: e.target.checked })} /> Contours</label>
+              <label className="analyse-config-item" title="Colour dots by launch age: new = light, richest at ~3 years, washing out beyond"><input type="checkbox" checked={scatterConfig.ageShade ?? true} onChange={(e) => updateScatter({ ageShade: e.target.checked })} /> Age shading</label>
               <span style={{ flex: 1 }} />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
@@ -591,7 +593,28 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, show
 
 // ---------- Scatter ----------
 
-interface ScatterPoint { sku: string; name: string; category: string; subCategory: string; rrp: number; margin: number; revenue: number; }
+interface ScatterPoint { sku: string; name: string; category: string; subCategory: string; rrp: number; margin: number; revenue: number; launchSeason?: string; launchAge: number | null; }
+
+/** Lifecycle colour ramp for launch age:
+ *  - new products: the category colour, intense but LIGHT (interpolated
+ *    towards white), darkening as they mature
+ *  - richest, fully-saturated colour at ~3 years
+ *  - beyond 3 years: progressively desaturating towards grey over the
+ *    following 5 years (legacy products wash out)
+ *  - unparseable/missing launch season: the plain category colour. */
+function ageShadedColor(base: string, age: number | null): string {
+  if (age == null) return base;
+  const a = Math.max(0, age);
+  if (a <= 3) {
+    const t = 1 - a / 3; // 1 = brand new, 0 = 3 years old
+    return d3.interpolateLab(base, '#ffffff')(t * 0.55);
+  }
+  const over = Math.min((a - 3) / 5, 1);
+  const c = d3.hsl(base);
+  c.s = c.s * (1 - 0.8 * over);
+  c.l = Math.min(0.75, c.l + 0.15 * over);
+  return c.formatHex();
+}
 
 function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCats, onToggleCat }: { plans: RangePlan[]; catalogue: Product[]; shelfSide: string; config: ScatterConfig; catColors: Map<string, string>; hiddenCats: Set<string>; onToggleCat: (cat: string) => void }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -604,7 +627,11 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
       for (const item of shelf.items) { const prod = getProductForItem(item, catalogue); if (!prod || seen.has(prod.id)) continue; seen.add(prod.id);
         const rrp = prod.rrp ?? 0, margin = prod.operatingMarginGbp ?? 0, revenue = prod.revenue ?? 0;
         if (rrp <= 0 && margin === 0 && revenue === 0) continue;
-        pts.push({ sku: prod.sku, name: prod.name, category: prod.category || 'Uncategorised', subCategory: prod.subCategory || '', rrp, margin, revenue });
+        pts.push({
+          sku: prod.sku, name: prod.name, category: prod.category || 'Uncategorised', subCategory: prod.subCategory || '',
+          rrp, margin, revenue,
+          launchSeason: prod.launchSeason, launchAge: launchAgeYears(prod.launchSeason),
+        });
       }
     } return pts;
   }, [plans, catalogue, shelfSide]);
@@ -619,7 +646,7 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
     } return m;
   }, [categories, catColors]);
 
-  const { logX, logY, dotSize, contours, xAxis: xField } = config;
+  const { logX, logY, dotSize, contours, xAxis: xField, ageShade } = config;
   const xAccessor = (d: ScatterPoint) => xField === 'revenue' ? d.revenue : d.margin;
   const xLabel = xField === 'revenue' ? 'Revenue (£)' : 'Operating Margin (£)';
   const maxXN = config.maxX ? Number(config.maxX) : undefined;
@@ -686,11 +713,35 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
       }
     }
 
+    // Fill: with age shading on, the dot's colour is the category base
+    // run through the lifecycle ramp (sub-category shades are skipped so
+    // lightness only encodes age); otherwise the sub-category shade map.
+    const dotFill = (d: ScatterPoint): string => {
+      const base = colorMap.get(d.category) ?? '#999';
+      if (ageShade) return ageShadedColor(base, d.launchAge);
+      const k = d.subCategory ? `${d.category}::${d.subCategory}` : d.category;
+      return colorMap.get(k) ?? base;
+    };
+
     g.selectAll('circle').data(vis).join('circle')
       .attr('cx', (d) => xScale(xAccessor(d))).attr('cy', (d) => yScale(d.rrp)).attr('r', dotSize)
-      .attr('fill', (d) => { const k = d.subCategory ? `${d.category}::${d.subCategory}` : d.category; return colorMap.get(k) ?? colorMap.get(d.category) ?? '#999'; })
+      .attr('fill', dotFill)
       .attr('fill-opacity', 0.75).attr('stroke', (d) => colorMap.get(d.category) ?? '#999').attr('stroke-width', 1).style('cursor', 'pointer')
-      .on('mouseenter', function (ev, d) { d3.select(this).attr('r', dotSize + 2).attr('fill-opacity', 1).attr('stroke-width', 2); const r = wrapperRef.current?.getBoundingClientRect(); if (r) setTooltip({ x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8, label: `${d.sku} — ${d.name}`, value: `RRP: £${d.rrp.toFixed(2)} | ${xField === 'revenue' ? 'Rev' : 'OM'}: ${fmtGbp(xAccessor(d))}`, depth: d.subCategory ? `${d.category} / ${d.subCategory}` : d.category }); })
+      .on('mouseenter', function (ev, d) {
+        d3.select(this).attr('r', dotSize + 2).attr('fill-opacity', 1).attr('stroke-width', 2);
+        const r = wrapperRef.current?.getBoundingClientRect();
+        if (r) {
+          const launchBit = d.launchSeason
+            ? ` | Launch: ${d.launchSeason}${d.launchAge != null ? ` (${d.launchAge < 0 ? 'future' : `${d.launchAge.toFixed(1)}y`})` : ''}`
+            : '';
+          setTooltip({
+            x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8,
+            label: `${d.sku} — ${d.name}`,
+            value: `RRP: £${d.rrp.toFixed(2)} | ${xField === 'revenue' ? 'Rev' : 'OM'}: ${fmtGbp(xAccessor(d))}${launchBit}`,
+            depth: d.subCategory ? `${d.category} / ${d.subCategory}` : d.category,
+          });
+        }
+      })
       .on('mousemove', function (ev) { const r = wrapperRef.current?.getBoundingClientRect(); if (r) setTooltip((p) => p ? { ...p, x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8 } : null); })
       .on('mouseleave', function () { d3.select(this).attr('r', dotSize).attr('fill-opacity', 0.75).attr('stroke-width', 1); setTooltip(null); });
 
@@ -708,7 +759,7 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
       row.on('click', () => onToggleCat(cat));
       ly += 16;
     }
-  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, onToggleCat, xField, xAccessor, xLabel]);
+  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, onToggleCat, xField, xAccessor, xLabel, ageShade]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }

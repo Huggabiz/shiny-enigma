@@ -359,6 +359,9 @@ export function ProductCard({
             <span className="card-margin">{isCompact ? '' : 'OM\u00a3: '}\u00a3{cardProduct.operatingMarginGbp.toLocaleString()}</span>
           )}
           {cardFormat.showCategory && !isCompact && <span className="card-category">{cardProduct.category || '\u2014'}</span>}
+          {cardFormat.showLaunchSeason && !isCompact && cardProduct.launchSeason && (
+            <span className="card-category" title="Launch season">{cardProduct.launchSeason}</span>
+          )}
         </div>
       )}
       {item.isPlaceholder && !cardProduct && !isCompact && (
