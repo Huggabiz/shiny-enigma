@@ -26,6 +26,7 @@ interface ListColumnConfig {
   showForecastVolume: boolean;
   showForecastRevenue: boolean;
   showCategory: boolean;
+  showLaunchSeason: boolean;
   mergeDuplicates: boolean;
 }
 
@@ -40,6 +41,7 @@ const DEFAULT_COL_CONFIG: ListColumnConfig = {
   showForecastVolume: false,
   showForecastRevenue: false,
   showCategory: false,
+  showLaunchSeason: false,
   mergeDuplicates: false,
 };
 
@@ -187,7 +189,7 @@ export function MultiplanListView() {
 
   const dataColCount = [
     colConfig.showGroups, colConfig.showGroups,
-    colConfig.showCategory, colConfig.showVolume, colConfig.showRrp,
+    colConfig.showCategory, colConfig.showLaunchSeason, colConfig.showVolume, colConfig.showRrp,
     colConfig.showUsRrp, colConfig.showEuRrp, colConfig.showAusRrp,
     colConfig.showRevenue, colConfig.showForecastVolume, colConfig.showForecastRevenue,
   ].filter(Boolean).length;
@@ -221,6 +223,7 @@ export function MultiplanListView() {
                 {([
                   ['showGroups', 'X/Y Groups'],
                   ['showCategory', 'Category'],
+                  ['showLaunchSeason', 'Launch Season'],
                   ['showVolume', 'Volume'],
                   ['showRrp', 'UK RRP'],
                   ['showUsRrp', 'US RRP'],
@@ -288,6 +291,7 @@ export function MultiplanListView() {
                 <th className="mpl-th-sku">SKU</th>
                 <th className="mpl-th-name">Product</th>
                 {colConfig.showCategory && <th className="mpl-th-data">Category</th>}
+                {colConfig.showLaunchSeason && <th className="mpl-th-data">Launch Season</th>}
                 {colConfig.showVolume && <th className="mpl-th-num">Volume</th>}
                 {colConfig.showRrp && <th className="mpl-th-num">UK RRP</th>}
                 {colConfig.showUsRrp && <th className="mpl-th-num">US RRP</th>}
@@ -338,6 +342,7 @@ export function MultiplanListView() {
                       <td className="mpl-td-sku">{sku}</td>
                       <td className="mpl-td-name">{name}</td>
                       {colConfig.showCategory && <td className="mpl-td-data">{row.product?.category ?? ''}</td>}
+                      {colConfig.showLaunchSeason && <td className="mpl-td-data">{row.product?.launchSeason ?? ''}</td>}
                       {colConfig.showVolume && <td className="mpl-td-num">{(row.product?.volume ?? row.item.placeholderData?.volume ?? 0).toLocaleString()}</td>}
                       {colConfig.showRrp && <td className="mpl-td-num">{row.product?.rrp ?? row.item.placeholderData?.rrp ?? '—'}</td>}
                       {colConfig.showUsRrp && <td className="mpl-td-num">{row.product?.usRrp ?? '—'}</td>}

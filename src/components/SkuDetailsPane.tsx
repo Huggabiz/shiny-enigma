@@ -106,7 +106,9 @@ export function SkuDetailsPane() {
             {product.euRrp !== undefined && <div className="sku-attr"><span className="sku-attr-label">EU RRP</span><span>€{product.euRrp}</span></div>}
             {product.ausRrp !== undefined && <div className="sku-attr"><span className="sku-attr-label">AUS RRP</span><span>A${product.ausRrp}</span></div>}
             {product.revenue > 0 && <div className="sku-attr"><span className="sku-attr-label">Revenue</span><span>£{product.revenue.toLocaleString()}</span></div>}
-            {product.launchSeason && <div className="sku-attr"><span className="sku-attr-label">Launch Season</span><span>{product.launchSeason}</span></div>}
+            {/* Always rendered (with —) so a missing import is visible
+                rather than silently absent. */}
+            <div className="sku-attr"><span className="sku-attr-label">Launch Season</span><span>{product.launchSeason || '—'}</span></div>
             {product.operatingMarginPct != null && <div className="sku-attr"><span className="sku-attr-label">OM %</span><span>{product.operatingMarginPct.toFixed(1)}%</span></div>}
             {product.operatingMarginGbp != null && <div className="sku-attr"><span className="sku-attr-label">OM £</span><span>£{product.operatingMarginGbp.toLocaleString()}</span></div>}
           </div>

@@ -1282,7 +1282,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   // Catalogue
   setCatalogue: (newProducts) => {
-    if (editLocked(get)) return;
+    if (editLocked(get)) {
+      // A silently-ignored import is indistinguishable from a broken
+      // one — tell the user WHY nothing happened.
+      const fs = get().fileSession;
+      alert(fs.active && fs.checkout !== 'mine'
+        ? 'The shared file is read-only — check it out before importing a catalogue.'
+        : 'The project is locked — unlock it before importing a catalogue.');
+      return;
+    }
     const { project } = get();
     if (!project) return;
     const newBySku = new Map(newProducts.map((p) => [p.sku, p]));

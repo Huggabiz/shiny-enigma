@@ -285,6 +285,7 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
                           <th>Category</th>
                           <th>Volume</th>
                           <th>RRP</th>
+                          <th>Launch</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -295,6 +296,7 @@ export function ImportDialog({ onImport, onClose }: ImportDialogProps) {
                             <td>{p.category || <span className="empty-cell">—</span>}</td>
                             <td>{p.volume ? p.volume.toLocaleString() : <span className="empty-cell">—</span>}</td>
                             <td>{p.rrp || <span className="empty-cell">—</span>}</td>
+                            <td>{p.launchSeason || <span className="empty-cell">—</span>}</td>
                           </tr>
                         ))}
                       </tbody>
