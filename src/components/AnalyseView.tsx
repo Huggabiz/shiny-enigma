@@ -9,11 +9,12 @@ import './AnalyseView.css';
 
 type Metric = 'rrp' | 'revenue' | 'margin';
 type AspMode = 'standard' | 'weighted';
-type SheetId = 'icicle' | 'scatter' | 'sunburst';
+type SheetId = 'icicle' | 'scatter' | 'lifecycle' | 'sunburst';
 
 const SHEETS: { id: SheetId; label: string }[] = [
   { id: 'icicle', label: 'Icicle' },
   { id: 'scatter', label: 'Scatter' },
+  { id: 'lifecycle', label: 'Lifecycle' },
   { id: 'sunburst', label: 'Sunburst' },
 ];
 
@@ -387,7 +388,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} catColors={catColors} />}
             </div>
@@ -437,6 +438,13 @@ export function AnalyseView() {
               <div className="analyse-config-separator" />
               <label className="analyse-config-item"><input type="checkbox" checked={scatterConfig.contours} onChange={(e) => updateScatter({ contours: e.target.checked })} /> Contours</label>
               <label className="analyse-config-item" title="Colour dots by launch age: new = light, richest at ~3 years, washing out beyond"><input type="checkbox" checked={scatterConfig.ageShade ?? true} onChange={(e) => updateScatter({ ageShade: e.target.checked })} /> Age shading</label>
+              <span style={{ flex: 1 }} />
+              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
+            </div>
+          )}
+          {activeSheet === 'lifecycle' && (
+            <div className="analyse-chart-config">
+              <span className="analyse-config-item" style={{ cursor: 'default' }}>Avg OM (£) per SKU by launch-age bucket — click legend entries to isolate categories; hover points for SKU counts</span>
               <span style={{ flex: 1 }} />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
@@ -858,6 +866,161 @@ function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
         </div>
       </div>
       <button className="analyse-snip-btn" style={{ marginTop: 'auto', alignSelf: 'stretch' }} onClick={handleCopy}>{copyStatus ?? 'Copy stats'}</button>
+    </div>
+  );
+}
+
+// ---------- Lifecycle (avg OM per SKU by launch-age bucket) ----------
+
+const AGE_BUCKETS = [
+  { key: '<1y', min: 0, max: 1 },
+  { key: '1–2y', min: 1, max: 2 },
+  { key: '2–3y', min: 2, max: 3 },
+  { key: '3y+', min: 3, max: Infinity },
+] as const;
+
+interface LifecyclePoint { category: string; margin: number; age: number; }
+
+function LifecycleChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onToggleCat }: {
+  plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
+  catColors: Map<string, string>; hiddenCats: Set<string>; onToggleCat: (cat: string) => void;
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { wrapperRef, dims, measureRef } = useMeasure();
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  // One entry per distinct product with a margin AND a parseable,
+  // non-future launch season. Products missing either are excluded —
+  // they can't be bucketed.
+  const { points, excluded } = useMemo(() => {
+    const seen = new Set<string>();
+    const pts: LifecyclePoint[] = [];
+    let skipped = 0;
+    for (const plan of plans) {
+      const shelf = resolveShelf(plan, shelfSide);
+      if (!shelf) continue;
+      for (const item of shelf.items) {
+        const prod = getProductForItem(item, catalogue);
+        if (!prod || seen.has(prod.id)) continue;
+        seen.add(prod.id);
+        const margin = prod.operatingMarginGbp;
+        const age = launchAgeYears(prod.launchSeason);
+        if (margin == null || age == null || age < 0) { skipped++; continue; }
+        pts.push({ category: prod.category || 'Uncategorised', margin, age });
+      }
+    }
+    return { points: pts, excluded: skipped };
+  }, [plans, catalogue, shelfSide]);
+
+  const categories = useMemo(() => Array.from(new Set(points.map((p) => p.category))).sort(), [points]);
+
+  useEffect(() => {
+    const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
+    const { width, height } = dims;
+    const margin = { top: 16, right: 24, bottom: 40, left: 64 };
+    const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
+    if (iW < 20 || iH < 20 || points.length === 0) return;
+
+    const vis = points.filter((p) => !hiddenCats.has(p.category));
+
+    // Per-category per-bucket {avg, n}, plus the all-category series.
+    type BucketStat = { avg: number; n: number } | null;
+    const series: { name: string; color: string; dashed: boolean; stats: BucketStat[] }[] = [];
+    const bucketStats = (pts: LifecyclePoint[]): BucketStat[] =>
+      AGE_BUCKETS.map((b) => {
+        const inB = pts.filter((p) => p.age >= b.min && p.age < b.max);
+        if (inB.length === 0) return null;
+        return { avg: inB.reduce((s, p) => s + p.margin, 0) / inB.length, n: inB.length };
+      });
+    for (const cat of categories) {
+      if (hiddenCats.has(cat)) continue;
+      series.push({ name: cat, color: catColors.get(cat) ?? '#999', dashed: false, stats: bucketStats(vis.filter((p) => p.category === cat)) });
+    }
+    if (series.length > 1) {
+      series.push({ name: 'All categories', color: '#333', dashed: true, stats: bucketStats(vis) });
+    }
+
+    const maxAvg = d3.max(series.flatMap((s) => s.stats.filter((x): x is { avg: number; n: number } => !!x).map((x) => x.avg))) ?? 0;
+    if (maxAvg <= 0) return;
+
+    const xScale = d3.scalePoint<string>().domain(AGE_BUCKETS.map((b) => b.key)).range([0, iW]).padding(0.5);
+    const yScale = d3.scaleLinear().domain([0, maxAvg * 1.12]).range([iH, 0]);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+    g.append('g').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xScale)).selectAll('text').attr('font-size', '10px');
+    g.append('g').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickFormat((d) => fmtGbp(+d))).selectAll('text').attr('font-size', '8px');
+    g.append('text').attr('x', iW / 2).attr('y', iH + 32).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', '#666').text('Time on market since launch');
+    g.append('text').attr('x', -iH / 2).attr('y', -48).attr('text-anchor', 'middle').attr('transform', 'rotate(-90)').attr('font-size', '9px').attr('fill', '#666').text('Avg OM (£) per SKU');
+    g.append('g').attr('class', 'gy').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickSize(-iW).tickFormat(() => '')).selectAll('line').attr('stroke', '#eee');
+    g.selectAll('.gy .domain').remove();
+
+    const lineGen = d3.line<{ x: string; y: number }>().x((d) => xScale(d.x)!).y((d) => yScale(d.y));
+
+    for (const s of series) {
+      const pts = AGE_BUCKETS.map((b, i) => s.stats[i] ? { x: b.key as string, y: s.stats[i]!.avg } : null)
+        .filter((p): p is { x: string; y: number } => !!p);
+      if (pts.length === 0) continue;
+      if (pts.length > 1) {
+        g.append('path').attr('d', lineGen(pts)!).attr('fill', 'none')
+          .attr('stroke', s.color).attr('stroke-width', s.dashed ? 1.5 : 2)
+          .attr('stroke-dasharray', s.dashed ? '5,4' : null)
+          .attr('opacity', s.dashed ? 0.7 : 0.85);
+      }
+      AGE_BUCKETS.forEach((b, i) => {
+        const st = s.stats[i];
+        if (!st) return;
+        g.append('circle')
+          .attr('cx', xScale(b.key)!).attr('cy', yScale(st.avg)).attr('r', s.dashed ? 3 : 4.5)
+          .attr('fill', s.color).attr('stroke', '#fff').attr('stroke-width', 1)
+          .style('cursor', 'pointer')
+          .on('mouseenter', function (ev: MouseEvent) {
+            d3.select(this).attr('r', s.dashed ? 4.5 : 6);
+            const r = wrapperRef.current?.getBoundingClientRect();
+            if (r) setTooltip({
+              x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8,
+              label: `${s.name} — ${b.key}`,
+              value: `Avg OM: ${fmtGbp(st.avg)} · ${st.n} SKU${st.n !== 1 ? 's' : ''}`,
+              depth: 'Launch-age bucket',
+            });
+          })
+          .on('mousemove', function (ev: MouseEvent) {
+            const r = wrapperRef.current?.getBoundingClientRect();
+            if (r) setTooltip((p) => p ? { ...p, x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8 } : null);
+          })
+          .on('mouseleave', function () {
+            d3.select(this).attr('r', s.dashed ? 3 : 4.5);
+            setTooltip(null);
+          });
+      });
+    }
+
+    // Clickable category legend — same interaction as the scatter.
+    const lG = g.append('g').attr('transform', 'translate(8, 0)');
+    let ly = 0;
+    for (const cat of categories) {
+      const c = catColors.get(cat) ?? '#999';
+      const hidden = hiddenCats.has(cat);
+      const row = lG.append('g').attr('transform', `translate(0, ${ly})`).style('cursor', 'pointer');
+      row.append('rect').attr('x', -4).attr('y', -3).attr('width', cat.length * 5.5 + 22).attr('height', 15).attr('fill', '#fff').attr('fill-opacity', 0.88).attr('rx', 2);
+      row.append('circle').attr('cx', 4).attr('cy', 5).attr('r', 4).attr('fill', hidden ? '#ccc' : c);
+      row.append('text').attr('x', 12).attr('y', 8).attr('font-size', '8px').attr('fill', hidden ? '#bbb' : '#555').text(cat);
+      if (hidden) row.append('line').attr('x1', 0).attr('y1', 5).attr('x2', cat.length * 5.5 + 14).attr('y2', 5).attr('stroke', '#bbb').attr('stroke-width', 0.5);
+      row.on('click', () => onToggleCat(cat));
+      ly += 16;
+    }
+
+    // Excluded-SKU note so a thin dataset is visible, not misleading.
+    if (excluded > 0) {
+      g.append('text').attr('x', iW).attr('y', -4).attr('text-anchor', 'end')
+        .attr('font-size', '8px').attr('fill', '#aaa')
+        .text(`${excluded} SKU${excluded !== 1 ? 's' : ''} excluded (no margin or launch season)`);
+    }
+  }, [points, excluded, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat]);
+
+  return (
+    <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
+      <ChartTooltip tooltip={tooltip} />
     </div>
   );
 }
