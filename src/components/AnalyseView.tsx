@@ -9,12 +9,13 @@ import './AnalyseView.css';
 
 type Metric = 'rrp' | 'revenue' | 'margin';
 type AspMode = 'standard' | 'weighted';
-type SheetId = 'icicle' | 'scatter' | 'lifecycle' | 'sunburst';
+type SheetId = 'icicle' | 'scatter' | 'lifecycle' | 'pareto' | 'sunburst';
 
 const SHEETS: { id: SheetId; label: string }[] = [
   { id: 'icicle', label: 'Icicle' },
   { id: 'scatter', label: 'Scatter' },
   { id: 'lifecycle', label: 'Lifecycle' },
+  { id: 'pareto', label: 'Revenue Rank' },
   { id: 'sunburst', label: 'Sunburst' },
 ];
 
@@ -388,7 +389,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} catColors={catColors} />}
             </div>
@@ -445,6 +446,13 @@ export function AnalyseView() {
           {activeSheet === 'lifecycle' && (
             <div className="analyse-chart-config">
               <span className="analyse-config-item" style={{ cursor: 'default' }}>Avg OM (£) per SKU by launch-age bucket — click legend entries to isolate categories; hover points for SKU counts</span>
+              <span style={{ flex: 1 }} />
+              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
+            </div>
+          )}
+          {activeSheet === 'pareto' && (
+            <div className="analyse-chart-config">
+              <span className="analyse-config-item" style={{ cursor: 'default' }}>SKUs ranked by revenue — dashed line is cumulative share; click legend entries to isolate categories</span>
               <span style={{ flex: 1 }} />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
@@ -1016,6 +1024,146 @@ function LifecycleChart({ plans, catalogue, shelfSide, catColors, hiddenCats, on
         .text(`${excluded} SKU${excluded !== 1 ? 's' : ''} excluded (no margin or launch season)`);
     }
   }, [points, excluded, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat]);
+
+  return (
+    <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
+      <ChartTooltip tooltip={tooltip} />
+    </div>
+  );
+}
+
+// ---------- Revenue Rank (Pareto) ----------
+
+interface ParetoPoint { sku: string; name: string; category: string; revenue: number; }
+
+function ParetoChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onToggleCat }: {
+  plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
+  catColors: Map<string, string>; hiddenCats: Set<string>; onToggleCat: (cat: string) => void;
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { wrapperRef, dims, measureRef } = useMeasure();
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  const points = useMemo(() => {
+    const seen = new Set<string>();
+    const pts: ParetoPoint[] = [];
+    for (const plan of plans) {
+      const shelf = resolveShelf(plan, shelfSide);
+      if (!shelf) continue;
+      for (const item of shelf.items) {
+        const prod = getProductForItem(item, catalogue);
+        if (!prod || seen.has(prod.id)) continue;
+        seen.add(prod.id);
+        const revenue = prod.revenue ?? 0;
+        if (revenue <= 0) continue;
+        pts.push({ sku: prod.sku, name: prod.name, category: prod.category || 'Uncategorised', revenue });
+      }
+    }
+    return pts;
+  }, [plans, catalogue, shelfSide]);
+
+  const categories = useMemo(() => Array.from(new Set(points.map((p) => p.category))).sort(), [points]);
+
+  useEffect(() => {
+    const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
+    const { width, height } = dims;
+    const margin = { top: 16, right: 44, bottom: 36, left: 64 };
+    const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
+    if (iW < 20 || iH < 20 || points.length === 0) return;
+
+    // Visible SKUs ranked by revenue, descending.
+    const ranked = points.filter((p) => !hiddenCats.has(p.category)).sort((a, b) => b.revenue - a.revenue);
+    if (ranked.length === 0) return;
+    const total = ranked.reduce((s, p) => s + p.revenue, 0);
+
+    const xScale = d3.scaleLinear().domain([0, ranked.length]).range([0, iW]);
+    const yScale = d3.scaleLinear().domain([0, (ranked[0].revenue) * 1.05]).range([iH, 0]);
+    const pctScale = d3.scaleLinear().domain([0, 100]).range([iH, 0]);
+    const barW = Math.max(iW / ranked.length - 0.5, 0.5);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    // Axes: left = revenue, right = cumulative %, bottom = rank.
+    g.append('g').attr('transform', `translate(0,${iH})`)
+      .call(d3.axisBottom(xScale).ticks(Math.min(10, ranked.length)).tickFormat((d) => `${d}`))
+      .selectAll('text').attr('font-size', '8px');
+    g.append('g').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickFormat((d) => fmtGbp(+d))).selectAll('text').attr('font-size', '8px');
+    g.append('g').attr('transform', `translate(${iW},0)`)
+      .call(d3.axisRight(pctScale).ticks(5).tickFormat((d) => `${d}%`))
+      .selectAll('text').attr('font-size', '8px').attr('fill', '#666');
+    g.append('text').attr('x', iW / 2).attr('y', iH + 28).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', '#666')
+      .text(`SKUs ranked by revenue (${ranked.length})`);
+    g.append('text').attr('x', -iH / 2).attr('y', -48).attr('text-anchor', 'middle').attr('transform', 'rotate(-90)')
+      .attr('font-size', '9px').attr('fill', '#666').text('Revenue (£)');
+    g.append('text').attr('x', iH / 2).attr('y', -iW - 34).attr('text-anchor', 'middle').attr('transform', 'rotate(90)')
+      .attr('font-size', '9px').attr('fill', '#666').text('Cumulative share');
+    g.append('g').attr('class', 'gy')
+      .call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickSize(-iW).tickFormat(() => ''))
+      .selectAll('line').attr('stroke', '#eee');
+    g.selectAll('.gy .domain').remove();
+
+    // Bars — one per SKU, coloured by category.
+    g.selectAll('rect.pareto-bar').data(ranked).join('rect')
+      .attr('class', 'pareto-bar')
+      .attr('x', (_, i) => xScale(i))
+      .attr('y', (d) => yScale(d.revenue))
+      .attr('width', barW)
+      .attr('height', (d) => iH - yScale(d.revenue))
+      .attr('fill', (d) => catColors.get(d.category) ?? '#999')
+      .attr('fill-opacity', 0.85)
+      .style('cursor', 'pointer')
+      .on('mouseenter', function (ev: MouseEvent, d) {
+        d3.select(this).attr('fill-opacity', 1).attr('stroke', '#333').attr('stroke-width', 0.5);
+        const i = ranked.indexOf(d);
+        const cum = ranked.slice(0, i + 1).reduce((s, p) => s + p.revenue, 0);
+        const r = wrapperRef.current?.getBoundingClientRect();
+        if (r) setTooltip({
+          x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8,
+          label: `#${i + 1} · ${d.sku} — ${d.name}`,
+          value: `Revenue: ${fmtGbp(d.revenue)} · top ${i + 1} = ${(cum / total * 100).toFixed(1)}% of total`,
+          depth: d.category,
+        });
+      })
+      .on('mousemove', function (ev: MouseEvent) {
+        const r = wrapperRef.current?.getBoundingClientRect();
+        if (r) setTooltip((p) => p ? { ...p, x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8 } : null);
+      })
+      .on('mouseleave', function () {
+        d3.select(this).attr('fill-opacity', 0.85).attr('stroke', 'none');
+        setTooltip(null);
+      });
+
+    // Cumulative share line (dashed).
+    let running = 0;
+    const cumPts = ranked.map((p, i) => { running += p.revenue; return { x: xScale(i) + barW / 2, y: pctScale(running / total * 100) }; });
+    g.append('path')
+      .attr('d', d3.line<{ x: number; y: number }>().x((d) => d.x).y((d) => d.y)(cumPts)!)
+      .attr('fill', 'none').attr('stroke', '#333').attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '5,4').attr('opacity', 0.7);
+
+    // 80% guide line — the classic Pareto reference.
+    g.append('line').attr('x1', 0).attr('x2', iW).attr('y1', pctScale(80)).attr('y2', pctScale(80))
+      .attr('stroke', '#c62828').attr('stroke-width', 0.5).attr('stroke-dasharray', '2,3').attr('opacity', 0.5);
+    g.append('text').attr('x', iW - 4).attr('y', pctScale(80) - 3).attr('text-anchor', 'end')
+      .attr('font-size', '7px').attr('fill', '#c62828').attr('opacity', 0.7).text('80%');
+
+    // Clickable category legend — same interaction as the other sheets.
+    const lG = g.append('g').attr('transform', `translate(${iW - 8}, 8)`);
+    let ly = 0;
+    for (const cat of categories) {
+      const c = catColors.get(cat) ?? '#999';
+      const hidden = hiddenCats.has(cat);
+      const labelW = cat.length * 5.5 + 22;
+      const row = lG.append('g').attr('transform', `translate(${-labelW}, ${ly})`).style('cursor', 'pointer');
+      row.append('rect').attr('x', -4).attr('y', -3).attr('width', labelW + 4).attr('height', 15).attr('fill', '#fff').attr('fill-opacity', 0.88).attr('rx', 2);
+      row.append('circle').attr('cx', 4).attr('cy', 5).attr('r', 4).attr('fill', hidden ? '#ccc' : c);
+      row.append('text').attr('x', 12).attr('y', 8).attr('font-size', '8px').attr('fill', hidden ? '#bbb' : '#555').text(cat);
+      if (hidden) row.append('line').attr('x1', 0).attr('y1', 5).attr('x2', labelW - 8).attr('y2', 5).attr('stroke', '#bbb').attr('stroke-width', 0.5);
+      row.on('click', () => onToggleCat(cat));
+      ly += 16;
+    }
+  }, [points, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
