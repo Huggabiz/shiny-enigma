@@ -605,14 +605,19 @@ interface ScatterPoint { sku: string; name: string; category: string; subCategor
 function ageShadedColor(base: string, age: number | null): string {
   if (age == null) return base;
   const a = Math.max(0, age);
+  // Endpoints chosen for a WIDE luminance span so the differential is
+  // obvious at dot size: brand new = strong pastel tint of the
+  // category colour; 3 years = the richest, slightly deepened base.
+  const rich = d3.interpolateLab(base, '#000000')(0.18);
   if (a <= 3) {
-    const t = 1 - a / 3; // 1 = brand new, 0 = 3 years old
-    return d3.interpolateLab(base, '#ffffff')(t * 0.55);
+    const light = d3.interpolateLab(base, '#ffffff')(0.72);
+    return d3.interpolateLab(light, rich)(a / 3);
   }
-  const over = Math.min((a - 3) / 5, 1);
-  const c = d3.hsl(base);
-  c.s = c.s * (1 - 0.8 * over);
-  c.l = Math.min(0.75, c.l + 0.15 * over);
+  // Legacy: wash out to grey quickly — fully washed by ~6 years.
+  const over = Math.min((a - 3) / 3, 1);
+  const c = d3.hsl(rich);
+  c.s = c.s * (1 - 0.85 * over);
+  c.l = c.l + (0.62 - c.l) * 0.8 * over;
   return c.formatHex();
 }
 
@@ -726,7 +731,10 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
     g.selectAll('circle').data(vis).join('circle')
       .attr('cx', (d) => xScale(xAccessor(d))).attr('cy', (d) => yScale(d.rrp)).attr('r', dotSize)
       .attr('fill', dotFill)
-      .attr('fill-opacity', 0.75).attr('stroke', (d) => colorMap.get(d.category) ?? '#999').attr('stroke-width', 1).style('cursor', 'pointer')
+      // Higher opacity in age-shading mode: the ramp's pastel end would
+      // otherwise be double-faded by translucency over white.
+      .attr('fill-opacity', ageShade ? 0.92 : 0.75)
+      .attr('stroke', (d) => colorMap.get(d.category) ?? '#999').attr('stroke-width', 1).style('cursor', 'pointer')
       .on('mouseenter', function (ev, d) {
         d3.select(this).attr('r', dotSize + 2).attr('fill-opacity', 1).attr('stroke-width', 2);
         const r = wrapperRef.current?.getBoundingClientRect();
@@ -743,7 +751,7 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
         }
       })
       .on('mousemove', function (ev) { const r = wrapperRef.current?.getBoundingClientRect(); if (r) setTooltip((p) => p ? { ...p, x: ev.clientX - r.left + 12, y: ev.clientY - r.top - 8 } : null); })
-      .on('mouseleave', function () { d3.select(this).attr('r', dotSize).attr('fill-opacity', 0.75).attr('stroke-width', 1); setTooltip(null); });
+      .on('mouseleave', function () { d3.select(this).attr('r', dotSize).attr('fill-opacity', ageShade ? 0.92 : 0.75).attr('stroke-width', 1); setTooltip(null); });
 
     // Legend — inside plot, top-left, clickable to toggle category visibility
     const lG = g.append('g').attr('transform', 'translate(8, 4)');
