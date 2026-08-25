@@ -265,6 +265,7 @@ export function AnalyseView() {
   // grow OM £ or grow Revenue.
   const [growthMetric, setGrowthMetric] = useState<'margin' | 'revenue'>('margin');
   const [showCatFilter, setShowCatFilter] = useState(false);
+  const [showCombinedNewness, setShowCombinedNewness] = useState(true);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [snipStatus, setSnipStatus] = useState<string | null>(null);
 
@@ -394,7 +395,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} growthPct={growthPct} growthMetric={growthMetric} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -472,6 +473,10 @@ export function AnalyseView() {
               <label className="analyse-config-item">Growth %
                 <input type="number" min="1" max="100" step="1" className="analyse-config-input" style={{ width: 44 }}
                   value={growthPct} onChange={(e) => setGrowthPct(Math.max(1, Number(e.target.value) || 5))} />
+              </label>
+              <label className="analyse-config-item" title="Summary bar concatenating every category's growth block into one combined annual newness requirement">
+                <input type="checkbox" checked={showCombinedNewness} onChange={(e) => setShowCombinedNewness(e.target.checked)} />
+                Combined newness
               </label>
               <div className="analyse-config-separator" />
               {/* Category filter lives HERE (below the canvas) so it is
@@ -1256,10 +1261,11 @@ function ParetoChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onTog
 
 // ---------- Growth (stacked existing + incremental, SKU-unit ticks) ----------
 
-function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growthPct, growthMetric }: {
+function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growthPct, growthMetric, showCombined }: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   catColors: Map<string, string>; hiddenCats: Set<string>;
   growthPct: number; growthMetric: 'margin' | 'revenue';
+  showCombined: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
@@ -1304,7 +1310,10 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growt
 
     const maxX = d3.max(rows, (r) => r.total + r.inc) ?? 0;
     const xScale = d3.scaleLinear().domain([0, maxX * 1.02]).range([0, iW]);
-    const yScale = d3.scaleBand<string>().domain(rows.map((r) => r.cat)).range([0, iH]).padding(0.3);
+    // When the combined-newness summary bar is on, reserve a band at
+    // the bottom (separated by a small gap) for it.
+    const comboH = showCombined ? 40 : 0;
+    const yScale = d3.scaleBand<string>().domain(rows.map((r) => r.cat)).range([0, iH - comboH]).padding(0.3);
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -1388,7 +1397,57 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growt
           .text(label);
       }
     }
-  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric]);
+
+    // Combined annual newness — every category's growth block laid end
+    // to end in one summary bar, each segment sub-ticked by its own
+    // avg-SKU width. Answers "what does X% growth cost in total new
+    // SKUs across the portfolio this year?".
+    if (showCombined && rows.length > 0) {
+      const comboY = iH - comboH + 12;
+      const comboBh = 20;
+      const totalInc = rows.reduce((s, r) => s + r.inc, 0);
+      const totalSkus = rows.reduce((s, r) => s + r.skusNeeded, 0);
+
+      g.append('line').attr('x1', 0).attr('x2', iW).attr('y1', iH - comboH + 4).attr('y2', iH - comboH + 4)
+        .attr('stroke', '#ddd').attr('stroke-width', 0.5);
+      g.append('text').attr('x', -8).attr('y', comboY + comboBh / 2 + 3).attr('text-anchor', 'end')
+        .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
+        .text('Combined newness');
+
+      let cx = 0;
+      for (const r of rows) {
+        const segW = xScale(r.inc);
+        if (segW <= 0) continue;
+        const base = catColors.get(r.cat) ?? '#999';
+        const segColor = d3.interpolateLab(base, '#ffffff')(0.45);
+        g.append('rect').attr('x', cx).attr('y', comboY).attr('width', segW).attr('height', comboBh)
+          .attr('fill', segColor).attr('stroke', base).attr('stroke-width', 1)
+          .style('cursor', 'pointer')
+          .on('mouseenter', (ev: MouseEvent) => {
+            const rc = wrapperRef.current?.getBoundingClientRect();
+            if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label: `${r.cat} — newness`, value: `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`, depth: 'Combined annual newness' });
+          })
+          .on('mousemove', (ev: MouseEvent) => { const rc = wrapperRef.current?.getBoundingClientRect(); if (rc) setTooltip((p) => p ? { ...p, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null); })
+          .on('mouseleave', () => setTooltip(null));
+
+        // SKU ticks within this category's segment.
+        const unitPx = xScale(r.avg);
+        if (unitPx >= 3 && r.skusNeeded <= 200) {
+          for (let u = 1; u < r.skusNeeded; u++) {
+            const ux = cx + xScale(u * r.avg);
+            if (ux >= cx + segW) break;
+            g.append('line').attr('x1', ux).attr('x2', ux).attr('y1', comboY).attr('y2', comboY + comboBh)
+              .attr('stroke', '#fff').attr('stroke-width', 1).attr('opacity', 0.9);
+          }
+        }
+        cx += segW;
+      }
+
+      g.append('text').attr('x', cx + 6).attr('y', comboY + comboBh / 2 + 3)
+        .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
+        .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
+    }
+  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
