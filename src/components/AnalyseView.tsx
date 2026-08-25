@@ -9,13 +9,14 @@ import './AnalyseView.css';
 
 type Metric = 'rrp' | 'revenue' | 'margin';
 type AspMode = 'standard' | 'weighted';
-type SheetId = 'icicle' | 'scatter' | 'lifecycle' | 'pareto' | 'sunburst';
+type SheetId = 'icicle' | 'scatter' | 'lifecycle' | 'pareto' | 'growth' | 'sunburst';
 
 const SHEETS: { id: SheetId; label: string }[] = [
   { id: 'icicle', label: 'Icicle' },
   { id: 'scatter', label: 'Scatter' },
   { id: 'lifecycle', label: 'Lifecycle' },
   { id: 'pareto', label: 'Revenue Rank' },
+  { id: 'growth', label: 'Growth' },
   { id: 'sunburst', label: 'Sunburst' },
 ];
 
@@ -260,6 +261,9 @@ export function AnalyseView() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [hiddenCats, setHiddenCats] = useState<Set<string>>(new Set());
   const [growthPct, setGrowthPct] = useState(5);
+  // Shared between the scatter stats panel and the Growth sheet:
+  // grow OM £ or grow Revenue.
+  const [growthMetric, setGrowthMetric] = useState<'margin' | 'revenue'>('margin');
   const canvasRef = useRef<HTMLDivElement>(null);
   const [snipStatus, setSnipStatus] = useState<string | null>(null);
 
@@ -389,9 +393,9 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} growthPct={growthPct} growthMetric={growthMetric} /> : <Sunburst {...chartProps} />}
               </div>
-              {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} catColors={catColors} />}
+              {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
           </div>
 
@@ -453,6 +457,22 @@ export function AnalyseView() {
           {activeSheet === 'pareto' && (
             <div className="analyse-chart-config">
               <span className="analyse-config-item" style={{ cursor: 'default' }}>SKUs ranked by revenue — dashed line is cumulative share; click legend entries to isolate categories</span>
+              <span style={{ flex: 1 }} />
+              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
+            </div>
+          )}
+          {activeSheet === 'growth' && (
+            <div className="analyse-chart-config">
+              <div className="analyse-metric-toggle" role="tablist">
+                <button role="tab" className={growthMetric === 'revenue' ? 'active' : ''} onClick={() => setGrowthMetric('revenue')}>Revenue</button>
+                <button role="tab" className={growthMetric === 'margin' ? 'active' : ''} onClick={() => setGrowthMetric('margin')}>OM £</button>
+              </div>
+              <div className="analyse-config-separator" />
+              <label className="analyse-config-item">Growth %
+                <input type="number" min="1" max="100" step="1" className="analyse-config-input" style={{ width: 44 }}
+                  value={growthPct} onChange={(e) => setGrowthPct(Math.max(1, Number(e.target.value) || 5))} />
+              </label>
+              <span className="analyse-config-item" style={{ cursor: 'default' }}>Bar segments are one avg-SKU wide — count the ticks in the growth block to read the SKU requirement</span>
               <span style={{ flex: 1 }} />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
@@ -796,10 +816,12 @@ function fmtGbp(v: number): string {
   return `£${v.toFixed(0)}`;
 }
 
-function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
+function ScatterStats({ points, growthPct, onGrowthChange, growthMetric, onGrowthMetricChange, catColors }: {
   points: { rrp: number; margin: number; revenue: number; category: string }[];
   growthPct: number;
   onGrowthChange: (v: number) => void;
+  growthMetric: 'margin' | 'revenue';
+  onGrowthMetricChange: (m: 'margin' | 'revenue') => void;
   catColors: Map<string, string>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -829,8 +851,9 @@ function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
 
   const catMap = new Map<string, { total: number; count: number }>();
   for (const p of points) {
+    const v = growthMetric === 'revenue' ? p.revenue : p.margin;
     const e = catMap.get(p.category) ?? { total: 0, count: 0 };
-    e.total += p.margin; e.count++; catMap.set(p.category, e);
+    e.total += v; e.count++; catMap.set(p.category, e);
   }
 
   return (
@@ -852,6 +875,10 @@ function ScatterStats({ points, growthPct, onGrowthChange, catColors }: {
             value={growthPct} onChange={(e) => onGrowthChange(Math.max(1, Number(e.target.value) || 5))}
           />
           <span className="analyse-stat-label">% growth</span>
+        </div>
+        <div className="analyse-metric-toggle" role="tablist" style={{ marginTop: 4 }}>
+          <button role="tab" className={growthMetric === 'margin' ? 'active' : ''} onClick={() => onGrowthMetricChange('margin')} style={{ padding: '2px 8px', fontSize: 9 }}>OM £</button>
+          <button role="tab" className={growthMetric === 'revenue' ? 'active' : ''} onClick={() => onGrowthMetricChange('revenue')} style={{ padding: '2px 8px', fontSize: 9 }}>Revenue</button>
         </div>
         <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {Array.from(catMap).map(([cat, { total, count }]) => {
@@ -1193,6 +1220,141 @@ function ParetoChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onTog
       ly += 16;
     }
   }, [points, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat]);
+
+  return (
+    <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
+      <ChartTooltip tooltip={tooltip} />
+    </div>
+  );
+}
+
+// ---------- Growth (stacked existing + incremental, SKU-unit ticks) ----------
+
+function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growthPct, growthMetric }: {
+  plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
+  catColors: Map<string, string>; hiddenCats: Set<string>;
+  growthPct: number; growthMetric: 'margin' | 'revenue';
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { wrapperRef, dims, measureRef } = useMeasure();
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  // Per-category totals of the chosen metric across the selected
+  // plans' shelf (deduped by product).
+  const cats = useMemo(() => {
+    const seen = new Set<string>();
+    const map = new Map<string, { total: number; n: number }>();
+    for (const plan of plans) {
+      const shelf = resolveShelf(plan, shelfSide);
+      if (!shelf) continue;
+      for (const item of shelf.items) {
+        const prod = getProductForItem(item, catalogue);
+        if (!prod || seen.has(prod.id)) continue;
+        seen.add(prod.id);
+        const v = growthMetric === 'revenue' ? (prod.revenue ?? 0) : (prod.operatingMarginGbp ?? 0);
+        if (v <= 0) continue;
+        const cat = prod.category || 'Uncategorised';
+        if (hiddenCats.has(cat)) continue;
+        const e = map.get(cat) ?? { total: 0, n: 0 };
+        e.total += v; e.n++; map.set(cat, e);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([cat, { total, n }]) => ({ cat, total, n, avg: total / n }))
+      .sort((a, b) => b.total - a.total);
+  }, [plans, catalogue, shelfSide, growthMetric, hiddenCats]);
+
+  useEffect(() => {
+    const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
+    const { width, height } = dims;
+    const margin = { top: 20, right: 130, bottom: 36, left: 130 };
+    const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
+    if (iW < 20 || iH < 20 || cats.length === 0) return;
+
+    const rows = cats.map((c) => {
+      const inc = c.total * (growthPct / 100);
+      return { ...c, inc, skusNeeded: c.avg > 0 ? Math.ceil(inc / c.avg) : 0 };
+    });
+
+    const maxX = d3.max(rows, (r) => r.total + r.inc) ?? 0;
+    const xScale = d3.scaleLinear().domain([0, maxX * 1.02]).range([0, iW]);
+    const yScale = d3.scaleBand<string>().domain(rows.map((r) => r.cat)).range([0, iH]).padding(0.3);
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+    g.append('g').attr('transform', `translate(0,${iH})`)
+      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickFormat((d) => fmtGbp(+d)))
+      .selectAll('text').attr('font-size', '8px');
+    g.append('g').call(d3.axisLeft(yScale)).selectAll('text').attr('font-size', '9px').attr('font-weight', '600');
+    g.append('text').attr('x', iW / 2).attr('y', iH + 30).attr('text-anchor', 'middle')
+      .attr('font-size', '9px').attr('fill', '#666')
+      .text(`${growthMetric === 'revenue' ? 'Revenue' : 'Operating Margin'} (£) — existing + ${growthPct}% growth`);
+    g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`)
+      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickSize(-iH).tickFormat(() => ''))
+      .selectAll('line').attr('stroke', '#eee');
+    g.selectAll('.gx .domain').remove();
+
+    for (const r of rows) {
+      const y = yScale(r.cat)!;
+      const bh = yScale.bandwidth();
+      const base = catColors.get(r.cat) ?? '#999';
+      const incColor = d3.interpolateLab(base, '#ffffff')(0.55);
+
+      // Existing segment.
+      g.append('rect').attr('x', 0).attr('y', y).attr('width', xScale(r.total)).attr('height', bh)
+        .attr('fill', base).attr('fill-opacity', 0.9).attr('rx', 2)
+        .style('cursor', 'pointer')
+        .on('mouseenter', (ev: MouseEvent) => {
+          const rc = wrapperRef.current?.getBoundingClientRect();
+          if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label: `${r.cat} — existing`, value: `${fmtGbp(r.total)} · ${r.n} SKUs · avg ${fmtGbp(r.avg)}/SKU`, depth: growthMetric === 'revenue' ? 'Revenue' : 'OM £' });
+        })
+        .on('mousemove', (ev: MouseEvent) => { const rc = wrapperRef.current?.getBoundingClientRect(); if (rc) setTooltip((p) => p ? { ...p, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null); })
+        .on('mouseleave', () => setTooltip(null));
+
+      // Incremental segment.
+      g.append('rect').attr('x', xScale(r.total)).attr('y', y)
+        .attr('width', Math.max(0, xScale(r.total + r.inc) - xScale(r.total))).attr('height', bh)
+        .attr('fill', incColor).attr('stroke', base).attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('rx', 2)
+        .style('cursor', 'pointer')
+        .on('mouseenter', (ev: MouseEvent) => {
+          const rc = wrapperRef.current?.getBoundingClientRect();
+          if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label: `${r.cat} — +${growthPct}% growth`, value: `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} new SKU${r.skusNeeded !== 1 ? 's' : ''} @ avg ${fmtGbp(r.avg)}/SKU`, depth: growthMetric === 'revenue' ? 'Revenue' : 'OM £' });
+        })
+        .on('mousemove', (ev: MouseEvent) => { const rc = wrapperRef.current?.getBoundingClientRect(); if (rc) setTooltip((p) => p ? { ...p, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null); })
+        .on('mouseleave', () => setTooltip(null));
+
+      // SKU-unit separators: one tick every avg-per-SKU along the whole
+      // bar, so the growth block visually spans "N SKUs" worth. Skipped
+      // when they'd be sub-pixel noise.
+      const unitPx = xScale(r.avg);
+      const units = Math.floor((r.total + r.inc) / r.avg);
+      if (unitPx >= 3 && units <= 400) {
+        for (let u = 1; u <= units; u++) {
+          const ux = xScale(u * r.avg);
+          const inGrowth = u * r.avg > r.total;
+          g.append('line').attr('x1', ux).attr('x2', ux).attr('y1', y).attr('y2', y + bh)
+            .attr('stroke', '#fff').attr('stroke-width', inGrowth ? 1.5 : 1)
+            .attr('opacity', inGrowth ? 0.95 : 0.75);
+        }
+      }
+
+      // Right-hand annotation: the headline SKU requirement.
+      g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 3)
+        .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
+        .text(`+${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`);
+      g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 13)
+        .attr('font-size', '7.5px').attr('fill', '#888')
+        .text(`@ ${fmtGbp(r.avg)}/SKU`);
+
+      // In-bar value label for the existing segment when it fits.
+      if (xScale(r.total) > 60) {
+        g.append('text').attr('x', 6).attr('y', y + bh / 2 + 3)
+          .attr('font-size', '8px').attr('font-weight', '600').attr('fill', '#fff')
+          .text(fmtGbp(r.total));
+      }
+    }
+  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
