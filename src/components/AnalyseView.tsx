@@ -1372,11 +1372,20 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growt
         .attr('font-size', '7.5px').attr('fill', '#888')
         .text(`@ ${fmtGbp(r.avg)}/SKU`);
 
-      // In-bar value label for the existing segment when it fits.
-      if (xScale(r.total) > 60) {
-        g.append('text').attr('x', 6).attr('y', y + bh / 2 + 3)
-          .attr('font-size', '8px').attr('font-weight', '600').attr('fill', '#fff')
-          .text(fmtGbp(r.total));
+      // In-bar value label for the existing segment when it fits —
+      // dark text on a translucent white pill so it stays readable
+      // over the SKU-unit division ticks.
+      if (xScale(r.total) > 70) {
+        const label = fmtGbp(r.total);
+        const labelW = label.length * 6.5 + 12;
+        const labelH = 16;
+        g.append('rect').attr('x', 6).attr('y', y + bh / 2 - labelH / 2)
+          .attr('width', labelW).attr('height', labelH).attr('rx', labelH / 2)
+          .attr('fill', '#fff').attr('fill-opacity', 0.8);
+        g.append('text').attr('x', 6 + labelW / 2).attr('y', y + bh / 2 + 3.5)
+          .attr('text-anchor', 'middle')
+          .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+          .text(label);
       }
     }
   }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric]);
