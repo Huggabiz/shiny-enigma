@@ -1068,7 +1068,8 @@ function ParetoChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onTog
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
     const { width, height } = dims;
-    const margin = { top: 16, right: 44, bottom: 36, left: 64 };
+    // Extra headroom for the top %-of-SKUs axis and its intercept label.
+    const margin = { top: 34, right: 44, bottom: 36, left: 64 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || points.length === 0) return;
 
@@ -1142,24 +1143,52 @@ function ParetoChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onTog
       .attr('fill', 'none').attr('stroke', '#333').attr('stroke-width', 1.5)
       .attr('stroke-dasharray', '5,4').attr('opacity', 0.7);
 
+    // Top secondary axis: % of SKUs.
+    const skuPctScale = d3.scaleLinear().domain([0, 100]).range([0, iW]);
+    g.append('g').call(d3.axisTop(skuPctScale).ticks(10).tickFormat((d) => `${d}%`))
+      .selectAll('text').attr('font-size', '7px').attr('fill', '#888');
+    g.append('text').attr('x', iW / 2).attr('y', -22).attr('text-anchor', 'middle')
+      .attr('font-size', '8px').attr('fill', '#888').text('% of SKUs');
+
     // 80% guide line — the classic Pareto reference.
     g.append('line').attr('x1', 0).attr('x2', iW).attr('y1', pctScale(80)).attr('y2', pctScale(80))
       .attr('stroke', '#c62828').attr('stroke-width', 0.5).attr('stroke-dasharray', '2,3').attr('opacity', 0.5);
     g.append('text').attr('x', iW - 4).attr('y', pctScale(80) - 3).attr('text-anchor', 'end')
       .attr('font-size', '7px').attr('fill', '#c62828').attr('opacity', 0.7).text('80%');
 
-    // Clickable category legend — same interaction as the other sheets.
-    const lG = g.append('g').attr('transform', `translate(${iW - 8}, 8)`);
+    // Intercept: first rank whose cumulative share reaches 80%. Dotted
+    // drop-line UP from the intercept to the top axis, annotated with
+    // the % of SKUs that produce 80% of the revenue.
+    {
+      let cum = 0;
+      let k = -1;
+      for (let i = 0; i < ranked.length; i++) { cum += ranked[i].revenue; if (cum / total >= 0.8) { k = i; break; } }
+      if (k >= 0) {
+        const xi = xScale(k) + barW / 2;
+        const skuPct = ((k + 1) / ranked.length) * 100;
+        g.append('line').attr('x1', xi).attr('x2', xi).attr('y1', pctScale(80)).attr('y2', 0)
+          .attr('stroke', '#c62828').attr('stroke-width', 1).attr('stroke-dasharray', '3,3').attr('opacity', 0.7);
+        g.append('circle').attr('cx', xi).attr('cy', pctScale(80)).attr('r', 3)
+          .attr('fill', '#c62828').attr('opacity', 0.8);
+        g.append('text').attr('x', xi + 4).attr('y', 10).attr('text-anchor', 'start')
+          .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#c62828')
+          .text(`${skuPct.toFixed(0)}% of SKUs = 80% of revenue`);
+      }
+    }
+
+    // Clickable category legend — fixed-width rows so the colour dots
+    // share one column regardless of label length.
+    const maxLabelW = Math.max(...categories.map((c) => c.length * 5.5 + 22));
+    const lG = g.append('g').attr('transform', `translate(${iW - 8 - maxLabelW}, 26)`);
     let ly = 0;
     for (const cat of categories) {
       const c = catColors.get(cat) ?? '#999';
       const hidden = hiddenCats.has(cat);
-      const labelW = cat.length * 5.5 + 22;
-      const row = lG.append('g').attr('transform', `translate(${-labelW}, ${ly})`).style('cursor', 'pointer');
-      row.append('rect').attr('x', -4).attr('y', -3).attr('width', labelW + 4).attr('height', 15).attr('fill', '#fff').attr('fill-opacity', 0.88).attr('rx', 2);
+      const row = lG.append('g').attr('transform', `translate(0, ${ly})`).style('cursor', 'pointer');
+      row.append('rect').attr('x', -4).attr('y', -3).attr('width', maxLabelW + 4).attr('height', 15).attr('fill', '#fff').attr('fill-opacity', 0.88).attr('rx', 2);
       row.append('circle').attr('cx', 4).attr('cy', 5).attr('r', 4).attr('fill', hidden ? '#ccc' : c);
       row.append('text').attr('x', 12).attr('y', 8).attr('font-size', '8px').attr('fill', hidden ? '#bbb' : '#555').text(cat);
-      if (hidden) row.append('line').attr('x1', 0).attr('y1', 5).attr('x2', labelW - 8).attr('y2', 5).attr('stroke', '#bbb').attr('stroke-width', 0.5);
+      if (hidden) row.append('line').attr('x1', 0).attr('y1', 5).attr('x2', cat.length * 5.5 + 14).attr('y2', 5).attr('stroke', '#bbb').attr('stroke-width', 0.5);
       row.on('click', () => onToggleCat(cat));
       ly += 16;
     }
