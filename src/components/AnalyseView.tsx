@@ -260,12 +260,38 @@ export function AnalyseView() {
 
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [hiddenCats, setHiddenCats] = useState<Set<string>>(new Set());
-  const [growthPct, setGrowthPct] = useState(5);
-  // Shared between the scatter stats panel and the Growth sheet:
-  // grow OM £ or grow Revenue.
-  const [growthMetric, setGrowthMetric] = useState<'margin' | 'revenue'>('margin');
+  // Growth settings — initialised from the saved project and persisted
+  // on every change so they survive save/reload. Default 10%.
+  const [growthPct, setGrowthPctState] = useState(() => av?.growthConfig?.pct ?? 10);
+  const [growthMetric, setGrowthMetricState] = useState<'margin' | 'revenue'>(
+    () => (av?.growthConfig?.metric === 'revenue' ? 'revenue' : 'margin'));
+  const [showCombinedNewness, setShowCombinedNewnessState] = useState(() => av?.growthConfig?.combined ?? true);
+  // Growth-sheet-specific category hiding — independent of the legend
+  // hidden-set the other sheets share, and persisted with the project.
+  const [growthHiddenCats, setGrowthHiddenCats] = useState<Set<string>>(
+    () => new Set(av?.growthConfig?.hiddenCats ?? []));
   const [showCatFilter, setShowCatFilter] = useState(false);
-  const [showCombinedNewness, setShowCombinedNewness] = useState(true);
+
+  const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; hiddenCats?: string[] }) => {
+    const current = {
+      pct: growthPct, metric: growthMetric, combined: showCombinedNewness,
+      hiddenCats: Array.from(growthHiddenCats),
+      ...patch,
+    };
+    setAnalyseConfig({ growthConfig: current });
+  }, [growthPct, growthMetric, showCombinedNewness, growthHiddenCats, setAnalyseConfig]);
+
+  const setGrowthPct = (v: number) => { setGrowthPctState(v); persistGrowth({ pct: v }); };
+  const setGrowthMetric = (m: 'margin' | 'revenue') => { setGrowthMetricState(m); persistGrowth({ metric: m }); };
+  const setShowCombinedNewness = (v: boolean) => { setShowCombinedNewnessState(v); persistGrowth({ combined: v }); };
+  const toggleGrowthCat = (cat: string) => {
+    setGrowthHiddenCats((prev) => {
+      const n = new Set(prev);
+      if (n.has(cat)) n.delete(cat); else n.add(cat);
+      persistGrowth({ hiddenCats: Array.from(n) });
+      return n;
+    });
+  };
   const canvasRef = useRef<HTMLDivElement>(null);
   const [snipStatus, setSnipStatus] = useState<string | null>(null);
 
@@ -395,7 +421,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -484,15 +510,15 @@ export function AnalyseView() {
                   config bar sits near the bottom of the viewport. */}
               <div className="toolbar-dropdown-wrapper">
                 <button className="toolbar-btn" style={{ fontSize: 10, padding: '3px 9px' }} onClick={() => setShowCatFilter((v) => !v)}>
-                  Categories ({allCategories.length - hiddenCats.size}/{allCategories.length}) ▾
+                  Categories ({allCategories.length - growthHiddenCats.size}/{allCategories.length}) ▾
                 </button>
                 {showCatFilter && (
                   <div className="toolbar-dropdown" onMouseLeave={() => setShowCatFilter(false)}
                     style={{ bottom: '100%', top: 'auto', marginBottom: 4, maxHeight: 260, overflowY: 'auto' }}>
                     {allCategories.map((cat) => (
                       <label key={cat} className="dropdown-checkbox">
-                        <input type="checkbox" checked={!hiddenCats.has(cat)}
-                          onChange={() => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} />
+                        <input type="checkbox" checked={!growthHiddenCats.has(cat)}
+                          onChange={() => toggleGrowthCat(cat)} />
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: catColors.get(cat) ?? '#999', display: 'inline-block', flexShrink: 0 }} />
                           {cat}
@@ -1310,17 +1336,18 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growt
 
     const maxX = d3.max(rows, (r) => r.total + r.inc) ?? 0;
     const xScale = d3.scaleLinear().domain([0, maxX * 1.02]).range([0, iW]);
-    // When the combined-newness summary bar is on, reserve a band at
-    // the bottom (separated by a small gap) for it.
-    const comboH = showCombined ? 40 : 0;
-    const yScale = d3.scaleBand<string>().domain(rows.map((r) => r.cat)).range([0, iH - comboH]).padding(0.3);
+    // The combined-newness bar is a sentinel band in the same scale so
+    // its height is IDENTICAL to the category bars.
+    const COMBINED_KEY = '__combined__';
+    const domain = showCombined ? [...rows.map((r) => r.cat), COMBINED_KEY] : rows.map((r) => r.cat);
+    const yScale = d3.scaleBand<string>().domain(domain).range([0, iH]).padding(0.3);
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
     g.append('g').attr('transform', `translate(0,${iH})`)
       .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickFormat((d) => fmtGbp(+d)))
       .selectAll('text').attr('font-size', '8px');
-    g.append('g').call(d3.axisLeft(yScale)).selectAll('text').attr('font-size', '9px').attr('font-weight', '600');
+    g.append('g').call(d3.axisLeft(yScale).tickFormat((d) => d === COMBINED_KEY ? '' : d)).selectAll('text').attr('font-size', '9px').attr('font-weight', '600');
     g.append('text').attr('x', iW / 2).attr('y', iH + 30).attr('text-anchor', 'middle')
       .attr('font-size', '9px').attr('fill', '#666')
       .text(`${growthMetric === 'revenue' ? 'Revenue' : 'Operating Margin'} (£) — existing + ${growthPct}% growth`);
@@ -1403,12 +1430,13 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growt
     // avg-SKU width. Answers "what does X% growth cost in total new
     // SKUs across the portfolio this year?".
     if (showCombined && rows.length > 0) {
-      const comboY = iH - comboH + 12;
-      const comboBh = 20;
+      const comboY = yScale(COMBINED_KEY)!;
+      const comboBh = yScale.bandwidth();
       const totalInc = rows.reduce((s, r) => s + r.inc, 0);
       const totalSkus = rows.reduce((s, r) => s + r.skusNeeded, 0);
 
-      g.append('line').attr('x1', 0).attr('x2', iW).attr('y1', iH - comboH + 4).attr('y2', iH - comboH + 4)
+      g.append('line').attr('x1', 0).attr('x2', iW)
+        .attr('y1', comboY - yScale.step() * 0.15).attr('y2', comboY - yScale.step() * 0.15)
         .attr('stroke', '#ddd').attr('stroke-width', 0.5);
       g.append('text').attr('x', -8).attr('y', comboY + comboBh / 2 + 3).attr('text-anchor', 'end')
         .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
