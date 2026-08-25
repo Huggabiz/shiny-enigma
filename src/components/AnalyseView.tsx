@@ -264,6 +264,7 @@ export function AnalyseView() {
   // Shared between the scatter stats panel and the Growth sheet:
   // grow OM £ or grow Revenue.
   const [growthMetric, setGrowthMetric] = useState<'margin' | 'revenue'>('margin');
+  const [showCatFilter, setShowCatFilter] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [snipStatus, setSnipStatus] = useState<string | null>(null);
 
@@ -472,6 +473,30 @@ export function AnalyseView() {
                 <input type="number" min="1" max="100" step="1" className="analyse-config-input" style={{ width: 44 }}
                   value={growthPct} onChange={(e) => setGrowthPct(Math.max(1, Number(e.target.value) || 5))} />
               </label>
+              <div className="analyse-config-separator" />
+              {/* Category filter lives HERE (below the canvas) so it is
+                  never captured in the slide copy. Opens upward — the
+                  config bar sits near the bottom of the viewport. */}
+              <div className="toolbar-dropdown-wrapper">
+                <button className="toolbar-btn" style={{ fontSize: 10, padding: '3px 9px' }} onClick={() => setShowCatFilter((v) => !v)}>
+                  Categories ({allCategories.length - hiddenCats.size}/{allCategories.length}) ▾
+                </button>
+                {showCatFilter && (
+                  <div className="toolbar-dropdown" onMouseLeave={() => setShowCatFilter(false)}
+                    style={{ bottom: '100%', top: 'auto', marginBottom: 4, maxHeight: 260, overflowY: 'auto' }}>
+                    {allCategories.map((cat) => (
+                      <label key={cat} className="dropdown-checkbox">
+                        <input type="checkbox" checked={!hiddenCats.has(cat)}
+                          onChange={() => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} />
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: catColors.get(cat) ?? '#999', display: 'inline-block', flexShrink: 0 }} />
+                          {cat}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
               <span className="analyse-config-item" style={{ cursor: 'default' }}>Bar segments are one avg-SKU wide — count the ticks in the growth block to read the SKU requirement</span>
               <span style={{ flex: 1 }} />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
