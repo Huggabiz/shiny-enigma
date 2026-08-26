@@ -526,17 +526,23 @@
   letter-spacing: 0.2px;
 }
 
+/* Business semantics: Discontinued = ~6 months of life left (warning
+   orange); Close-Out = no longer available (red). */
 .catalogue-ranking-chip.discontinued {
-  background: #ffebee;
-  color: #c62828;
+  background: #fff3e0;
+  color: #e65100;
 }
 
 .catalogue-ranking-chip.closeout {
-  background: #fff3e0;
-  color: #e65100;
+  background: #ffebee;
+  color: #c62828;
 }
 
 .catalogue-ranking-chip.neutral {
   background: #eceff1;
   color: #546e7a;
+}
+
+.catalogue-ranking-row {
+  margin-top: 2px;
 }

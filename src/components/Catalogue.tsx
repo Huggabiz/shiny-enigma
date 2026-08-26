@@ -85,8 +85,8 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds,
           <div className="catalogue-item-details">
             <span>Vol: {product.volume.toLocaleString()}</span>
             {product.rrp > 0 && <span>RRP: {product.rrp}</span>}
-            {product.itemRanking && <RankingChip ranking={product.itemRanking} />}
           </div>
+          {product.itemRanking && <div className="catalogue-ranking-row"><RankingChip ranking={product.itemRanking} /></div>}
           {product.productFamily && (
             <div className="catalogue-item-family">{product.productFamily}</div>
           )}
@@ -117,15 +117,16 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds,
         <div className="catalogue-item-meta">
           <span>{product.sku}</span>
           <span>Vol: {product.volume.toLocaleString()}</span>
-          {product.itemRanking && <RankingChip ranking={product.itemRanking} />}
         </div>
+        {product.itemRanking && <div className="catalogue-ranking-row"><RankingChip ranking={product.itemRanking} /></div>}
       </div>
     </div>
   );
 }
 
 /** Small ranking badge shown on catalogue items. Colour keys off the
- * label content: discontinued = red, close-out = orange, else grey. */
+ * label content — business semantics: Discontinued = ~6 months of
+ * life left (orange), Close-Out = no longer available (red). */
 function RankingChip({ ranking }: { ranking: string }) {
   const r = ranking.toLowerCase();
   const cls = r.includes('discont') ? 'discontinued' : r.includes('close') ? 'closeout' : 'neutral';

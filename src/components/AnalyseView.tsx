@@ -1536,8 +1536,7 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, hiddenCats, g
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
     const { width, height } = dims;
-    // Extra top room for the numbered plan legend and above-bar badges.
-    const margin = { top: 30, right: 130, bottom: 36, left: 130 };
+    const margin = { top: 20, right: 130, bottom: 36, left: 130 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || cats.length === 0) return;
 
@@ -1566,29 +1565,11 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, hiddenCats, g
       .selectAll('line').attr('stroke', '#eee');
     g.selectAll('.gx .domain').remove();
 
-    // Plans are identified by NUMBER, not colour — every segment keeps
-    // the pure category colour (per user preference), and a numbered
-    // badge ties each segment to the legend at the top of the chart.
-    // The badge is drawn for every segment regardless of width, so no
-    // plan is ever unnamed: wide segments also print the name, narrow
-    // ones rely on the number + legend + tooltip.
-    const planIndex = new Map(plans.map((p, i) => [p.name, i]));
-    const usedPlans = plans.filter((p) => rows.some((r) => r.segs.some((s) => s.plan === p.name)));
-
-    // Plan legend — one numbered chip per plan, across the top.
-    let lx = 0;
-    const legendG = g.append('g').attr('transform', 'translate(0,-8)');
-    for (const p of usedPlans) {
-      const num = (planIndex.get(p.name) ?? 0) + 1;
-      const label = p.name.length > 24 ? p.name.slice(0, 23) + '…' : p.name;
-      const w = label.length * 5 + 26;
-      const chip = legendG.append('g').attr('transform', `translate(${lx},0)`);
-      chip.append('circle').attr('cx', 7).attr('cy', 0).attr('r', 7).attr('fill', '#1a1a2e');
-      chip.append('text').attr('x', 7).attr('y', 3).attr('text-anchor', 'middle')
-        .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#fff').text(num);
-      chip.append('text').attr('x', 18).attr('y', 3).attr('font-size', '8px').attr('fill', '#555').text(label);
-      lx += w;
-    }
+    // Plans are labelled BENEATH each bar: every segment gets its plan
+    // name under its left edge, alternating between two label lanes so
+    // adjacent narrow segments never collide. A subtle boundary tick
+    // ties each label to its segment. Names truncate (with a hover
+    // tooltip) only when the same lane's next label leaves no room.
 
     for (const r of rows) {
       const y = yScale(r.cat)!;
@@ -1597,11 +1578,11 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, hiddenCats, g
       const incColor = d3.interpolateLab(base, '#ffffff')(0.55);
 
       // Plan segments, laid end to end — all in the plain category colour.
+      const segLabels: { start: number; plan: string }[] = [];
       let cx = 0;
       for (const s of r.segs) {
         const segW = xScale(s.total);
         if (segW <= 0) continue;
-        const segIdx = planIndex.get(s.plan) ?? 0;
         g.append('rect').attr('x', cx).attr('y', y).attr('width', segW).attr('height', bh)
           .attr('fill', base).attr('fill-opacity', 0.9)
           .attr('stroke', '#fff').attr('stroke-width', 1.5)
@@ -1624,29 +1605,26 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, hiddenCats, g
           }
         }
 
-        // Plan number badge — ALWAYS drawn. Inside the segment when it
-        // fits; perched just above the bar (still centred on the
-        // segment) when the segment is too narrow to hold it.
-        const badgeCx = cx + segW / 2;
-        const badgeInside = segW >= 16;
-        const badgeCy = badgeInside ? y + 9 : y - 8;
-        g.append('circle').attr('cx', badgeCx).attr('cy', badgeCy).attr('r', 6.5)
-          .attr('fill', '#fff').attr('fill-opacity', 0.92).attr('stroke', '#1a1a2e').attr('stroke-width', 0.75)
-          .style('pointer-events', 'none');
-        g.append('text').attr('x', badgeCx).attr('y', badgeCy + 2.7).attr('text-anchor', 'middle')
-          .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#1a1a2e')
-          .style('pointer-events', 'none')
-          .text(segIdx + 1);
-
-        // Full plan name inside the segment when there is room.
-        if (segW > 46) {
-          g.append('text').attr('x', cx + segW / 2).attr('y', y + bh - 4)
-            .attr('text-anchor', 'middle').attr('font-size', '7px').attr('font-weight', '600')
-            .attr('fill', 'rgba(255,255,255,0.9)')
-            .text(s.plan.length > Math.floor(segW / 5) ? s.plan.slice(0, Math.floor(segW / 5) - 1) + '…' : s.plan);
-        }
+        segLabels.push({ start: cx, plan: s.plan });
         cx += segW;
       }
+
+      // Below-bar plan labels, two staggered lanes (even indices on
+      // lane 1, odd on lane 2). Truncation only against the next label
+      // in the SAME lane, so short adjacent segments still get room.
+      segLabels.forEach((sl, i) => {
+        const laneY = y + bh + 8 + (i % 2) * 8;
+        const sameLaneNext = segLabels[i + 2];
+        const maxW = (sameLaneNext ? sameLaneNext.start : iW + 110) - sl.start - 6;
+        const maxChars = Math.max(3, Math.floor(maxW / 4.3));
+        const label = sl.plan.length > maxChars ? sl.plan.slice(0, maxChars - 1) + '…' : sl.plan;
+        g.append('line').attr('x1', sl.start + 0.5).attr('x2', sl.start + 0.5)
+          .attr('y1', y + bh).attr('y2', laneY - 6)
+          .attr('stroke', '#ccc').attr('stroke-width', 0.6);
+        const t = g.append('text').attr('x', sl.start + 3).attr('y', laneY)
+          .attr('font-size', '7px').attr('font-weight', '600').attr('fill', '#666').text(label);
+        t.append('title').text(sl.plan);
+      });
 
       // Growth increment — category level, same style as the Growth sheet.
       g.append('rect').attr('x', cx).attr('y', y)
