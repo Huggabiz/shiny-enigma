@@ -39,6 +39,7 @@ export function exportToExcelEnriched(project: Project): void {
     row['Operating Margin %'] = product.operatingMarginPct ?? '';
     row['Operating Margin £'] = product.operatingMarginGbp ?? '';
     row['Launch Season'] = product.launchSeason ?? '';
+    row['Item Ranking'] = product.itemRanking ?? '';
 
     // Range plan usage — which plans and at which stages
     const planUsage: string[] = [];

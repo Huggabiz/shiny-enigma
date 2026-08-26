@@ -64,8 +64,8 @@ interface ProjectStore {
   assumeContinuity: boolean;
   cardFormat: CardFormat;
   showPlanTree: boolean;
-  catalogueFilters: { search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean };
-  setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean }>) => void;
+  catalogueFilters: { search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean; excludeDiscontinued: boolean; excludeCloseOut: boolean };
+  setCatalogueFilters: (f: Partial<{ search: string; category: string; subCategory: string; family: string; showLive: boolean; showDev: boolean; showCore: boolean; showDuo: boolean; hideUsed: boolean; excludeDiscontinued: boolean; excludeCloseOut: boolean }>) => void;
 
   // Views — lifted out of App local state so the export loop can drive them
   activeView: 'transform' | 'range-design' | 'multiplan' | 'multiplan-list' | 'analyse' | 'forecast-lab' | 'set-lab';
@@ -286,7 +286,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   showDiscontinued: true,
   exclusiveLensFilter: false,
   setExclusiveLensFilter: (on) => set({ exclusiveLensFilter: on }),
-  catalogueFilters: { search: '', category: '', subCategory: '', family: '', showLive: true, showDev: true, showCore: true, showDuo: true, hideUsed: false },
+  catalogueFilters: { search: '', category: '', subCategory: '', family: '', showLive: true, showDev: true, showCore: true, showDuo: true, hideUsed: false, excludeDiscontinued: false, excludeCloseOut: false },
   setCatalogueFilters: (f) => set((s) => ({ catalogueFilters: { ...s.catalogueFilters, ...f } })),
 
   activeView: 'range-design',

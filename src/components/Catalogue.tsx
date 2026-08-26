@@ -85,6 +85,7 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds,
           <div className="catalogue-item-details">
             <span>Vol: {product.volume.toLocaleString()}</span>
             {product.rrp > 0 && <span>RRP: {product.rrp}</span>}
+            {product.itemRanking && <RankingChip ranking={product.itemRanking} />}
           </div>
           {product.productFamily && (
             <div className="catalogue-item-family">{product.productFamily}</div>
@@ -116,10 +117,19 @@ function CatalogueItem({ product, expanded, currentProductIds, futureProductIds,
         <div className="catalogue-item-meta">
           <span>{product.sku}</span>
           <span>Vol: {product.volume.toLocaleString()}</span>
+          {product.itemRanking && <RankingChip ranking={product.itemRanking} />}
         </div>
       </div>
     </div>
   );
+}
+
+/** Small ranking badge shown on catalogue items. Colour keys off the
+ * label content: discontinued = red, close-out = orange, else grey. */
+function RankingChip({ ranking }: { ranking: string }) {
+  const r = ranking.toLowerCase();
+  const cls = r.includes('discont') ? 'discontinued' : r.includes('close') ? 'closeout' : 'neutral';
+  return <span className={`catalogue-ranking-chip ${cls}`} title={`Item Ranking: ${ranking}`}>{ranking}</span>;
 }
 
 interface GroupedProducts {
@@ -158,7 +168,7 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   const categoryFilter = catalogueFilters.category;
   const subCategoryFilter = catalogueFilters.subCategory;
   const familyFilter = catalogueFilters.family;
-  const { showLive, showDev, showCore, showDuo, hideUsed } = catalogueFilters;
+  const { showLive, showDev, showCore, showDuo, hideUsed, excludeDiscontinued, excludeCloseOut } = catalogueFilters;
   const setSearch = (v: string) => setCatalogueFilters({ search: v });
   // Changing category clears sub-category + family. Changing sub-category
   // clears family. Keeps downstream filters consistent with the cascade.
@@ -228,9 +238,15 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
         : designShelfId === 'current'
             ? !currentProductIds.has(p.id)
             : !currentProductIds.has(p.id) && !futureProductIds.has(p.id);
-      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource && matchesCollection && matchesHideUsed;
+      // Item-ranking exclusions — hide Discontinued / Close-Out labelled
+      // products so the team maps against the live assortment only.
+      const rank = (p.itemRanking || '').toLowerCase();
+      const matchesRanking =
+        !(excludeDiscontinued && rank.includes('discont')) &&
+        !(excludeCloseOut && rank.includes('close'));
+      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource && matchesCollection && matchesHideUsed && matchesRanking;
     });
-  }, [products, search, categoryFilter, subCategoryFilter, familyFilter, showLive, showDev, showCore, showDuo, hideUsed, designShelfId, currentProductIds, futureProductIds]);
+  }, [products, search, categoryFilter, subCategoryFilter, familyFilter, showLive, showDev, showCore, showDuo, hideUsed, excludeDiscontinued, excludeCloseOut, designShelfId, currentProductIds, futureProductIds]);
 
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
@@ -382,6 +398,22 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
               <span>Hide Used</span>
             </label>
           )}
+          <label title="Hide products whose Item Ranking is Discontinued">
+            <input
+              type="checkbox"
+              checked={excludeDiscontinued}
+              onChange={(e) => setCatalogueFilters({ excludeDiscontinued: e.target.checked })}
+            />
+            <span>Excl. Discontinued</span>
+          </label>
+          <label title="Hide products whose Item Ranking is Close-Out">
+            <input
+              type="checkbox"
+              checked={excludeCloseOut}
+              onChange={(e) => setCatalogueFilters({ excludeCloseOut: e.target.checked })}
+            />
+            <span>Excl. Close-Out</span>
+          </label>
         </div>
       </div>
 

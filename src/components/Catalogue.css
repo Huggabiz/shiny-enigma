@@ -514,3 +514,29 @@
 .catalogue-item-expanded {
   position: relative;
 }
+
+/* Item Ranking chip on catalogue items */
+.catalogue-ranking-chip {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 7px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+.catalogue-ranking-chip.discontinued {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.catalogue-ranking-chip.closeout {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.catalogue-ranking-chip.neutral {
+  background: #eceff1;
+  color: #546e7a;
+}

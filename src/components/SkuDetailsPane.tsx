@@ -109,6 +109,7 @@ export function SkuDetailsPane() {
             {/* Always rendered (with —) so a missing import is visible
                 rather than silently absent. */}
             <div className="sku-attr"><span className="sku-attr-label">Launch Season</span><span>{product.launchSeason || '—'}</span></div>
+            {product.itemRanking && <div className="sku-attr"><span className="sku-attr-label">Item Ranking</span><span>{product.itemRanking}</span></div>}
             {product.operatingMarginPct != null && <div className="sku-attr"><span className="sku-attr-label">OM %</span><span>{product.operatingMarginPct.toFixed(1)}%</span></div>}
             {product.operatingMarginGbp != null && <div className="sku-attr"><span className="sku-attr-label">OM £</span><span>£{product.operatingMarginGbp.toLocaleString()}</span></div>}
           </div>

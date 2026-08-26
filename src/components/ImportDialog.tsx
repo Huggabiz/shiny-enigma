@@ -116,6 +116,12 @@ const FIELD_DESCRIPTIONS: Record<keyof ColumnMapping, { label: string; hint: str
     // orderings plus common variants.
     aliases: ['launch season', 'season launch', 'season launched', 'launch', 'first season', 'intro season', 'introduction season', 'launch period'],
   },
+  itemRanking: {
+    label: 'Item Ranking',
+    hint: 'Commercial ranking label, e.g. Core / Discontinued / Close-Out',
+    required: false,
+    aliases: ['item ranking', 'item rank', 'ranking', 'rank'],
+  },
   imageUrl: { label: 'Image URL', hint: 'Web URL to product image', required: false, aliases: ['image', 'image url', 'imageurl', 'img', 'picture', 'photo'] },
   source: { label: 'Source', hint: 'Live or Dev — set Dev for in-development products', required: false, aliases: ['status', 'product status'] },
 };

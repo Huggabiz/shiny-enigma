@@ -99,6 +99,9 @@ export function parseSpreadsheet(
       launchSeason: row[mapping.launchSeason] != null && String(row[mapping.launchSeason]).trim() !== ''
         ? String(row[mapping.launchSeason]).trim()
         : undefined,
+      itemRanking: row[mapping.itemRanking] != null && String(row[mapping.itemRanking]).trim() !== ''
+        ? String(row[mapping.itemRanking]).trim()
+        : undefined,
       imageUrl: row[mapping.imageUrl] ? String(row[mapping.imageUrl]).trim() : undefined,
       source,
     };

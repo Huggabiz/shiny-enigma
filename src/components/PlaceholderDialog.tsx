@@ -28,6 +28,7 @@ const EMPTY_DATA: PlaceholderData = {
   operatingMarginPct: undefined,
   operatingMarginGbp: undefined,
   launchSeason: undefined,
+  itemRanking: undefined,
   imageUrl: undefined,
   source: 'live',
 };

@@ -62,6 +62,10 @@ export interface Product {
   /** Retail season the product launched (e.g. "AW26", "SS27", "MS25").
    * Parsed to a comparative date by utils/launchSeason.ts. */
   launchSeason?: string;
+  /** Commercial ranking label from the source dataset, e.g. "Core",
+   * "Discontinued", "Close-Out". Drives catalogue exclusion filters
+   * and the ranking chip on catalogue items. */
+  itemRanking?: string;
   imageUrl?: string;
   source?: 'live' | 'dev';
   // Keyed by horizon — 'default' for the immediate next future range.
@@ -91,6 +95,7 @@ export interface PlaceholderData {
   operatingMarginPct?: number;
   operatingMarginGbp?: number;
   launchSeason?: string;
+  itemRanking?: string;
   imageUrl?: string;
   source: 'live' | 'dev';
 }
@@ -739,6 +744,7 @@ export interface ColumnMapping {
   operatingMarginPct: string;
   operatingMarginGbp: string;
   launchSeason: string;
+  itemRanking: string;
   imageUrl: string;
   source: string;
 }
@@ -766,6 +772,7 @@ export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
   operatingMarginPct: 'Operating Margin %',
   operatingMarginGbp: 'Operating Margin £',
   launchSeason: 'Launch Season',
+  itemRanking: 'Item Ranking',
   imageUrl: 'Image URL',
   source: 'Source',
 };
