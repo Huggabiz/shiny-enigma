@@ -192,7 +192,19 @@ function fmtMetric(value: number, metric: Metric, isLeaf: boolean, sc: number, a
   return fmtVal(value, 'rrp');
 }
 
-interface ChartProps { plans: RangePlan[]; catalogue: Product[]; metric: Metric; shelfSide: string; activeLens?: Lens | null; aspMode: AspMode; showSegments: boolean; catColors: Map<string, string>; }
+/** Post-render text scaling: multiplies every SVG text's font-size by
+ * the sheet's configured factor. Charts fully rebuild on each effect
+ * run, so this stays idempotent per render. */
+function applyTextScale(svgEl: SVGSVGElement | null, scale: number) {
+  if (!svgEl || !scale || scale === 1) return;
+  d3.select(svgEl).selectAll('text').each(function () {
+    const t = d3.select(this);
+    const cur = parseFloat(t.attr('font-size') || '10');
+    t.attr('font-size', `${cur * scale}px`);
+  });
+}
+
+interface ChartProps { plans: RangePlan[]; catalogue: Product[]; metric: Metric; shelfSide: string; activeLens?: Lens | null; aspMode: AspMode; showSegments: boolean; catColors: Map<string, string>; textScale: number; }
 
 // Per-sheet config state that persists across tab switches
 interface IcicleConfig { metric: Metric; aspMode: AspMode; showSegments: boolean; }
@@ -273,6 +285,17 @@ export function AnalyseView() {
     () => new Set(av?.growthConfig?.hiddenCats ?? []));
   const [showCatFilter, setShowCatFilter] = useState(false);
 
+  // Per-sheet text-size multiplier for presentation exports.
+  const [textScales, setTextScales] = useState<Record<string, number>>(() => av?.textScales ?? {});
+  const activeTextScale = textScales[activeSheet] ?? 1;
+  const setTextScale = (v: number) => {
+    setTextScales((prev) => {
+      const next = { ...prev, [activeSheet]: v };
+      setAnalyseConfig({ textScales: next });
+      return next;
+    });
+  };
+
   const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; hiddenCats?: string[] }) => {
     const current = {
       pct: growthPct, metric: growthMetric, combined: showCombinedNewness,
@@ -349,6 +372,7 @@ export function AnalyseView() {
     metric: icicleConfig.metric, shelfSide, activeLens,
     aspMode: icicleConfig.aspMode, showSegments: icicleConfig.showSegments,
     catColors,
+    textScale: activeTextScale,
   };
 
   const updateIcicle = (patch: Partial<IcicleConfig>) => {
@@ -422,7 +446,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -449,6 +473,11 @@ export function AnalyseView() {
                 </label>
               )}
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
+                <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
+                <span>{activeTextScale.toFixed(2)}×</span>
+              </label>
+              <div className="analyse-config-separator" />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
           )}
@@ -473,6 +502,11 @@ export function AnalyseView() {
               <label className="analyse-config-item"><input type="checkbox" checked={scatterConfig.contours} onChange={(e) => updateScatter({ contours: e.target.checked })} /> Contours</label>
               <label className="analyse-config-item" title="Colour dots by launch age: new = light, richest at ~3 years, washing out beyond"><input type="checkbox" checked={scatterConfig.ageShade ?? true} onChange={(e) => updateScatter({ ageShade: e.target.checked })} /> Age shading</label>
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
+                <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
+                <span>{activeTextScale.toFixed(2)}×</span>
+              </label>
+              <div className="analyse-config-separator" />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
           )}
@@ -480,6 +514,11 @@ export function AnalyseView() {
             <div className="analyse-chart-config">
               <span className="analyse-config-item" style={{ cursor: 'default' }}>Avg OM (£) per SKU by launch-age bucket — click legend entries to isolate categories; hover points for SKU counts</span>
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
+                <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
+                <span>{activeTextScale.toFixed(2)}×</span>
+              </label>
+              <div className="analyse-config-separator" />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
           )}
@@ -487,6 +526,11 @@ export function AnalyseView() {
             <div className="analyse-chart-config">
               <span className="analyse-config-item" style={{ cursor: 'default' }}>SKUs ranked by revenue — dashed line is cumulative share; click legend entries to isolate categories</span>
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
+                <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
+                <span>{activeTextScale.toFixed(2)}×</span>
+              </label>
+              <div className="analyse-config-separator" />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
           )}
@@ -531,6 +575,11 @@ export function AnalyseView() {
               </div>
               <span className="analyse-config-item" style={{ cursor: 'default' }}>Bar segments are one avg-SKU wide — count the ticks in the growth block to read the SKU requirement</span>
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
+                <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
+                <span>{activeTextScale.toFixed(2)}×</span>
+              </label>
+              <div className="analyse-config-separator" />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
           )}
@@ -575,7 +624,7 @@ function ChartTooltip({ tooltip }: { tooltip: TooltipState | null }) {
 
 // ---------- Sunburst ----------
 
-function Sunburst({ plans, catalogue, metric, shelfSide, showSegments, catColors }: ChartProps) {
+function Sunburst({ plans, catalogue, metric, shelfSide, showSegments, catColors, textScale }: ChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -605,7 +654,8 @@ function Sunburst({ plans, catalogue, metric, shelfSide, showSegments, catColors
       .attr('transform', (d) => { const a = ((d.x0 + d.x1) / 2) * (180 / Math.PI) - 90, r = (d.y0 + d.y1) / 2; return `rotate(${a}) translate(${r},0) rotate(${a > 90 ? 180 : 0})`; })
       .attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', '9px').attr('font-weight', '600').attr('fill', '#fff')
       .text((d) => { const m = Math.floor(((d.x1 - d.x0) * (d.y0 + d.y1) / 2) / 5.5); return d.data.name.length > m ? d.data.name.slice(0, m - 1) + '…' : d.data.name; });
-  }, [data, dims, metric, wrapperRef, showSegments, catColors]);
+    applyTextScale(svgRef.current, textScale);
+  }, [data, dims, metric, wrapperRef, showSegments, catColors, textScale]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
@@ -623,7 +673,7 @@ function isInLens(n: d3.HierarchyNode<HierNode>, lens: Lens, sk: string): boolea
   return lens.productIds.includes(n.data.productId);
 }
 
-function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, showSegments, catColors }: ChartProps) {
+function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, showSegments, catColors, textScale }: ChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -677,7 +727,8 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, show
       const my = vis.length * lH + lH * 0.75;
       if (my + 2 < cH) gr.append('text').attr('x', 0).attr('y', my).attr('font-size', `${Math.max(7, fs - 1)}px`).attr('font-weight', '400').attr('fill', dk ? 'rgba(255,255,255,0.8)' : '#555').text(mt.length > mxC ? mt.slice(0, mxC - 1) + '…' : mt);
     });
-  }, [data, dims, metric, wrapperRef, activeLens, shelfSide, aspMode, cw, md, dl, catColors]);
+    applyTextScale(svgRef.current, textScale);
+  }, [data, dims, metric, wrapperRef, activeLens, shelfSide, aspMode, cw, md, dl, catColors, textScale]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
@@ -714,7 +765,7 @@ function ageShadedColor(base: string, age: number | null): string {
   return c.formatHex();
 }
 
-function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCats, onToggleCat }: { plans: RangePlan[]; catalogue: Product[]; shelfSide: string; config: ScatterConfig; catColors: Map<string, string>; hiddenCats: Set<string>; onToggleCat: (cat: string) => void }) {
+function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, textScale, hiddenCats, onToggleCat }: { plans: RangePlan[]; catalogue: Product[]; shelfSide: string; config: ScatterConfig; catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>; onToggleCat: (cat: string) => void }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -860,7 +911,8 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, hiddenCat
       row.on('click', () => onToggleCat(cat));
       ly += 16;
     }
-  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, onToggleCat, xField, xAccessor, xLabel, ageShade]);
+    applyTextScale(svgRef.current, textScale);
+  }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, onToggleCat, xField, xAccessor, xLabel, ageShade, textScale]);
 
   return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
@@ -973,9 +1025,9 @@ const AGE_BUCKETS = [
 
 interface LifecyclePoint { category: string; margin: number; age: number; }
 
-function LifecycleChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onToggleCat }: {
+function LifecycleChart({ plans, catalogue, shelfSide, catColors, textScale, hiddenCats, onToggleCat }: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
-  catColors: Map<string, string>; hiddenCats: Set<string>; onToggleCat: (cat: string) => void;
+  catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>; onToggleCat: (cat: string) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
@@ -1107,7 +1159,8 @@ function LifecycleChart({ plans, catalogue, shelfSide, catColors, hiddenCats, on
         .attr('font-size', '8px').attr('fill', '#aaa')
         .text(`${excluded} SKU${excluded !== 1 ? 's' : ''} excluded (no margin or launch season)`);
     }
-  }, [points, excluded, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat]);
+    applyTextScale(svgRef.current, textScale);
+  }, [points, excluded, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -1121,9 +1174,9 @@ function LifecycleChart({ plans, catalogue, shelfSide, catColors, hiddenCats, on
 
 interface ParetoPoint { sku: string; name: string; category: string; revenue: number; }
 
-function ParetoChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onToggleCat }: {
+function ParetoChart({ plans, catalogue, shelfSide, catColors, textScale, hiddenCats, onToggleCat }: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
-  catColors: Map<string, string>; hiddenCats: Set<string>; onToggleCat: (cat: string) => void;
+  catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>; onToggleCat: (cat: string) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
@@ -1276,7 +1329,8 @@ function ParetoChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onTog
       row.on('click', () => onToggleCat(cat));
       ly += 16;
     }
-  }, [points, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat]);
+    applyTextScale(svgRef.current, textScale);
+  }, [points, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -1288,9 +1342,9 @@ function ParetoChart({ plans, catalogue, shelfSide, catColors, hiddenCats, onTog
 
 // ---------- Growth (stacked existing + incremental, SKU-unit ticks) ----------
 
-function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growthPct, growthMetric, showCombined }: {
+function GrowthChart({ plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showCombined }: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
-  catColors: Map<string, string>; hiddenCats: Set<string>;
+  catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
   growthPct: number; growthMetric: 'margin' | 'revenue';
   showCombined: boolean;
 }) {
@@ -1476,7 +1530,8 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growt
         .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
         .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
     }
-  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined]);
+    applyTextScale(svgRef.current, textScale);
+  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -1488,9 +1543,9 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growt
 
 // ---------- Growth by Plan (category bars stacked by range plan) ----------
 
-function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, hiddenCats, growthPct, growthMetric, showCombined }: {
+function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showCombined }: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
-  catColors: Map<string, string>; hiddenCats: Set<string>;
+  catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
   growthPct: number; growthMetric: 'margin' | 'revenue';
   showCombined: boolean;
 }) {
@@ -1712,7 +1767,8 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, hiddenCats, g
         .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
         .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
     }
-  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined, plans]);
+    applyTextScale(svgRef.current, textScale);
+  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined, plans, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
