@@ -192,18 +192,6 @@ function fmtMetric(value: number, metric: Metric, isLeaf: boolean, sc: number, a
   return fmtVal(value, 'rrp');
 }
 
-/** Post-render text scaling: multiplies every SVG text's font-size by
- * the sheet's configured factor. Charts fully rebuild on each effect
- * run, so this stays idempotent per render. */
-function applyTextScale(svgEl: SVGSVGElement | null, scale: number) {
-  if (!svgEl || !scale || scale === 1) return;
-  d3.select(svgEl).selectAll('text').each(function () {
-    const t = d3.select(this);
-    const cur = parseFloat(t.attr('font-size') || '10');
-    t.attr('font-size', `${cur * scale}px`);
-  });
-}
-
 interface ChartProps { plans: RangePlan[]; catalogue: Product[]; metric: Metric; shelfSide: string; activeLens?: Lens | null; aspMode: AspMode; showSegments: boolean; catColors: Map<string, string>; textScale: number; }
 
 // Per-sheet config state that persists across tab switches
@@ -632,7 +620,11 @@ function Sunburst({ plans, catalogue, metric, shelfSide, showSegments, catColors
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
-    const { width, height } = dims;
+    // Layout at a proportionally SMALLER internal size, then let the
+    // viewBox scale it back up — text, margins, axes, and spacing all
+    // grow together so enlarged text genuinely gets its room.
+    const width = dims.width / textScale;
+    const height = dims.height / textScale;
     const radius = Math.min(width, height) / 2 * 0.85;
     const root = d3.hierarchy<HierNode>(data).sum((d) => d.value ?? 0).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
     if (!root.children || root.children.length === 0) return;
@@ -654,10 +646,9 @@ function Sunburst({ plans, catalogue, metric, shelfSide, showSegments, catColors
       .attr('transform', (d) => { const a = ((d.x0 + d.x1) / 2) * (180 / Math.PI) - 90, r = (d.y0 + d.y1) / 2; return `rotate(${a}) translate(${r},0) rotate(${a > 90 ? 180 : 0})`; })
       .attr('text-anchor', 'middle').attr('dy', '0.35em').attr('font-size', '9px').attr('font-weight', '600').attr('fill', '#fff')
       .text((d) => { const m = Math.floor(((d.x1 - d.x0) * (d.y0 + d.y1) / 2) / 5.5); return d.data.name.length > m ? d.data.name.slice(0, m - 1) + '…' : d.data.name; });
-    applyTextScale(svgRef.current, textScale);
   }, [data, dims, metric, wrapperRef, showSegments, catColors, textScale]);
 
-  return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
+  return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
 
 // ---------- Icicle ----------
@@ -684,7 +675,11 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, show
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
-    const { width, height } = dims;
+    // Layout at a proportionally SMALLER internal size, then let the
+    // viewBox scale it back up — text, margins, axes, and spacing all
+    // grow together so enlarged text genuinely gets its room.
+    const width = dims.width / textScale;
+    const height = dims.height / textScale;
     const margin = { top: 8, right: 4, bottom: 4, left: 4 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     const root = d3.hierarchy<HierNode>(data).sum((d) => d.value ?? 0).sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
@@ -727,10 +722,9 @@ function Icicle({ plans, catalogue, metric, shelfSide, activeLens, aspMode, show
       const my = vis.length * lH + lH * 0.75;
       if (my + 2 < cH) gr.append('text').attr('x', 0).attr('y', my).attr('font-size', `${Math.max(7, fs - 1)}px`).attr('font-weight', '400').attr('fill', dk ? 'rgba(255,255,255,0.8)' : '#555').text(mt.length > mxC ? mt.slice(0, mxC - 1) + '…' : mt);
     });
-    applyTextScale(svgRef.current, textScale);
   }, [data, dims, metric, wrapperRef, activeLens, shelfSide, aspMode, cw, md, dl, catColors, textScale]);
 
-  return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
+  return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
 
 // ---------- Scatter ----------
@@ -803,7 +797,11 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, textScale
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
-    const { width, height } = dims;
+    // Layout at a proportionally SMALLER internal size, then let the
+    // viewBox scale it back up — text, margins, axes, and spacing all
+    // grow together so enlarged text genuinely gets its room.
+    const width = dims.width / textScale;
+    const height = dims.height / textScale;
     const margin = { top: 12, right: 12, bottom: 52, left: 60 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || points.length === 0) return;
@@ -911,10 +909,9 @@ function ScatterPlot({ plans, catalogue, shelfSide, config, catColors, textScale
       row.on('click', () => onToggleCat(cat));
       ly += 16;
     }
-    applyTextScale(svgRef.current, textScale);
   }, [points, dims, wrapperRef, colorMap, categories, logX, logY, maxXN, maxYN, dotSize, contours, hiddenCats, onToggleCat, xField, xAccessor, xLabel, ageShade, textScale]);
 
-  return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
+  return (<div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}><svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" /><ChartTooltip tooltip={tooltip} /></div>);
 }
 
 // ---------- Scatter Stats Panel ----------
@@ -1060,7 +1057,11 @@ function LifecycleChart({ plans, catalogue, shelfSide, catColors, textScale, hid
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
-    const { width, height } = dims;
+    // Layout at a proportionally SMALLER internal size, then let the
+    // viewBox scale it back up — text, margins, axes, and spacing all
+    // grow together so enlarged text genuinely gets its room.
+    const width = dims.width / textScale;
+    const height = dims.height / textScale;
     const margin = { top: 16, right: 24, bottom: 40, left: 64 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || points.length === 0) return;
@@ -1159,12 +1160,11 @@ function LifecycleChart({ plans, catalogue, shelfSide, catColors, textScale, hid
         .attr('font-size', '8px').attr('fill', '#aaa')
         .text(`${excluded} SKU${excluded !== 1 ? 's' : ''} excluded (no margin or launch season)`);
     }
-    applyTextScale(svgRef.current, textScale);
   }, [points, excluded, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" />
       <ChartTooltip tooltip={tooltip} />
     </div>
   );
@@ -1204,7 +1204,11 @@ function ParetoChart({ plans, catalogue, shelfSide, catColors, textScale, hidden
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
-    const { width, height } = dims;
+    // Layout at a proportionally SMALLER internal size, then let the
+    // viewBox scale it back up — text, margins, axes, and spacing all
+    // grow together so enlarged text genuinely gets its room.
+    const width = dims.width / textScale;
+    const height = dims.height / textScale;
     // Extra headroom for the top %-of-SKUs axis and its intercept label.
     const margin = { top: 34, right: 44, bottom: 36, left: 64 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
@@ -1329,12 +1333,11 @@ function ParetoChart({ plans, catalogue, shelfSide, catColors, textScale, hidden
       row.on('click', () => onToggleCat(cat));
       ly += 16;
     }
-    applyTextScale(svgRef.current, textScale);
   }, [points, dims, wrapperRef, catColors, categories, hiddenCats, onToggleCat, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" />
       <ChartTooltip tooltip={tooltip} />
     </div>
   );
@@ -1379,7 +1382,11 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, textScale, hidden
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
-    const { width, height } = dims;
+    // Layout at a proportionally SMALLER internal size, then let the
+    // viewBox scale it back up — text, margins, axes, and spacing all
+    // grow together so enlarged text genuinely gets its room.
+    const width = dims.width / textScale;
+    const height = dims.height / textScale;
     const margin = { top: 20, right: 130, bottom: 36, left: 130 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || cats.length === 0) return;
@@ -1530,12 +1537,11 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, textScale, hidden
         .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
         .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
     }
-    applyTextScale(svgRef.current, textScale);
   }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" />
       <ChartTooltip tooltip={tooltip} />
     </div>
   );
@@ -1590,7 +1596,11 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, textScale, hi
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
-    const { width, height } = dims;
+    // Layout at a proportionally SMALLER internal size, then let the
+    // viewBox scale it back up — text, margins, axes, and spacing all
+    // grow together so enlarged text genuinely gets its room.
+    const width = dims.width / textScale;
+    const height = dims.height / textScale;
     const margin = { top: 20, right: 130, bottom: 36, left: 130 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || cats.length === 0) return;
@@ -1767,12 +1777,11 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, textScale, hi
         .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
         .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
     }
-    applyTextScale(svgRef.current, textScale);
   }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined, plans, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width} ${dims.height}`} preserveAspectRatio="xMidYMid meet" />
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" />
       <ChartTooltip tooltip={tooltip} />
     </div>
   );
