@@ -286,6 +286,7 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
   const displayFcstRev = isPlaceholder ? placeholderData?.forecastRevenue : product?.forecastRevenue;
   const displayCategory = isPlaceholder ? placeholderData?.category : product?.category;
   const displayLaunchSeason = isPlaceholder ? placeholderData?.launchSeason : product?.launchSeason;
+  const displayItemRanking = isPlaceholder ? placeholderData?.itemRanking : product?.itemRanking;
   const isDev = isPlaceholder ? placeholderData?.source === 'dev' : product?.source === 'dev';
 
   // Compute RRP deltas vs the catalogue (live) price when a future
@@ -423,6 +424,9 @@ function MatrixProductCard({ itemId, product, isPlaceholder, placeholderName, pl
         )}
         {cardFormat.showLaunchSeason && displayLaunchSeason && (
           <div className="matrix-card-category" title="Launch season">{displayLaunchSeason}</div>
+        )}
+        {cardFormat.showItemRanking && displayItemRanking && (
+          <div className="matrix-card-category" title="Item ranking">{displayItemRanking}</div>
         )}
       </div>
     </div>

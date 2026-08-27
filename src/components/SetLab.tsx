@@ -693,6 +693,8 @@ function SetComponentCard({ product, quantity, catalogue, onRemove }: {
             <div className="matrix-card-rev">Rev: {product.revenue.toLocaleString()}</div>
           )}
           {cardFormat.showCategory && product.category && <div className="matrix-card-category">{product.category}</div>}
+          {cardFormat.showLaunchSeason && product.launchSeason && <div className="matrix-card-category" title="Launch season">{product.launchSeason}</div>}
+          {cardFormat.showItemRanking && product.itemRanking && <div className="matrix-card-category" title="Item ranking">{product.itemRanking}</div>}
         </div>
       </div>
     </div>

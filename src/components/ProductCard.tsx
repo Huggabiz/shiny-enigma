@@ -362,6 +362,9 @@ export function ProductCard({
           {cardFormat.showLaunchSeason && !isCompact && cardProduct.launchSeason && (
             <span className="card-category" title="Launch season">{cardProduct.launchSeason}</span>
           )}
+          {cardFormat.showItemRanking && !isCompact && cardProduct.itemRanking && (
+            <span className="card-category" title="Item ranking">{cardProduct.itemRanking}</span>
+          )}
         </div>
       )}
       {item.isPlaceholder && !cardProduct && !isCompact && (

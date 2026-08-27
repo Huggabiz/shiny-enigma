@@ -169,12 +169,14 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
   const categoryFilter = catalogueFilters.category;
   const subCategoryFilter = catalogueFilters.subCategory;
   const familyFilter = catalogueFilters.family;
+  const rankingFilter = catalogueFilters.ranking;
   const { showLive, showDev, showCore, showDuo, hideUsed, excludeDiscontinued, excludeCloseOut } = catalogueFilters;
   const setSearch = (v: string) => setCatalogueFilters({ search: v });
   // Changing category clears sub-category + family. Changing sub-category
   // clears family. Keeps downstream filters consistent with the cascade.
   const setCategoryFilter = (v: string) => setCatalogueFilters({ category: v, subCategory: '', family: '' });
   const setSubCategoryFilter = (v: string) => setCatalogueFilters({ subCategory: v, family: '' });
+  const setRankingFilter = (v: string) => setCatalogueFilters({ ranking: v });
   const setFamilyFilter = (v: string) => setCatalogueFilters({ family: v });
 
   const cycleViewMode = () => {
@@ -207,6 +209,12 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
     });
     return [...new Set(source.map((p) => (p.productFamily || '').trim()).filter(Boolean))].sort();
   }, [products, categoryFilter, subCategoryFilter]);
+
+  // Distinct Item Ranking labels present in the catalogue.
+  const rankings = useMemo(
+    () => [...new Set(products.map((p) => (p.itemRanking || '').trim()).filter(Boolean))].sort(),
+    [products]
+  );
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -245,9 +253,10 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
       const matchesRanking =
         !(excludeDiscontinued && rank.includes('discont')) &&
         !(excludeCloseOut && rank.includes('close'));
-      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource && matchesCollection && matchesHideUsed && matchesRanking;
+      const matchesRankingFilter = !rankingFilter || (p.itemRanking || '').trim() === rankingFilter;
+      return matchesSearch && matchesCategory && matchesSubCategory && matchesFamily && matchesSource && matchesCollection && matchesHideUsed && matchesRanking && matchesRankingFilter;
     });
-  }, [products, search, categoryFilter, subCategoryFilter, familyFilter, showLive, showDev, showCore, showDuo, hideUsed, excludeDiscontinued, excludeCloseOut, designShelfId, currentProductIds, futureProductIds]);
+  }, [products, search, categoryFilter, subCategoryFilter, familyFilter, rankingFilter, showLive, showDev, showCore, showDuo, hideUsed, excludeDiscontinued, excludeCloseOut, designShelfId, currentProductIds, futureProductIds]);
 
   const grouped = useMemo(() => groupByCategory(filtered), [filtered]);
 
@@ -356,6 +365,20 @@ export function Catalogue({ products, onImport, currentProductIds, futureProduct
             </option>
           ))}
         </select>
+        {rankings.length > 0 && (
+          <select
+            className="catalogue-select"
+            value={rankingFilter}
+            onChange={(e) => setRankingFilter(e.target.value)}
+          >
+            <option value="">All Rankings</option>
+            {rankings.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="catalogue-source-toggles">
           <label>
             <input

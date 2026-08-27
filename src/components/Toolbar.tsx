@@ -438,6 +438,7 @@ export function Toolbar({ activeView }: ToolbarProps) {
                     ['showForecastRevenue', 'Forecast Revenue (next year)'],
                     ['showCategory', 'Category'],
                     ['showLaunchSeason', 'Launch Season'],
+                    ['showItemRanking', 'Item Ranking'],
                   ] as const).map(([key, label]) => (
                     <label key={key} className="dropdown-checkbox">
                       <input type="checkbox" checked={cardFormat[key]}

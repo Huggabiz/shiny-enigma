@@ -703,6 +703,7 @@ export interface CardFormat {
   showOperatingMarginGbp: boolean;
   showCategory: boolean;
   showLaunchSeason: boolean;
+  showItemRanking: boolean;
 }
 
 export const DEFAULT_CARD_FORMAT: CardFormat = {
@@ -721,6 +722,7 @@ export const DEFAULT_CARD_FORMAT: CardFormat = {
   showOperatingMarginGbp: false,
   showCategory: false,
   showLaunchSeason: false,
+  showItemRanking: false,
 };
 
 // Column mapping for import flexibility
