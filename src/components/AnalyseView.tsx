@@ -2129,18 +2129,6 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
       if (rc) setTooltip((pv) => pv ? { ...pv, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null);
     };
 
-    // Group legend — neutral grey shades matching the relative
-    // lightness step, since actual colours vary per category.
-    let lx = 0;
-    const legendG = g.append('g').attr('transform', 'translate(0,-12)');
-    data.forEach((d, gi) => {
-      const sw = legendG.append('g').attr('transform', `translate(${lx},0)`);
-      sw.append('rect').attr('x', 0).attr('y', -7).attr('width', 10).attr('height', 10).attr('rx', 2)
-        .attr('fill', d3.interpolateLab('#555', '#ffffff')(Math.min(gi * 0.38, 0.65))).attr('stroke', '#555').attr('stroke-width', 0.5);
-      sw.append('text').attr('x', 14).attr('y', 1).attr('font-size', '9px').attr('font-weight', '600').attr('fill', '#444').text(d.name);
-      lx += d.name.length * 5.5 + 30;
-    });
-
     const metricLabel = `${growthMetric === 'revenue' ? 'Revenue' : 'Operating Margin'} (£) by group${showGrowth ? ` — existing + ${growthPct}% growth` : ''}`;
 
     if (!vertical) {
@@ -2161,13 +2149,16 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
       for (const cat of categories) {
         const yBase = yOuter(cat)!;
         const base = catColors.get(cat) ?? '#999';
+        let catTotal = 0;
+        let maxEnd = 0;
         data.forEach((d, gi) => {
           const c = cell(gi, cat);
           if (!c) return;
           const y = yBase + yInner(d.name)!;
           const bh = yInner.bandwidth();
           const fill = shade(base, gi);
-          g.append('rect').attr('x', 0).attr('y', y).attr('width', xScale(c.total)).attr('height', bh)
+          const barW = xScale(c.total);
+          g.append('rect').attr('x', 0).attr('y', y).attr('width', barW).attr('height', bh)
             .attr('fill', fill).attr('fill-opacity', 0.92).attr('rx', 2).style('cursor', 'pointer')
             .on('mouseenter', hoverSeg(`${cat} · ${d.name}`, `${fmtGbp(c.total)} · ${c.n} SKUs · avg ${fmtGbp(c.avg)}/SKU`))
             .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
@@ -2175,15 +2166,16 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
           const step = unitTickStep(unitPx);
           if (step > 0) {
             let drawn = 0;
-            for (let u = step; u * unitPx < xScale(c.total) && drawn < 800; u += step) {
+            for (let u = step; u * unitPx < barW && drawn < 800; u += step) {
               g.append('line').attr('x1', u * unitPx).attr('x2', u * unitPx).attr('y1', y).attr('y2', y + bh)
                 .attr('stroke', '#fff').attr('stroke-width', 0.75).attr('opacity', 0.7);
               drawn++;
             }
           }
+          let endX = barW;
           if (showGrowth && c.inc > 0) {
-            g.append('rect').attr('x', xScale(c.total)).attr('y', y)
-              .attr('width', Math.max(0, xScale(c.total + c.inc) - xScale(c.total))).attr('height', bh)
+            g.append('rect').attr('x', barW).attr('y', y)
+              .attr('width', Math.max(0, xScale(c.total + c.inc) - barW)).attr('height', bh)
               .attr('fill', d3.interpolateLab(fill, '#ffffff')(0.5)).attr('stroke', fill).attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('rx', 2)
               .style('cursor', 'pointer')
               .on('mouseenter', hoverSeg(`${cat} · ${d.name} — +${growthPct}%`, `${fmtGbp(c.inc)} ≈ ${c.skusNeeded} new SKU${c.skusNeeded !== 1 ? 's' : ''} @ avg ${fmtGbp(c.avg)}/SKU`))
@@ -2191,17 +2183,51 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
             g.append('text').attr('x', xScale(c.total + c.inc) + 5).attr('y', y + bh / 2 + 3)
               .attr('font-size', '7.5px').attr('font-weight', '700').attr('fill', '#333')
               .text(`+${c.skusNeeded}`);
+            endX = xScale(c.total + c.inc) + 10 + String(c.skusNeeded).length * 5;
           }
+          // Group name inside the start of the bar.
+          if (barW > 26 && bh >= 9) {
+            const maxChars = Math.max(2, Math.floor((barW - 8) / 4.3));
+            const gl = d.name.length > maxChars ? d.name.slice(0, Math.max(1, maxChars - 1)) + '…' : d.name;
+            const gt = g.append('text').attr('x', 4).attr('y', y + bh / 2 + 2.5)
+              .attr('font-size', '7px').attr('font-weight', '600').attr('fill', 'rgba(255,255,255,0.95)')
+              .style('pointer-events', 'none').text(gl);
+            gt.append('title').text(d.name);
+          }
+          // Value pill at the end of the solid bar (inside), else dark
+          // text just past the bar when there is no growth block there.
+          const label = fmtGbp(c.total);
+          const labelW = label.length * 5.5 + 10;
+          if (barW > labelW + 42) {
+            g.append('rect').attr('x', barW - labelW - 4).attr('y', y + bh / 2 - 6.5).attr('width', labelW).attr('height', 13).attr('rx', 6.5)
+              .attr('fill', '#fff').attr('fill-opacity', 0.8).style('pointer-events', 'none');
+            g.append('text').attr('x', barW - 4 - labelW / 2).attr('y', y + bh / 2 + 2.5).attr('text-anchor', 'middle')
+              .attr('font-size', '8.5px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+              .style('pointer-events', 'none').text(label);
+          } else if (!(showGrowth && c.inc > 0)) {
+            g.append('text').attr('x', barW + 5).attr('y', y + bh / 2 + 3)
+              .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#333').text(label);
+            endX = barW + 8 + label.length * 4.5;
+          }
+          catTotal += c.total;
+          maxEnd = Math.max(maxEnd, endX);
         });
+        // Cumulative category total floating past the category's bars,
+        // vertically centred on the category band.
+        if (catTotal > 0) {
+          g.append('text').attr('x', maxEnd + 10).attr('y', yBase + yOuter.bandwidth() / 2 + 3.5)
+            .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+            .text(fmtGbp(catTotal));
+        }
       }
     } else {
       const xOuter = d3.scaleBand<string>().domain(categories).range([0, iW]).padding(0.25);
       const xInner = d3.scaleBand<string>().domain(data.map((d) => d.name)).range([0, xOuter.bandwidth()]).padding(0.12);
       const yScale = d3.scaleLinear().domain([0, maxV * 1.08]).range([iH, 0]);
 
-      const xAxisG = g.append('g').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xOuter));
-      xAxisG.selectAll('text').attr('font-size', '8.5px').attr('font-weight', '600')
-        .attr('text-anchor', 'end').attr('transform', 'rotate(-30)').attr('dx', '-4px').attr('dy', '4px');
+      // Axis line + ticks only — the labels are drawn per bar (group
+      // name) and per band (category name) in two rows below.
+      g.append('g').attr('transform', `translate(0,${iH})`).call(d3.axisBottom(xOuter).tickFormat(() => ''));
       g.append('g').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickFormat((d) => fmtGbp(+d))).selectAll('text').attr('font-size', '8px');
       g.append('text').attr('x', -iH / 2).attr('y', -50).attr('text-anchor', 'middle').attr('transform', 'rotate(-90)')
         .attr('font-size', '9px').attr('fill', '#666').text(metricLabel);
@@ -2213,6 +2239,14 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
       for (const cat of categories) {
         const xBase = xOuter(cat)!;
         const base = catColors.get(cat) ?? '#999';
+        // Category name centred under its band — row 2 of the axis labels.
+        const catMaxChars = Math.max(3, Math.floor(xOuter.step() / 4.6));
+        const cl = cat.length > catMaxChars ? cat.slice(0, catMaxChars - 1) + '…' : cat;
+        const ct = g.append('text').attr('x', xBase + xOuter.bandwidth() / 2).attr('y', iH + 25).attr('text-anchor', 'middle')
+          .attr('font-size', '8.5px').attr('font-weight', '700').attr('fill', '#333').text(cl);
+        ct.append('title').text(cat);
+        let catTotal = 0;
+        let topY = Infinity;
         data.forEach((d, gi) => {
           const c = cell(gi, cat);
           if (!c) return;
@@ -2234,6 +2268,7 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
               drawn++;
             }
           }
+          let barTop = yScale(c.total);
           if (showGrowth && c.inc > 0) {
             const y0 = yScale(c.total + c.inc), y1 = yScale(c.total);
             g.append('rect').attr('x', x).attr('y', y0).attr('width', bw).attr('height', Math.max(0, y1 - y0))
@@ -2244,8 +2279,45 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
             g.append('text').attr('x', x + bw / 2).attr('y', y0 - 4).attr('text-anchor', 'middle')
               .attr('font-size', '7.5px').attr('font-weight', '700').attr('fill', '#333')
               .text(`+${c.skusNeeded}`);
+            barTop = y0 - 12;
           }
+          // Group name just below the axis line — row 1 of the labels.
+          const maxChars = Math.max(2, Math.floor(bw / 4));
+          const gl = d.name.length > maxChars ? d.name.slice(0, Math.max(1, maxChars - 1)) + '…' : d.name;
+          const gt = g.append('text').attr('x', x + bw / 2).attr('y', iH + 12).attr('text-anchor', 'middle')
+            .attr('font-size', '7px').attr('font-weight', '600').attr('fill', '#555').text(gl);
+          gt.append('title').text(d.name);
+          // Value pill inside the top of the bar; a short bar with no
+          // growth block gets a plain dark label above instead.
+          const label = fmtGbp(c.total);
+          const labelW = label.length * 5.5 + 10;
+          if (iH - yScale(c.total) > 26) {
+            g.append('rect').attr('x', x + bw / 2 - labelW / 2).attr('y', yScale(c.total) + 5).attr('width', labelW).attr('height', 13).attr('rx', 6.5)
+              .attr('fill', '#fff').attr('fill-opacity', 0.8).style('pointer-events', 'none');
+            g.append('text').attr('x', x + bw / 2).attr('y', yScale(c.total) + 14).attr('text-anchor', 'middle')
+              .attr('font-size', '8.5px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+              .style('pointer-events', 'none').text(label);
+          } else if (!(showGrowth && c.inc > 0)) {
+            g.append('text').attr('x', x + bw / 2).attr('y', yScale(c.total) - 4).attr('text-anchor', 'middle')
+              .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#333').text(label);
+            barTop = yScale(c.total) - 12;
+          }
+          catTotal += c.total;
+          topY = Math.min(topY, barTop);
         });
+        // Cumulative category total floating above the tallest bar,
+        // centred on the category band.
+        if (catTotal > 0 && isFinite(topY)) {
+          const label = fmtGbp(catTotal);
+          const labelW = label.length * 6 + 12;
+          const cx = xBase + xOuter.bandwidth() / 2;
+          const ty = Math.max(topY - 8, -margin.top + 14);
+          g.append('rect').attr('x', cx - labelW / 2).attr('y', ty - 11).attr('width', labelW).attr('height', 15).attr('rx', 7.5)
+            .attr('fill', '#fff').attr('fill-opacity', 0.85).style('pointer-events', 'none');
+          g.append('text').attr('x', cx).attr('y', ty).attr('text-anchor', 'middle')
+            .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+            .style('pointer-events', 'none').text(label);
+        }
       }
     }
   }, [data, groups.length, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale]);
