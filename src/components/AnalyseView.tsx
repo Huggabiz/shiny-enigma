@@ -2365,21 +2365,19 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, restHatch, g
     // Per-segment cross-hatch flags, indexed by aggregation index.
     const hatchFlags = [...compounds.map((c) => !!c.hatch), restHatch];
     if (compound && hatchFlags.some(Boolean)) {
-      const defs = svg.append('defs');
-      const mkHatch = (id: string, color: string) => {
-        const p = defs.append('pattern').attr('id', id).attr('width', 6).attr('height', 6).attr('patternUnits', 'userSpaceOnUse');
-        p.append('path').attr('d', 'M0,0 L6,6').attr('stroke', color).attr('stroke-width', 1);
-        p.append('path').attr('d', 'M0,6 L6,0').attr('stroke', color).attr('stroke-width', 1);
-      };
-      mkHatch('gg-hatch-w', 'rgba(255,255,255,0.55)');
-      mkHatch('gg-hatch-d', 'rgba(0,0,0,0.25)');
+      // Single diagonal hatch in white, matching the segment borders.
+      svg.append('defs').append('pattern')
+        .attr('id', 'gg-hatch').attr('width', 6).attr('height', 6).attr('patternUnits', 'userSpaceOnUse')
+        .append('path').attr('d', 'M0,6 L6,0').attr('stroke', '#fff').attr('stroke-width', 1).attr('opacity', 0.8);
     }
     const maxV = d3.max(categories.flatMap((cat) => data.map((_, gi) => { const c = cell(gi, cat); return c ? c.total + c.inc : 0; }))) ?? 0;
     if (maxV <= 0) return;
 
     // Group shading: group 1 = full category colour, later groups
     // progressively lighter — consistent in every category.
-    const shade = (base: string, gi: number) => d3.interpolateLab(base, '#ffffff')(Math.min(gi * 0.38, 0.65));
+    // Group bars are NOT shaded by group — bars are identified by the
+    // explicit group labels, so the same compound segment is the same
+    // colour in every group's bar of a category.
 
     const hoverSeg = (label: string, value: string) => (ev: MouseEvent) => {
       const rc = wrapperRef.current?.getBoundingClientRect();
@@ -2417,7 +2415,7 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, restHatch, g
           if (!c) return;
           const y = yBase + yInner(d.name)!;
           const bh = yInner.bandwidth();
-          const fill = shade(base, gi);
+          const fill = base;
           const barW = xScale(c.total);
           // Approximate width the in-bar group name will occupy, so the
           // first compound segment's label can dodge it.
@@ -2453,7 +2451,7 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, restHatch, g
                 .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
               if (hatchFlags[si]) {
                 g.append('rect').attr('x', x0).attr('y', y).attr('width', Math.max(0, x1 - x0)).attr('height', bh)
-                  .attr('fill', `url(#${d3.hsl(segFill).l > 0.62 ? 'gg-hatch-d' : 'gg-hatch-w'})`)
+                  .attr('fill', 'url(#gg-hatch)')
                   .style('pointer-events', 'none');
               }
               // Segment name (plus its value when it fits) inside the
@@ -2552,7 +2550,7 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, restHatch, g
           if (!c) return;
           const x = xBase + xInner(d.name)!;
           const bw = xInner.bandwidth();
-          const fill = shade(base, gi);
+          const fill = base;
           if (!compound) {
             g.append('rect').attr('x', x).attr('y', yScale(c.total)).attr('width', bw).attr('height', iH - yScale(c.total))
               .attr('fill', fill).attr('fill-opacity', 0.92).attr('rx', 2).style('cursor', 'pointer')
@@ -2586,7 +2584,7 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, restHatch, g
                 .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
               if (hatchFlags[si]) {
                 g.append('rect').attr('x', x).attr('y', sy0).attr('width', bw).attr('height', Math.max(0, sy1 - sy0))
-                  .attr('fill', `url(#${d3.hsl(segFill).l > 0.62 ? 'gg-hatch-d' : 'gg-hatch-w'})`)
+                  .attr('fill', 'url(#gg-hatch)')
                   .style('pointer-events', 'none');
               }
               // Segment name inside when the segment is tall enough;
