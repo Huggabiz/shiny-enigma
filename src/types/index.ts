@@ -556,6 +556,10 @@ export interface Project {
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;
+    /** Per-sheet canvas aspect adjustment in [-1, 1] (0 = the default
+     * 16:9): negative narrows the width at constant height, positive
+     * shortens the height at constant width. Keyed by sheet id. */
+    aspectBySheet?: Record<string, number>;
   };
   /** SHA-256 hex hash of the lock password. When present the project is
    * locked — edits are blocked until the user supplies the matching

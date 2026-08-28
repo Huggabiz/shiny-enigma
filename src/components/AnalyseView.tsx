@@ -350,6 +350,27 @@ export function AnalyseView() {
     });
   };
 
+  // Per-sheet canvas aspect adjustment: 0 = the standard 16:9. Left of
+  // centre narrows the width at constant height; right of centre
+  // shortens the height at constant width — so the chart's rendered
+  // size barely changes, only the empty canvas around it.
+  const [aspects, setAspects] = useState<Record<string, number>>(() => av?.aspectBySheet ?? {});
+  const activeAspect = aspects[activeSheet] ?? 0;
+  const setAspect = (v: number) => {
+    setAspects((prev) => {
+      const next = { ...prev, [activeSheet]: v };
+      setAnalyseConfig({ aspectBySheet: next });
+      return next;
+    });
+  };
+  // Width scale below centre, height scale above — each down to 55%.
+  const aspectWs = activeAspect < 0 ? 1 + activeAspect * 0.45 : 1;
+  const aspectHs = activeAspect > 0 ? 1 - activeAspect * 0.45 : 1;
+  const canvasStyle: React.CSSProperties = {
+    aspectRatio: `${16 * aspectWs} / ${9 * aspectHs}`,
+    ...(aspectWs < 1 ? { flex: 'none', width: `min(${(aspectWs * 100).toFixed(1)}%, ${Math.round(1280 * aspectWs)}px)` } : {}),
+  };
+
   // Cross-plan duplication: how many distinct SKUs appear in more
   // than one selected plan (on the active stage). Surfaced in the
   // growth config bar — the dedupe counts them once, but the user
@@ -581,7 +602,7 @@ export function AnalyseView() {
         <div className="analyse-body">
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
-              <div className="analyse-canvas" ref={canvasRef}>
+              <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
                 {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
@@ -609,6 +630,12 @@ export function AnalyseView() {
                 </label>
               )}
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
+                <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
+                  onChange={(e) => setAspect(Number(e.target.value))}
+                  onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
+                <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+              </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
                 <span>{activeTextScale.toFixed(2)}×</span>
@@ -638,6 +665,12 @@ export function AnalyseView() {
               <label className="analyse-config-item"><input type="checkbox" checked={scatterConfig.contours} onChange={(e) => updateScatter({ contours: e.target.checked })} /> Contours</label>
               <label className="analyse-config-item" title="Colour dots by launch age: new = light, richest at ~3 years, washing out beyond"><input type="checkbox" checked={scatterConfig.ageShade ?? true} onChange={(e) => updateScatter({ ageShade: e.target.checked })} /> Age shading</label>
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
+                <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
+                  onChange={(e) => setAspect(Number(e.target.value))}
+                  onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
+                <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+              </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
                 <span>{activeTextScale.toFixed(2)}×</span>
@@ -650,6 +683,12 @@ export function AnalyseView() {
             <div className="analyse-chart-config">
               <span className="analyse-config-item" style={{ cursor: 'default' }}>Avg OM (£) per SKU by launch-age bucket — click legend entries to isolate categories; hover points for SKU counts</span>
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
+                <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
+                  onChange={(e) => setAspect(Number(e.target.value))}
+                  onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
+                <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+              </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
                 <span>{activeTextScale.toFixed(2)}×</span>
@@ -662,6 +701,12 @@ export function AnalyseView() {
             <div className="analyse-chart-config">
               <span className="analyse-config-item" style={{ cursor: 'default' }}>SKUs ranked by revenue — dashed line is cumulative share; click legend entries to isolate categories</span>
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
+                <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
+                  onChange={(e) => setAspect(Number(e.target.value))}
+                  onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
+                <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+              </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
                 <span>{activeTextScale.toFixed(2)}×</span>
@@ -768,6 +813,12 @@ export function AnalyseView() {
               )}
               <span className="analyse-config-item" style={{ cursor: 'default' }}>Bar segments are one avg-SKU wide — count the ticks in the growth block to read the SKU requirement</span>
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
+                <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
+                  onChange={(e) => setAspect(Number(e.target.value))}
+                  onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
+                <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+              </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
                 <span>{activeTextScale.toFixed(2)}×</span>

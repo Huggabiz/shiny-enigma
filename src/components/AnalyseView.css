@@ -163,6 +163,7 @@
 .analyse-canvas-area {
   display: flex;
   align-items: flex-start;
+  justify-content: center; /* centres a width-reduced canvas; no effect at flex:1 */
   gap: 0;
   max-width: 1480px;
   width: 100%;
