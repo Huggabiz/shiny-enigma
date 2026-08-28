@@ -537,6 +537,9 @@ export interface Project {
     compoundGroups?: { id: string; name: string; rankings: string[] }[];
     /** Display name for the catch-all compound segment (default "Other"). */
     compoundRestName?: string;
+    /** Stacking position of the catch-all segment, expressed as the
+     * number of compound groups stacked before it (default: last). */
+    compoundRestIndex?: number;
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;

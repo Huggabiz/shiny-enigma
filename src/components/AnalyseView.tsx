@@ -294,6 +294,9 @@ export function AnalyseView() {
   // segment, whose display name is also user-defined.
   const compoundGroups = useMemo(() => av?.compoundGroups ?? [], [av?.compoundGroups]);
   const compoundRestName = av?.compoundRestName ?? 'Other';
+  // Stacking position of the catch-all segment = number of compound
+  // groups before it (defaults to last; clamped after deletions).
+  const compoundRestIndex = Math.min(av?.compoundRestIndex ?? compoundGroups.length, compoundGroups.length);
   const [showCompoundDialog, setShowCompoundDialog] = useState(false);
   const availableRankings = useMemo(() => {
     const set = new Set<string>();
@@ -492,8 +495,10 @@ export function AnalyseView() {
         <CompoundGroupsDialog
           groups={compoundGroups}
           restName={compoundRestName}
+          restIndex={compoundRestIndex}
           availableRankings={availableRankings}
           onChange={(groups) => setAnalyseConfig({ compoundGroups: groups })}
+          onReorder={(groups, restIdx) => setAnalyseConfig({ compoundGroups: groups, compoundRestIndex: restIdx })}
           onRestNameChange={(name) => setAnalyseConfig({ compoundRestName: name })}
           onClose={() => setShowCompoundDialog(false)}
         />
@@ -508,7 +513,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -2095,26 +2100,36 @@ function PlanGroupsDialog({ groups, onChange, onClose }: {
 
 // ---------- Compound Groups dialog (Growth by Group segments) ----------
 
-function CompoundGroupsDialog({ groups, restName, availableRankings, onChange, onRestNameChange, onClose }: {
+function CompoundGroupsDialog({ groups, restName, restIndex, availableRankings, onChange, onReorder, onRestNameChange, onClose }: {
   groups: { id: string; name: string; rankings: string[] }[];
   restName: string;
+  restIndex: number;
   availableRankings: string[];
   onChange: (groups: { id: string; name: string; rankings: string[] }[]) => void;
+  onReorder: (groups: { id: string; name: string; rankings: string[] }[], restIndex: number) => void;
   onRestNameChange: (name: string) => void;
   onClose: () => void;
 }) {
+  // Combined display list: group cards plus the catch-all card at its
+  // stacking position — all draggable as peers.
+  type Item = { kind: 'group'; gi: number } | { kind: 'rest' };
+  const items: Item[] = groups.map((_, gi) => ({ kind: 'group', gi } as Item));
+  items.splice(Math.min(restIndex, groups.length), 0, { kind: 'rest' });
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const addGroup = () => {
     onChange([...groups, { id: `cg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name: `Compound ${groups.length + 1}`, rankings: [] }]);
   };
   const rename = (id: string, name: string) => onChange(groups.map((g) => g.id === id ? { ...g, name } : g));
-  const remove = (id: string) => onChange(groups.filter((g) => g.id !== id));
+  const remove = (gi: number) => {
+    onReorder(groups.filter((_, i) => i !== gi), gi < restIndex ? restIndex - 1 : restIndex);
+  };
   const moveTo = (from: number, to: number) => {
     if (from === to) return;
-    const next = [...groups];
+    const next = [...items];
     const [m] = next.splice(from, 1);
     next.splice(to, 0, m);
-    onChange(next);
+    const newGroups = next.flatMap((it) => it.kind === 'group' ? [groups[it.gi]] : []);
+    onReorder(newGroups, next.findIndex((it) => it.kind === 'rest'));
   };
   const toggleRanking = (id: string, ranking: string) => onChange(groups.map((g) => {
     if (g.id !== id) return g;
@@ -2134,9 +2149,9 @@ function CompoundGroupsDialog({ groups, restName, availableRankings, onChange, o
           Name each compound group and tick the Item Rankings that belong to it —
           every bar on the Growth by Group sheet then splits into stacked segments,
           one per compound group. SKUs whose ranking is unallocated (or blank) fall
-          into the catch-all segment below. If a ranking is ticked in two groups,
-          the first group listed wins. Drag ⠿ to reorder — the order sets the
-          stacking order of the segments.
+          into the dashed catch-all group. If a ranking is ticked in two groups,
+          the first group listed wins. Drag ⠿ to reorder — the order (catch-all
+          included) sets the stacking order of the segments.
         </p>
         {availableRankings.length === 0 && (
           <p style={{ margin: '0 0 10px', fontSize: 12, color: '#c62828' }}>
@@ -2144,40 +2159,54 @@ function CompoundGroupsDialog({ groups, restName, availableRankings, onChange, o
             Item Ranking column first.
           </p>
         )}
-        {groups.map((g, gi) => (
-          <div key={g.id} style={{ border: '1px solid #e0e0e0', borderRadius: 6, padding: 10, marginBottom: 10, opacity: dragIdx === gi ? 0.5 : 1 }}
-            onDragOver={(e) => { if (dragIdx !== null) e.preventDefault(); }}
-            onDrop={(e) => { if (dragIdx !== null) { e.preventDefault(); moveTo(dragIdx, gi); setDragIdx(null); } }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-              <span draggable onDragStart={(e) => { setDragIdx(gi); e.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => setDragIdx(null)}
-                style={{ cursor: 'grab', color: '#aaa', fontSize: 14, userSelect: 'none' }} title="Drag to reorder">⠿</span>
-              <input className="slab-dialog-input" style={{ flex: 1 }} value={g.name}
-                onChange={(e) => rename(g.id, e.target.value)} placeholder="Compound group name" />
-              <button className="slab-dialog-btn cancel" onClick={() => remove(g.id)} title="Delete compound group">×</button>
+        {items.map((it, idx) => {
+          const dragProps = {
+            onDragOver: (e: React.DragEvent) => { if (dragIdx !== null) e.preventDefault(); },
+            onDrop: (e: React.DragEvent) => { if (dragIdx !== null) { e.preventDefault(); moveTo(dragIdx, idx); setDragIdx(null); } },
+          };
+          const handle = (
+            <span draggable onDragStart={(e) => { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => setDragIdx(null)}
+              style={{ cursor: 'grab', color: '#aaa', fontSize: 14, userSelect: 'none' }} title="Drag to reorder">⠿</span>
+          );
+          if (it.kind === 'rest') {
+            return (
+              <div key="__rest__" style={{ border: '1px dashed #bbb', borderRadius: 6, padding: 10, marginBottom: 10, opacity: dragIdx === idx ? 0.5 : 1 }} {...dragProps}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#333' }}>
+                  {handle}
+                  Everything else appears as
+                  <input className="slab-dialog-input" style={{ flex: 1 }} value={restName}
+                    onChange={(e) => onRestNameChange(e.target.value)} placeholder="Other" />
+                </label>
+              </div>
+            );
+          }
+          const g = groups[it.gi];
+          const gi = it.gi;
+          return (
+            <div key={g.id} style={{ border: '1px solid #e0e0e0', borderRadius: 6, padding: 10, marginBottom: 10, opacity: dragIdx === idx ? 0.5 : 1 }} {...dragProps}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                {handle}
+                <input className="slab-dialog-input" style={{ flex: 1 }} value={g.name}
+                  onChange={(e) => rename(g.id, e.target.value)} placeholder="Compound group name" />
+                <button className="slab-dialog-btn cancel" onClick={() => remove(gi)} title="Delete compound group">×</button>
+              </div>
+              <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {availableRankings.map((r) => {
+                  const claimer = claimedBefore(gi, r);
+                  return (
+                    <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#333', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={g.rankings.includes(r)} onChange={() => toggleRanking(g.id, r)} />
+                      {r}
+                      {claimer && g.rankings.includes(r) && (
+                        <span style={{ fontSize: 10, color: '#e65100' }}>(also in {claimer} — that group wins)</span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
-            <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {availableRankings.map((r) => {
-                const claimer = claimedBefore(gi, r);
-                return (
-                  <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#333', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={g.rankings.includes(r)} onChange={() => toggleRanking(g.id, r)} />
-                    {r}
-                    {claimer && g.rankings.includes(r) && (
-                      <span style={{ fontSize: 10, color: '#e65100' }}>(also in {claimer} — that group wins)</span>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        <div style={{ border: '1px dashed #bbb', borderRadius: 6, padding: 10, marginBottom: 10 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#333' }}>
-            Everything else appears as
-            <input className="slab-dialog-input" style={{ flex: 1 }} value={restName}
-              onChange={(e) => onRestNameChange(e.target.value)} placeholder="Other" />
-          </label>
-        </div>
+          );
+        })}
         <div className="slab-dialog-actions" style={{ justifyContent: 'space-between' }}>
           <button className="slab-dialog-btn primary" onClick={addGroup}>+ Add Compound Group</button>
           <button className="slab-dialog-btn cancel" onClick={onClose}>Done</button>
@@ -2189,10 +2218,11 @@ function CompoundGroupsDialog({ groups, restName, availableRankings, onChange, o
 
 // ---------- Growth by Group (grouped bars per category) ----------
 
-function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showGrowth, vertical, showSummary }: {
+function GrowthGroupChart({ groups, compounds, restName, restIndex, plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showGrowth, vertical, showSummary }: {
   groups: { id: string; name: string; planIds: string[] }[];
   compounds: { id: string; name: string; rankings: string[] }[];
   restName: string;
+  restIndex: number;
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
   growthPct: number; growthMetric: 'margin' | 'revenue';
@@ -2284,8 +2314,13 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
       return { total: e.total, n: e.n, avg, inc, skusNeeded: showGrowth && avg > 0 ? Math.ceil(inc / avg) : 0, segs: e.segs, segNs: e.segNs };
     };
     // Compound view: stacked ranking-bucket segments inside each bar.
+    // segOrder maps stacking position → aggregation index (compounds in
+    // defined order with the catch-all inserted at its dragged
+    // position); shading follows stacking position.
     const compound = compounds.length > 0;
-    const segShade = (fill: string, si: number) => d3.interpolateLab(fill, '#ffffff')(Math.min(0.6, si * 0.2));
+    const segOrder = compounds.map((_, i) => i);
+    segOrder.splice(Math.min(restIndex, compounds.length), 0, compounds.length);
+    const segShade = (fill: string, pi: number) => d3.interpolateLab(fill, '#ffffff')(Math.min(0.6, pi * 0.2));
     const maxV = d3.max(categories.flatMap((cat) => data.map((_, gi) => { const c = cell(gi, cat); return c ? c.total + c.inc : 0; }))) ?? 0;
     if (maxV <= 0) return;
 
@@ -2353,10 +2388,11 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
             }
           } else {
             let cv = 0;
-            c.segs.forEach((sv, si) => {
+            segOrder.forEach((si, pi) => {
+              const sv = c.segs[si];
               if (sv <= 0) return;
               const x0 = xScale(cv), x1 = xScale(cv + sv);
-              const segFill = segShade(fill, si);
+              const segFill = segShade(fill, pi);
               g.append('rect').attr('x', x0).attr('y', y).attr('width', Math.max(0, x1 - x0)).attr('height', bh)
                 .attr('fill', segFill).attr('fill-opacity', 0.95).attr('stroke', '#fff').attr('stroke-width', 0.75)
                 .style('cursor', 'pointer')
@@ -2477,10 +2513,11 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
             }
           } else {
             let cv = 0;
-            c.segs.forEach((sv, si) => {
+            segOrder.forEach((si, pi) => {
+              const sv = c.segs[si];
               if (sv <= 0) return;
               const sy1 = yScale(cv), sy0 = yScale(cv + sv);
-              const segFill = segShade(fill, si);
+              const segFill = segShade(fill, pi);
               g.append('rect').attr('x', x).attr('y', sy0).attr('width', bw).attr('height', Math.max(0, sy1 - sy0))
                 .attr('fill', segFill).attr('fill-opacity', 0.95).attr('stroke', '#fff').attr('stroke-width', 0.75)
                 .style('cursor', 'pointer')
@@ -2569,10 +2606,10 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
         for (const e of d.catMap.values()) t += e.total;
         return { name: d.name, total: t };
       });
-      const segTotals = segNames.map((name, si) => {
+      const segTotals = segOrder.map((si) => {
         let t = 0;
         for (const d of data) for (const e of d.catMap.values()) t += e.segs[si] ?? 0;
-        return { name, total: t };
+        return { name: segNames[si], total: t };
       });
       type Row = { label: string; value?: string; header?: boolean; bold?: boolean };
       const rows: Row[] = [
@@ -2611,7 +2648,7 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
         }
       }
     }
-  }, [data, groups.length, compounds.length, segNames, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale, showSummary]);
+  }, [data, groups.length, compounds.length, segNames, restIndex, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale, showSummary]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
