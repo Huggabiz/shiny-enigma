@@ -401,3 +401,20 @@
 .analyse-chart-config .toolbar-btn:hover {
   background: #ececec;
 }
+
+/* Reset button beside the Aspect slider, shown when off-default. */
+.analyse-aspect-reset {
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 16px;
+  background: #fff;
+  color: #555;
+  border: 1px solid #c5c5c5;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.analyse-aspect-reset:hover {
+  background: #ececec;
+  color: #222;
+}

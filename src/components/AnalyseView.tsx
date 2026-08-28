@@ -635,6 +635,9 @@ export function AnalyseView() {
                   onChange={(e) => setAspect(Number(e.target.value))}
                   onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
                 <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+                {activeAspect !== 0 && (
+                  <button className="analyse-aspect-reset" onClick={(e) => { e.preventDefault(); setAspect(0); }} title="Reset to 16:9">↺</button>
+                )}
               </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
@@ -670,6 +673,9 @@ export function AnalyseView() {
                   onChange={(e) => setAspect(Number(e.target.value))}
                   onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
                 <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+                {activeAspect !== 0 && (
+                  <button className="analyse-aspect-reset" onClick={(e) => { e.preventDefault(); setAspect(0); }} title="Reset to 16:9">↺</button>
+                )}
               </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
@@ -688,6 +694,9 @@ export function AnalyseView() {
                   onChange={(e) => setAspect(Number(e.target.value))}
                   onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
                 <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+                {activeAspect !== 0 && (
+                  <button className="analyse-aspect-reset" onClick={(e) => { e.preventDefault(); setAspect(0); }} title="Reset to 16:9">↺</button>
+                )}
               </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
@@ -706,6 +715,9 @@ export function AnalyseView() {
                   onChange={(e) => setAspect(Number(e.target.value))}
                   onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
                 <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+                {activeAspect !== 0 && (
+                  <button className="analyse-aspect-reset" onClick={(e) => { e.preventDefault(); setAspect(0); }} title="Reset to 16:9">↺</button>
+                )}
               </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
@@ -818,6 +830,9 @@ export function AnalyseView() {
                   onChange={(e) => setAspect(Number(e.target.value))}
                   onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
                 <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+                {activeAspect !== 0 && (
+                  <button className="analyse-aspect-reset" onClick={(e) => { e.preventDefault(); setAspect(0); }} title="Reset to 16:9">↺</button>
+                )}
               </label>
               <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
                 <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
