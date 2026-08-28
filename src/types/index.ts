@@ -526,6 +526,9 @@ export interface Project {
     activeSheet?: string;
     categoryColors?: Record<string, string>;
     growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[] };
+    /** Named plan groups for the Growth by Group sheet (e.g. Core /
+     * Duo). Future: rankingBuckets for the item-ranking composite. */
+    planGroups?: { id: string; name: string; planIds: string[] }[];
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;
