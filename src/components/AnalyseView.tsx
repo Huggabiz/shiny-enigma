@@ -267,8 +267,20 @@ export function AnalyseView() {
   const [growthPct, setGrowthPctState] = useState(() => av?.growthConfig?.pct ?? 10);
   const [growthMetric, setGrowthMetricState] = useState<'margin' | 'revenue'>(
     () => (av?.growthConfig?.metric === 'revenue' ? 'revenue' : 'margin'));
-  const [showCombinedNewness, setShowCombinedNewnessState] = useState(() => av?.growthConfig?.combined ?? true);
-  const [showGrowthUplift, setShowGrowthUpliftState] = useState(() => av?.growthConfig?.uplift ?? true);
+  // Growth uplift and Combined newness are per growth sheet (keyed by
+  // sheet id, default on); the legacy shared booleans seed all three.
+  const [growthUpliftBySheet, setGrowthUpliftBySheet] = useState<Record<string, boolean>>(() => {
+    const stored = av?.growthConfig?.upliftBySheet;
+    if (stored) return stored;
+    return (av?.growthConfig?.uplift ?? true) ? {} : { growth: false, 'growth-plans': false, 'growth-groups': false };
+  });
+  const [growthCombinedBySheet, setGrowthCombinedBySheet] = useState<Record<string, boolean>>(() => {
+    const stored = av?.growthConfig?.combinedBySheet;
+    if (stored) return stored;
+    return (av?.growthConfig?.combined ?? true) ? {} : { growth: false, 'growth-plans': false };
+  });
+  const showGrowthUplift = growthUpliftBySheet[activeSheet] ?? true;
+  const showCombinedNewness = growthCombinedBySheet[activeSheet] ?? true;
   // Orientation is per growth sheet (keyed by sheet id); the legacy
   // shared `vertical` boolean seeds all three on first load.
   const [growthVerticalBySheet, setGrowthVerticalBySheet] = useState<Record<string, boolean>>(() => {
@@ -359,22 +371,36 @@ export function AnalyseView() {
     return n;
   }, [selectedPlans, shelfSide]);
 
-  const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; uplift?: boolean; verticalBySheet?: Record<string, boolean>; hiddenCats?: string[]; summary?: boolean; arpsExclRankings?: string[] }) => {
+  const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; upliftBySheet?: Record<string, boolean>; combinedBySheet?: Record<string, boolean>; verticalBySheet?: Record<string, boolean>; hiddenCats?: string[]; summary?: boolean; arpsExclRankings?: string[] }) => {
     const current = {
-      pct: growthPct, metric: growthMetric, combined: showCombinedNewness,
-      uplift: showGrowthUplift, verticalBySheet: growthVerticalBySheet,
+      pct: growthPct, metric: growthMetric,
+      combinedBySheet: growthCombinedBySheet,
+      upliftBySheet: growthUpliftBySheet,
+      verticalBySheet: growthVerticalBySheet,
       hiddenCats: Array.from(growthHiddenCats),
       summary: showGroupSummary,
       arpsExclRankings: Array.from(arpsExclRankings),
       ...patch,
     };
     setAnalyseConfig({ growthConfig: current });
-  }, [growthPct, growthMetric, showCombinedNewness, showGrowthUplift, growthVerticalBySheet, growthHiddenCats, showGroupSummary, arpsExclRankings, setAnalyseConfig]);
+  }, [growthPct, growthMetric, growthCombinedBySheet, growthUpliftBySheet, growthVerticalBySheet, growthHiddenCats, showGroupSummary, arpsExclRankings, setAnalyseConfig]);
 
   const setGrowthPct = (v: number) => { setGrowthPctState(v); persistGrowth({ pct: v }); };
   const setGrowthMetric = (m: 'margin' | 'revenue') => { setGrowthMetricState(m); persistGrowth({ metric: m }); };
-  const setShowCombinedNewness = (v: boolean) => { setShowCombinedNewnessState(v); persistGrowth({ combined: v }); };
-  const setShowGrowthUplift = (v: boolean) => { setShowGrowthUpliftState(v); persistGrowth({ uplift: v }); };
+  const setShowCombinedNewness = (v: boolean) => {
+    setGrowthCombinedBySheet((prev) => {
+      const next = { ...prev, [activeSheet]: v };
+      persistGrowth({ combinedBySheet: next });
+      return next;
+    });
+  };
+  const setShowGrowthUplift = (v: boolean) => {
+    setGrowthUpliftBySheet((prev) => {
+      const next = { ...prev, [activeSheet]: v };
+      persistGrowth({ upliftBySheet: next });
+      return next;
+    });
+  };
   const setGrowthVertical = (v: boolean) => {
     setGrowthVerticalBySheet((prev) => {
       const next = { ...prev, [activeSheet]: v };

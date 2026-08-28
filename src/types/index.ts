@@ -529,7 +529,7 @@ export interface Project {
      * totals and the growth-uplift £, but are excluded from the
      * avg-revenue-per-SKU (ARPS) divisor and hence the "SKUs needed"
      * calculation — e.g. end-of-line rankings being closed out. */
-    growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; verticalBySheet?: Record<string, boolean>; hiddenCats?: string[]; summary?: boolean; arpsExclRankings?: string[] };
+    growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; verticalBySheet?: Record<string, boolean>; upliftBySheet?: Record<string, boolean>; combinedBySheet?: Record<string, boolean>; hiddenCats?: string[]; summary?: boolean; arpsExclRankings?: string[] };
     /** Named plan groups for the Growth by Group sheet (e.g. Core /
      * Duo). */
     planGroups?: { id: string; name: string; planIds: string[] }[];
