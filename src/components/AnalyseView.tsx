@@ -269,7 +269,16 @@ export function AnalyseView() {
     () => (av?.growthConfig?.metric === 'revenue' ? 'revenue' : 'margin'));
   const [showCombinedNewness, setShowCombinedNewnessState] = useState(() => av?.growthConfig?.combined ?? true);
   const [showGrowthUplift, setShowGrowthUpliftState] = useState(() => av?.growthConfig?.uplift ?? true);
-  const [growthVertical, setGrowthVerticalState] = useState(() => av?.growthConfig?.vertical ?? false);
+  // Orientation is per growth sheet (keyed by sheet id); the legacy
+  // shared `vertical` boolean seeds all three on first load.
+  const [growthVerticalBySheet, setGrowthVerticalBySheet] = useState<Record<string, boolean>>(() => {
+    const stored = av?.growthConfig?.verticalBySheet;
+    if (stored) return stored;
+    return (av?.growthConfig?.vertical ?? false)
+      ? { growth: true, 'growth-plans': true, 'growth-groups': true }
+      : {};
+  });
+  const growthVertical = growthVerticalBySheet[activeSheet] ?? false;
   // Summary overlay (Growth by Group): cumulative totals card in the
   // chart's top-right corner.
   const [showGroupSummary, setShowGroupSummaryState] = useState(() => av?.growthConfig?.summary ?? false);
@@ -350,23 +359,29 @@ export function AnalyseView() {
     return n;
   }, [selectedPlans, shelfSide]);
 
-  const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[]; summary?: boolean; arpsExclRankings?: string[] }) => {
+  const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; uplift?: boolean; verticalBySheet?: Record<string, boolean>; hiddenCats?: string[]; summary?: boolean; arpsExclRankings?: string[] }) => {
     const current = {
       pct: growthPct, metric: growthMetric, combined: showCombinedNewness,
-      uplift: showGrowthUplift, vertical: growthVertical,
+      uplift: showGrowthUplift, verticalBySheet: growthVerticalBySheet,
       hiddenCats: Array.from(growthHiddenCats),
       summary: showGroupSummary,
       arpsExclRankings: Array.from(arpsExclRankings),
       ...patch,
     };
     setAnalyseConfig({ growthConfig: current });
-  }, [growthPct, growthMetric, showCombinedNewness, showGrowthUplift, growthVertical, growthHiddenCats, showGroupSummary, arpsExclRankings, setAnalyseConfig]);
+  }, [growthPct, growthMetric, showCombinedNewness, showGrowthUplift, growthVerticalBySheet, growthHiddenCats, showGroupSummary, arpsExclRankings, setAnalyseConfig]);
 
   const setGrowthPct = (v: number) => { setGrowthPctState(v); persistGrowth({ pct: v }); };
   const setGrowthMetric = (m: 'margin' | 'revenue') => { setGrowthMetricState(m); persistGrowth({ metric: m }); };
   const setShowCombinedNewness = (v: boolean) => { setShowCombinedNewnessState(v); persistGrowth({ combined: v }); };
   const setShowGrowthUplift = (v: boolean) => { setShowGrowthUpliftState(v); persistGrowth({ uplift: v }); };
-  const setGrowthVertical = (v: boolean) => { setGrowthVerticalState(v); persistGrowth({ vertical: v }); };
+  const setGrowthVertical = (v: boolean) => {
+    setGrowthVerticalBySheet((prev) => {
+      const next = { ...prev, [activeSheet]: v };
+      persistGrowth({ verticalBySheet: next });
+      return next;
+    });
+  };
   const setShowGroupSummary = (v: boolean) => { setShowGroupSummaryState(v); persistGrowth({ summary: v }); };
   const toggleArpsRanking = (r: string) => {
     setArpsExclRankings((prev) => {
