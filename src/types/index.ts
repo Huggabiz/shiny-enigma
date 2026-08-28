@@ -525,7 +525,11 @@ export interface Project {
     scatterConfig?: { logX?: boolean; logY?: boolean; maxX?: string; maxY?: string; dotSize?: number; contours?: boolean };
     activeSheet?: string;
     categoryColors?: Record<string, string>;
-    growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[]; summary?: boolean };
+    /** arpsExclRankings: Item Ranking values whose SKUs still count in
+     * totals and the growth-uplift £, but are excluded from the
+     * avg-revenue-per-SKU (ARPS) divisor and hence the "SKUs needed"
+     * calculation — e.g. end-of-line rankings being closed out. */
+    growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[]; summary?: boolean; arpsExclRankings?: string[] };
     /** Named plan groups for the Growth by Group sheet (e.g. Core /
      * Duo). */
     planGroups?: { id: string; name: string; planIds: string[] }[];
@@ -539,6 +543,9 @@ export interface Project {
     compoundRestName?: string;
     /** Cross-hatch the catch-all segment. */
     compoundRestHatch?: boolean;
+    /** Compound gradient direction: first group in the list darkest
+     * ('dark-first', default) or lightest ('light-first'). */
+    compoundShadeDir?: 'dark-first' | 'light-first';
     /** Stacking position of the catch-all segment, expressed as the
      * number of compound groups stacked before it (default: last). */
     compoundRestIndex?: number;
