@@ -285,6 +285,22 @@ export function AnalyseView() {
     setAnalyseConfig({ planGroups: groups });
   };
 
+  // Compound groups: named buckets of Item Ranking values that split
+  // each Growth by Group bar into stacked segments. Any SKU whose
+  // ranking is unallocated (or missing) lands in the catch-all
+  // segment, whose display name is also user-defined.
+  const compoundGroups = useMemo(() => av?.compoundGroups ?? [], [av?.compoundGroups]);
+  const compoundRestName = av?.compoundRestName ?? 'Other';
+  const [showCompoundDialog, setShowCompoundDialog] = useState(false);
+  const availableRankings = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of project?.catalogue ?? []) {
+      const r = (p.itemRanking ?? '').trim();
+      if (r) set.add(r);
+    }
+    return Array.from(set).sort();
+  }, [project?.catalogue]);
+
   // Per-sheet text-size multiplier for presentation exports.
   const [textScales, setTextScales] = useState<Record<string, number>>(() => av?.textScales ?? {});
   const activeTextScale = textScales[activeSheet] ?? 1;
@@ -467,6 +483,16 @@ export function AnalyseView() {
           onClose={() => setShowGroupsDialog(false)}
         />
       )}
+      {showCompoundDialog && (
+        <CompoundGroupsDialog
+          groups={compoundGroups}
+          restName={compoundRestName}
+          availableRankings={availableRankings}
+          onChange={(groups) => setAnalyseConfig({ compoundGroups: groups })}
+          onRestNameChange={(name) => setAnalyseConfig({ compoundRestName: name })}
+          onClose={() => setShowCompoundDialog(false)}
+        />
+      )}
       {selectedPlans.length === 0 ? (
         <div className="analyse-empty">
           <h3>No plans selected</h3>
@@ -477,7 +503,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -587,9 +613,15 @@ export function AnalyseView() {
                 </label>
               )}
               {activeSheet === 'growth-groups' && (
-                <button className="analyse-snip-btn" onClick={() => setShowGroupsDialog(true)} title="Define named groups (e.g. Core / Duo) and assign range plans to them">
-                  Manage Groups ({planGroups.length})
-                </button>
+                <>
+                  <button className="analyse-snip-btn" onClick={() => setShowGroupsDialog(true)} title="Define named groups (e.g. Core / Duo) and assign range plans to them">
+                    Manage Groups ({planGroups.length})
+                  </button>
+                  <button className="analyse-snip-btn" onClick={() => setShowCompoundDialog(true)}
+                    title="Define named buckets of Item Ranking values — each bar splits into stacked segments by bucket, with unallocated rankings in a catch-all segment">
+                    Compound Groups ({compoundGroups.length})
+                  </button>
+                </>
               )}
               <div className="analyse-metric-toggle" role="tablist">
                 <button role="tab" className={!growthVertical ? 'active' : ''} onClick={() => setGrowthVertical(false)}>Horizontal</button>
@@ -2039,10 +2071,93 @@ function PlanGroupsDialog({ groups, onChange, onClose }: {
   );
 }
 
+// ---------- Compound Groups dialog (Growth by Group segments) ----------
+
+function CompoundGroupsDialog({ groups, restName, availableRankings, onChange, onRestNameChange, onClose }: {
+  groups: { id: string; name: string; rankings: string[] }[];
+  restName: string;
+  availableRankings: string[];
+  onChange: (groups: { id: string; name: string; rankings: string[] }[]) => void;
+  onRestNameChange: (name: string) => void;
+  onClose: () => void;
+}) {
+  const addGroup = () => {
+    onChange([...groups, { id: `cg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name: `Compound ${groups.length + 1}`, rankings: [] }]);
+  };
+  const rename = (id: string, name: string) => onChange(groups.map((g) => g.id === id ? { ...g, name } : g));
+  const remove = (id: string) => onChange(groups.filter((g) => g.id !== id));
+  const toggleRanking = (id: string, ranking: string) => onChange(groups.map((g) => {
+    if (g.id !== id) return g;
+    return { ...g, rankings: g.rankings.includes(ranking) ? g.rankings.filter((r) => r !== ranking) : [...g.rankings, ranking] };
+  }));
+  // First group claiming a ranking wins at aggregation time — flag
+  // rankings already claimed by an earlier group so double-allocations
+  // are visible while still allowed.
+  const claimedBefore = (gi: number, ranking: string) =>
+    groups.slice(0, gi).find((g) => g.rankings.includes(ranking))?.name;
+
+  return (
+    <div className="slab-dialog-overlay" onClick={onClose}>
+      <div className="slab-dialog" style={{ width: 440, maxHeight: '80vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+        <h3>Compound Groups</h3>
+        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#666' }}>
+          Name each compound group and tick the Item Rankings that belong to it —
+          every bar on the Growth by Group sheet then splits into stacked segments,
+          one per compound group. SKUs whose ranking is unallocated (or blank) fall
+          into the catch-all segment below. If a ranking is ticked in two groups,
+          the first group listed wins.
+        </p>
+        {availableRankings.length === 0 && (
+          <p style={{ margin: '0 0 10px', fontSize: 12, color: '#c62828' }}>
+            No Item Ranking values found in the catalogue — import products with an
+            Item Ranking column first.
+          </p>
+        )}
+        {groups.map((g, gi) => (
+          <div key={g.id} style={{ border: '1px solid #e0e0e0', borderRadius: 6, padding: 10, marginBottom: 10 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+              <input className="slab-dialog-input" style={{ flex: 1 }} value={g.name}
+                onChange={(e) => rename(g.id, e.target.value)} placeholder="Compound group name" />
+              <button className="slab-dialog-btn cancel" onClick={() => remove(g.id)} title="Delete compound group">×</button>
+            </div>
+            <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {availableRankings.map((r) => {
+                const claimer = claimedBefore(gi, r);
+                return (
+                  <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#333', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={g.rankings.includes(r)} onChange={() => toggleRanking(g.id, r)} />
+                    {r}
+                    {claimer && g.rankings.includes(r) && (
+                      <span style={{ fontSize: 10, color: '#e65100' }}>(also in {claimer} — that group wins)</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <div style={{ border: '1px dashed #bbb', borderRadius: 6, padding: 10, marginBottom: 10 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#333' }}>
+            Everything else appears as
+            <input className="slab-dialog-input" style={{ flex: 1 }} value={restName}
+              onChange={(e) => onRestNameChange(e.target.value)} placeholder="Other" />
+          </label>
+        </div>
+        <div className="slab-dialog-actions" style={{ justifyContent: 'space-between' }}>
+          <button className="slab-dialog-btn primary" onClick={addGroup}>+ Add Compound Group</button>
+          <button className="slab-dialog-btn cancel" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Growth by Group (grouped bars per category) ----------
 
-function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showGrowth, vertical }: {
+function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showGrowth, vertical }: {
   groups: { id: string; name: string; planIds: string[] }[];
+  compounds: { id: string; name: string; rankings: string[] }[];
+  restName: string;
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
   growthPct: number; growthMetric: 'margin' | 'revenue';
@@ -2052,13 +2167,25 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
+  // Compound segment names: defined buckets in order, catch-all last.
+  const segNames = useMemo(
+    () => [...compounds.map((c) => c.name), restName.trim() || 'Other'],
+    [compounds, restName]);
+
   // Per group: dedupe first-plan-wins WITHIN the group's selected
-  // plans, then per-category totals of the chosen metric.
+  // plans, then per-category totals of the chosen metric, split by
+  // compound segment (a ranking claimed by two buckets goes to the
+  // first; unclaimed/blank rankings go to the catch-all).
   const data = useMemo(() => {
+    const restIdx = compounds.length;
+    const rankIdx = new Map<string, number>();
+    compounds.forEach((cg, i) => {
+      for (const r of cg.rankings) if (!rankIdx.has(r)) rankIdx.set(r, i);
+    });
     return groups.map((grp) => {
       const groupPlans = plans.filter((p) => grp.planIds.includes(p.id));
       const seen = new Set<string>();
-      const catMap = new Map<string, { total: number; n: number }>();
+      const catMap = new Map<string, { total: number; n: number; segs: number[]; segNs: number[] }>();
       for (const plan of groupPlans) {
         const shelf = resolveShelf(plan, shelfSide);
         if (!shelf) continue;
@@ -2070,13 +2197,21 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
           if (v <= 0) continue;
           const cat = prod.category || 'Uncategorised';
           if (hiddenCats.has(cat)) continue;
-          const e = catMap.get(cat) ?? { total: 0, n: 0 };
-          e.total += v; e.n++; catMap.set(cat, e);
+          const e = catMap.get(cat) ?? {
+            total: 0, n: 0,
+            segs: new Array(restIdx + 1).fill(0),
+            segNs: new Array(restIdx + 1).fill(0),
+          };
+          e.total += v; e.n++;
+          const rk = (prod.itemRanking ?? '').trim();
+          const si = rk && rankIdx.has(rk) ? rankIdx.get(rk)! : restIdx;
+          e.segs[si] += v; e.segNs[si]++;
+          catMap.set(cat, e);
         }
       }
       return { name: grp.name, catMap };
     });
-  }, [groups, plans, catalogue, shelfSide, growthMetric, hiddenCats]);
+  }, [groups, compounds, plans, catalogue, shelfSide, growthMetric, hiddenCats]);
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
@@ -2105,14 +2240,17 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
     const categories = Array.from(catTotals.entries()).sort((a, b) => b[1] - a[1]).map(([c]) => c);
 
     // Per category per group stats with growth.
-    type Cell = { total: number; n: number; avg: number; inc: number; skusNeeded: number } | null;
+    type Cell = { total: number; n: number; avg: number; inc: number; skusNeeded: number; segs: number[]; segNs: number[] } | null;
     const cell = (gi: number, cat: string): Cell => {
       const e = data[gi].catMap.get(cat);
       if (!e) return null;
       const avg = e.total / e.n;
       const inc = showGrowth ? e.total * (growthPct / 100) : 0;
-      return { total: e.total, n: e.n, avg, inc, skusNeeded: showGrowth && avg > 0 ? Math.ceil(inc / avg) : 0 };
+      return { total: e.total, n: e.n, avg, inc, skusNeeded: showGrowth && avg > 0 ? Math.ceil(inc / avg) : 0, segs: e.segs, segNs: e.segNs };
     };
+    // Compound view: stacked ranking-bucket segments inside each bar.
+    const compound = compounds.length > 0;
+    const segShade = (fill: string, si: number) => d3.interpolateLab(fill, '#ffffff')(Math.min(0.6, si * 0.2));
     const maxV = d3.max(categories.flatMap((cat) => data.map((_, gi) => { const c = cell(gi, cat); return c ? c.total + c.inc : 0; }))) ?? 0;
     if (maxV <= 0) return;
 
@@ -2158,19 +2296,52 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
           const bh = yInner.bandwidth();
           const fill = shade(base, gi);
           const barW = xScale(c.total);
-          g.append('rect').attr('x', 0).attr('y', y).attr('width', barW).attr('height', bh)
-            .attr('fill', fill).attr('fill-opacity', 0.92).attr('rx', 2).style('cursor', 'pointer')
-            .on('mouseenter', hoverSeg(`${cat} · ${d.name}`, `${fmtGbp(c.total)} · ${c.n} SKUs · avg ${fmtGbp(c.avg)}/SKU`))
-            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
-          const unitPx = xScale(c.avg);
-          const step = unitTickStep(unitPx);
-          if (step > 0) {
-            let drawn = 0;
-            for (let u = step; u * unitPx < barW && drawn < 800; u += step) {
-              g.append('line').attr('x1', u * unitPx).attr('x2', u * unitPx).attr('y1', y).attr('y2', y + bh)
-                .attr('stroke', '#fff').attr('stroke-width', 0.75).attr('opacity', 0.7);
-              drawn++;
+          // Approximate width the in-bar group name will occupy, so the
+          // first compound segment's label can dodge it.
+          const groupLabelW = barW > 26 && bh >= 9
+            ? Math.min(d.name.length, Math.max(2, Math.floor((barW - 8) / 4.3))) * 4.3 + 8
+            : 0;
+          if (!compound) {
+            g.append('rect').attr('x', 0).attr('y', y).attr('width', barW).attr('height', bh)
+              .attr('fill', fill).attr('fill-opacity', 0.92).attr('rx', 2).style('cursor', 'pointer')
+              .on('mouseenter', hoverSeg(`${cat} · ${d.name}`, `${fmtGbp(c.total)} · ${c.n} SKUs · avg ${fmtGbp(c.avg)}/SKU`))
+              .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+            const unitPx = xScale(c.avg);
+            const step = unitTickStep(unitPx);
+            if (step > 0) {
+              let drawn = 0;
+              for (let u = step; u * unitPx < barW && drawn < 800; u += step) {
+                g.append('line').attr('x1', u * unitPx).attr('x2', u * unitPx).attr('y1', y).attr('y2', y + bh)
+                  .attr('stroke', '#fff').attr('stroke-width', 0.75).attr('opacity', 0.7);
+                drawn++;
+              }
             }
+          } else {
+            let cv = 0;
+            c.segs.forEach((sv, si) => {
+              if (sv <= 0) return;
+              const x0 = xScale(cv), x1 = xScale(cv + sv);
+              const segFill = segShade(fill, si);
+              g.append('rect').attr('x', x0).attr('y', y).attr('width', Math.max(0, x1 - x0)).attr('height', bh)
+                .attr('fill', segFill).attr('fill-opacity', 0.95).attr('stroke', '#fff').attr('stroke-width', 0.75)
+                .style('cursor', 'pointer')
+                .on('mouseenter', hoverSeg(`${cat} · ${d.name} · ${segNames[si]}`, `${fmtGbp(sv)} · ${c.segNs[si]} SKU${c.segNs[si] !== 1 ? 's' : ''}`))
+                .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+              // Segment name inside when it fits (dodging the group
+              // name written at the start of the bar).
+              const lx0 = si === 0 ? x0 + groupLabelW + 4 : x0;
+              const segW = x1 - lx0;
+              if (segW > 26 && bh >= 9) {
+                const maxChars = Math.max(2, Math.floor((segW - 6) / 3.8));
+                const sl = segNames[si].length > maxChars ? segNames[si].slice(0, Math.max(1, maxChars - 1)) + '…' : segNames[si];
+                const st = g.append('text').attr('x', (lx0 + x1) / 2).attr('y', y + bh / 2 + 2.2).attr('text-anchor', 'middle')
+                  .attr('font-size', '6.5px').attr('font-weight', '600')
+                  .attr('fill', d3.hsl(segFill).l > 0.62 ? '#444' : 'rgba(255,255,255,0.95)')
+                  .style('pointer-events', 'none').text(sl);
+                st.append('title').text(segNames[si]);
+              }
+              cv += sv;
+            });
           }
           let endX = barW;
           if (showGrowth && c.inc > 0) {
@@ -2253,20 +2424,45 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
           const x = xBase + xInner(d.name)!;
           const bw = xInner.bandwidth();
           const fill = shade(base, gi);
-          g.append('rect').attr('x', x).attr('y', yScale(c.total)).attr('width', bw).attr('height', iH - yScale(c.total))
-            .attr('fill', fill).attr('fill-opacity', 0.92).attr('rx', 2).style('cursor', 'pointer')
-            .on('mouseenter', hoverSeg(`${cat} · ${d.name}`, `${fmtGbp(c.total)} · ${c.n} SKUs · avg ${fmtGbp(c.avg)}/SKU`))
-            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
-          const unitPx = yScale(0) - yScale(c.avg);
-          const step = unitTickStep(unitPx);
-          if (step > 0) {
-            let drawn = 0;
-            for (let u = step; u * c.avg < c.total && drawn < 800; u += step) {
-              const vy = yScale(u * c.avg);
-              g.append('line').attr('x1', x).attr('x2', x + bw).attr('y1', vy).attr('y2', vy)
-                .attr('stroke', '#fff').attr('stroke-width', 0.75).attr('opacity', 0.7);
-              drawn++;
+          if (!compound) {
+            g.append('rect').attr('x', x).attr('y', yScale(c.total)).attr('width', bw).attr('height', iH - yScale(c.total))
+              .attr('fill', fill).attr('fill-opacity', 0.92).attr('rx', 2).style('cursor', 'pointer')
+              .on('mouseenter', hoverSeg(`${cat} · ${d.name}`, `${fmtGbp(c.total)} · ${c.n} SKUs · avg ${fmtGbp(c.avg)}/SKU`))
+              .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+            const unitPx = yScale(0) - yScale(c.avg);
+            const step = unitTickStep(unitPx);
+            if (step > 0) {
+              let drawn = 0;
+              for (let u = step; u * c.avg < c.total && drawn < 800; u += step) {
+                const vy = yScale(u * c.avg);
+                g.append('line').attr('x1', x).attr('x2', x + bw).attr('y1', vy).attr('y2', vy)
+                  .attr('stroke', '#fff').attr('stroke-width', 0.75).attr('opacity', 0.7);
+                drawn++;
+              }
             }
+          } else {
+            let cv = 0;
+            c.segs.forEach((sv, si) => {
+              if (sv <= 0) return;
+              const sy1 = yScale(cv), sy0 = yScale(cv + sv);
+              const segFill = segShade(fill, si);
+              g.append('rect').attr('x', x).attr('y', sy0).attr('width', bw).attr('height', Math.max(0, sy1 - sy0))
+                .attr('fill', segFill).attr('fill-opacity', 0.95).attr('stroke', '#fff').attr('stroke-width', 0.75)
+                .style('cursor', 'pointer')
+                .on('mouseenter', hoverSeg(`${cat} · ${d.name} · ${segNames[si]}`, `${fmtGbp(sv)} · ${c.segNs[si]} SKU${c.segNs[si] !== 1 ? 's' : ''}`))
+                .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+              // Segment name inside when the segment is tall enough.
+              if (sy1 - sy0 >= 10 && bw > 22) {
+                const maxChars = Math.max(2, Math.floor((bw - 4) / 3.8));
+                const sl = segNames[si].length > maxChars ? segNames[si].slice(0, Math.max(1, maxChars - 1)) + '…' : segNames[si];
+                const st = g.append('text').attr('x', x + bw / 2).attr('y', (sy0 + sy1) / 2 + 2.2).attr('text-anchor', 'middle')
+                  .attr('font-size', '6.5px').attr('font-weight', '600')
+                  .attr('fill', d3.hsl(segFill).l > 0.62 ? '#444' : 'rgba(255,255,255,0.95)')
+                  .style('pointer-events', 'none').text(sl);
+                st.append('title').text(segNames[si]);
+              }
+              cv += sv;
+            });
           }
           let barTop = yScale(c.total);
           if (showGrowth && c.inc > 0) {
@@ -2320,7 +2516,7 @@ function GrowthGroupChart({ groups, plans, catalogue, shelfSide, catColors, text
         }
       }
     }
-  }, [data, groups.length, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale]);
+  }, [data, groups.length, compounds.length, segNames, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>

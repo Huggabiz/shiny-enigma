@@ -527,8 +527,16 @@ export interface Project {
     categoryColors?: Record<string, string>;
     growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[] };
     /** Named plan groups for the Growth by Group sheet (e.g. Core /
-     * Duo). Future: rankingBuckets for the item-ranking composite. */
+     * Duo). */
     planGroups?: { id: string; name: string; planIds: string[] }[];
+    /** Compound groups for the Growth by Group sheet: named buckets of
+     * Item Ranking values that split each group bar into stacked
+     * segments. SKUs whose ranking is in no bucket (or who have no
+     * ranking) fall into a catch-all segment named by
+     * compoundRestName. */
+    compoundGroups?: { id: string; name: string; rankings: string[] }[];
+    /** Display name for the catch-all compound segment (default "Other"). */
+    compoundRestName?: string;
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;
