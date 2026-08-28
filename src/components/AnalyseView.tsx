@@ -284,6 +284,27 @@ export function AnalyseView() {
     });
   };
 
+  // Cross-plan duplication: how many distinct SKUs appear in more
+  // than one selected plan (on the active stage). Surfaced in the
+  // growth config bar — the dedupe counts them once, but the user
+  // should see the overlap exists.
+  const sharedSkuCount = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const plan of selectedPlans) {
+      const shelf = resolveShelf(plan, shelfSide);
+      if (!shelf) continue;
+      const seenInPlan = new Set<string>();
+      for (const item of shelf.items) {
+        if (!item.productId || seenInPlan.has(item.productId)) continue;
+        seenInPlan.add(item.productId);
+        counts.set(item.productId, (counts.get(item.productId) ?? 0) + 1);
+      }
+    }
+    let n = 0;
+    for (const c of counts.values()) if (c > 1) n++;
+    return n;
+  }, [selectedPlans, shelfSide]);
+
   const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; hiddenCats?: string[] }) => {
     const current = {
       pct: growthPct, metric: growthMetric, combined: showCombinedNewness,
@@ -537,6 +558,15 @@ export function AnalyseView() {
                 <input type="checkbox" checked={showCombinedNewness} onChange={(e) => setShowCombinedNewness(e.target.checked)} />
                 Combined newness
               </label>
+              {sharedSkuCount > 0 && (
+                <>
+                  <div className="analyse-config-separator" />
+                  <span className="analyse-config-item" style={{ cursor: 'help', color: '#e65100' }}
+                    title="These SKUs exist in more than one of the selected range plans. Both growth sheets count each SKU once — on Growth by Plan it is attributed to the first selected plan containing it, so later plans' segments show their incremental contribution.">
+                    ⚠ {sharedSkuCount} SKU{sharedSkuCount !== 1 ? 's' : ''} shared between plans (counted once)
+                  </span>
+                </>
+              )}
               <div className="analyse-config-separator" />
               {/* Category filter lives HERE (below the canvas) so it is
                   never captured in the slide copy. Opens upward — the
@@ -1559,20 +1589,24 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, textScale, hi
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  // Per category → per plan totals of the chosen metric. NOTE: unlike
-  // the Growth sheet, a SKU present in two selected plans counts in
-  // BOTH plan segments (this is a plan-composition view), so category
-  // totals can exceed the deduped Growth sheet's.
+  // Per category → per plan totals of the chosen metric, with
+  // FIRST-PLAN-WINS dedupe: a SKU present in several selected plans is
+  // attributed to the first plan (in selection order) that contains
+  // it. Plan segments therefore sum exactly to the deduped category
+  // totals, and every aggregate (totals, averages, increments, SKU
+  // counts) reconciles with the Growth sheet. Later plans' segments
+  // show their INCREMENTAL contribution. The skip sequence below
+  // mirrors GrowthChart exactly so the two sheets match to the penny.
   const cats = useMemo(() => {
     const map = new Map<string, Map<string, { total: number; n: number }>>();
+    const seen = new Set<string>();
     for (const plan of plans) {
       const shelf = resolveShelf(plan, shelfSide);
       if (!shelf) continue;
-      const seenInPlan = new Set<string>();
       for (const item of shelf.items) {
         const prod = getProductForItem(item, catalogue);
-        if (!prod || seenInPlan.has(prod.id)) continue;
-        seenInPlan.add(prod.id);
+        if (!prod || seen.has(prod.id)) continue;
+        seen.add(prod.id);
         const v = growthMetric === 'revenue' ? (prod.revenue ?? 0) : (prod.operatingMarginGbp ?? 0);
         if (v <= 0) continue;
         const cat = prod.category || 'Uncategorised';
