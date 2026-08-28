@@ -270,6 +270,9 @@ export function AnalyseView() {
   const [showCombinedNewness, setShowCombinedNewnessState] = useState(() => av?.growthConfig?.combined ?? true);
   const [showGrowthUplift, setShowGrowthUpliftState] = useState(() => av?.growthConfig?.uplift ?? true);
   const [growthVertical, setGrowthVerticalState] = useState(() => av?.growthConfig?.vertical ?? false);
+  // Summary overlay (Growth by Group): cumulative totals card in the
+  // chart's top-right corner.
+  const [showGroupSummary, setShowGroupSummaryState] = useState(() => av?.growthConfig?.summary ?? false);
   // Growth-sheet-specific category hiding — independent of the legend
   // hidden-set the other sheets share, and persisted with the project.
   const [growthHiddenCats, setGrowthHiddenCats] = useState<Set<string>>(
@@ -333,21 +336,23 @@ export function AnalyseView() {
     return n;
   }, [selectedPlans, shelfSide]);
 
-  const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[] }) => {
+  const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[]; summary?: boolean }) => {
     const current = {
       pct: growthPct, metric: growthMetric, combined: showCombinedNewness,
       uplift: showGrowthUplift, vertical: growthVertical,
       hiddenCats: Array.from(growthHiddenCats),
+      summary: showGroupSummary,
       ...patch,
     };
     setAnalyseConfig({ growthConfig: current });
-  }, [growthPct, growthMetric, showCombinedNewness, showGrowthUplift, growthVertical, growthHiddenCats, setAnalyseConfig]);
+  }, [growthPct, growthMetric, showCombinedNewness, showGrowthUplift, growthVertical, growthHiddenCats, showGroupSummary, setAnalyseConfig]);
 
   const setGrowthPct = (v: number) => { setGrowthPctState(v); persistGrowth({ pct: v }); };
   const setGrowthMetric = (m: 'margin' | 'revenue') => { setGrowthMetricState(m); persistGrowth({ metric: m }); };
   const setShowCombinedNewness = (v: boolean) => { setShowCombinedNewnessState(v); persistGrowth({ combined: v }); };
   const setShowGrowthUplift = (v: boolean) => { setShowGrowthUpliftState(v); persistGrowth({ uplift: v }); };
   const setGrowthVertical = (v: boolean) => { setGrowthVerticalState(v); persistGrowth({ vertical: v }); };
+  const setShowGroupSummary = (v: boolean) => { setShowGroupSummaryState(v); persistGrowth({ summary: v }); };
   const toggleGrowthCat = (cat: string) => {
     setGrowthHiddenCats((prev) => {
       const n = new Set(prev);
@@ -503,7 +508,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -614,6 +619,10 @@ export function AnalyseView() {
               )}
               {activeSheet === 'growth-groups' && (
                 <>
+                  <label className="analyse-config-item" title="Overlay cumulative totals in the top-right of the chart: grand total, per-group totals, and compound-group cross-category totals">
+                    <input type="checkbox" checked={showGroupSummary} onChange={(e) => setShowGroupSummary(e.target.checked)} />
+                    Summary
+                  </label>
                   <button className="analyse-snip-btn" onClick={() => setShowGroupsDialog(true)} title="Define named groups (e.g. Core / Duo) and assign range plans to them">
                     Manage Groups ({planGroups.length})
                   </button>
@@ -2034,11 +2043,19 @@ function PlanGroupsDialog({ groups, onChange, onClose }: {
   onChange: (groups: { id: string; name: string; planIds: string[] }[]) => void;
   onClose: () => void;
 }) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
   const addGroup = () => {
     onChange([...groups, { id: `pg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name: `Group ${groups.length + 1}`, planIds: [] }]);
   };
   const rename = (id: string, name: string) => onChange(groups.map((g) => g.id === id ? { ...g, name } : g));
   const remove = (id: string) => onChange(groups.filter((g) => g.id !== id));
+  const moveTo = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...groups];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m);
+    onChange(next);
+  };
 
   return (
     <div className="slab-dialog-overlay" onClick={onClose}>
@@ -2048,11 +2065,16 @@ function PlanGroupsDialog({ groups, onChange, onClose }: {
           Create and name your groups here (e.g. Core, Duo). To assign range plans,
           use the group boxes that appear next to each plan in the sidebar while the
           Growth by Group sheet is open. A plan contributes to a group's bar only
-          when it is also ticked for this view.
+          when it is also ticked for this view. Drag ⠿ to reorder — the order sets
+          the bar order within each category.
         </p>
-        {groups.map((g) => (
-          <div key={g.id} style={{ border: '1px solid #e0e0e0', borderRadius: 6, padding: 10, marginBottom: 10 }}>
+        {groups.map((g, gi) => (
+          <div key={g.id} style={{ border: '1px solid #e0e0e0', borderRadius: 6, padding: 10, marginBottom: 10, opacity: dragIdx === gi ? 0.5 : 1 }}
+            onDragOver={(e) => { if (dragIdx !== null) e.preventDefault(); }}
+            onDrop={(e) => { if (dragIdx !== null) { e.preventDefault(); moveTo(dragIdx, gi); setDragIdx(null); } }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span draggable onDragStart={(e) => { setDragIdx(gi); e.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => setDragIdx(null)}
+                style={{ cursor: 'grab', color: '#aaa', fontSize: 14, userSelect: 'none' }} title="Drag to reorder">⠿</span>
               <input className="slab-dialog-input" style={{ flex: 1 }} value={g.name}
                 onChange={(e) => rename(g.id, e.target.value)} placeholder="Group name" />
               <span style={{ fontSize: 11, color: '#999', whiteSpace: 'nowrap' }}>
@@ -2081,11 +2103,19 @@ function CompoundGroupsDialog({ groups, restName, availableRankings, onChange, o
   onRestNameChange: (name: string) => void;
   onClose: () => void;
 }) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
   const addGroup = () => {
     onChange([...groups, { id: `cg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name: `Compound ${groups.length + 1}`, rankings: [] }]);
   };
   const rename = (id: string, name: string) => onChange(groups.map((g) => g.id === id ? { ...g, name } : g));
   const remove = (id: string) => onChange(groups.filter((g) => g.id !== id));
+  const moveTo = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...groups];
+    const [m] = next.splice(from, 1);
+    next.splice(to, 0, m);
+    onChange(next);
+  };
   const toggleRanking = (id: string, ranking: string) => onChange(groups.map((g) => {
     if (g.id !== id) return g;
     return { ...g, rankings: g.rankings.includes(ranking) ? g.rankings.filter((r) => r !== ranking) : [...g.rankings, ranking] };
@@ -2105,7 +2135,8 @@ function CompoundGroupsDialog({ groups, restName, availableRankings, onChange, o
           every bar on the Growth by Group sheet then splits into stacked segments,
           one per compound group. SKUs whose ranking is unallocated (or blank) fall
           into the catch-all segment below. If a ranking is ticked in two groups,
-          the first group listed wins.
+          the first group listed wins. Drag ⠿ to reorder — the order sets the
+          stacking order of the segments.
         </p>
         {availableRankings.length === 0 && (
           <p style={{ margin: '0 0 10px', fontSize: 12, color: '#c62828' }}>
@@ -2114,8 +2145,12 @@ function CompoundGroupsDialog({ groups, restName, availableRankings, onChange, o
           </p>
         )}
         {groups.map((g, gi) => (
-          <div key={g.id} style={{ border: '1px solid #e0e0e0', borderRadius: 6, padding: 10, marginBottom: 10 }}>
+          <div key={g.id} style={{ border: '1px solid #e0e0e0', borderRadius: 6, padding: 10, marginBottom: 10, opacity: dragIdx === gi ? 0.5 : 1 }}
+            onDragOver={(e) => { if (dragIdx !== null) e.preventDefault(); }}
+            onDrop={(e) => { if (dragIdx !== null) { e.preventDefault(); moveTo(dragIdx, gi); setDragIdx(null); } }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+              <span draggable onDragStart={(e) => { setDragIdx(gi); e.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => setDragIdx(null)}
+                style={{ cursor: 'grab', color: '#aaa', fontSize: 14, userSelect: 'none' }} title="Drag to reorder">⠿</span>
               <input className="slab-dialog-input" style={{ flex: 1 }} value={g.name}
                 onChange={(e) => rename(g.id, e.target.value)} placeholder="Compound group name" />
               <button className="slab-dialog-btn cancel" onClick={() => remove(g.id)} title="Delete compound group">×</button>
@@ -2154,14 +2189,14 @@ function CompoundGroupsDialog({ groups, restName, availableRankings, onChange, o
 
 // ---------- Growth by Group (grouped bars per category) ----------
 
-function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showGrowth, vertical }: {
+function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showGrowth, vertical, showSummary }: {
   groups: { id: string; name: string; planIds: string[] }[];
   compounds: { id: string; name: string; rankings: string[] }[];
   restName: string;
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
   growthPct: number; growthMetric: 'margin' | 'revenue';
-  showGrowth: boolean; vertical: boolean;
+  showGrowth: boolean; vertical: boolean; showSummary: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
@@ -2327,18 +2362,21 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
                 .style('cursor', 'pointer')
                 .on('mouseenter', hoverSeg(`${cat} · ${d.name} · ${segNames[si]}`, `${fmtGbp(sv)} · ${c.segNs[si]} SKU${c.segNs[si] !== 1 ? 's' : ''}`))
                 .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
-              // Segment name inside when it fits (dodging the group
-              // name written at the start of the bar).
+              // Segment name (plus its value when it fits) inside the
+              // segment, dodging the group name at the start of the bar.
               const lx0 = si === 0 ? x0 + groupLabelW + 4 : x0;
               const segW = x1 - lx0;
               if (segW > 26 && bh >= 9) {
                 const maxChars = Math.max(2, Math.floor((segW - 6) / 3.8));
-                const sl = segNames[si].length > maxChars ? segNames[si].slice(0, Math.max(1, maxChars - 1)) + '…' : segNames[si];
+                const withVal = `${segNames[si]} ${fmtGbp(sv)}`;
+                const sl = withVal.length <= maxChars ? withVal
+                  : segNames[si].length <= maxChars ? segNames[si]
+                  : segNames[si].slice(0, Math.max(1, maxChars - 1)) + '…';
                 const st = g.append('text').attr('x', (lx0 + x1) / 2).attr('y', y + bh / 2 + 2.2).attr('text-anchor', 'middle')
                   .attr('font-size', '6.5px').attr('font-weight', '600')
                   .attr('fill', d3.hsl(segFill).l > 0.62 ? '#444' : 'rgba(255,255,255,0.95)')
                   .style('pointer-events', 'none').text(sl);
-                st.append('title').text(segNames[si]);
+                st.append('title').text(`${segNames[si]} — ${fmtGbp(sv)}`);
               }
               cv += sv;
             });
@@ -2365,30 +2403,27 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
               .style('pointer-events', 'none').text(gl);
             gt.append('title').text(d.name);
           }
-          // Value pill at the end of the solid bar (inside), else dark
-          // text just past the bar when there is no growth block there.
+          // Bar total just past the end of the bar (after the growth
+          // block and "+N" annotation when shown).
           const label = fmtGbp(c.total);
-          const labelW = label.length * 5.5 + 10;
-          if (barW > labelW + 42) {
-            g.append('rect').attr('x', barW - labelW - 4).attr('y', y + bh / 2 - 6.5).attr('width', labelW).attr('height', 13).attr('rx', 6.5)
-              .attr('fill', '#fff').attr('fill-opacity', 0.8).style('pointer-events', 'none');
-            g.append('text').attr('x', barW - 4 - labelW / 2).attr('y', y + bh / 2 + 2.5).attr('text-anchor', 'middle')
-              .attr('font-size', '8.5px').attr('font-weight', '700').attr('fill', '#1a1a2e')
-              .style('pointer-events', 'none').text(label);
-          } else if (!(showGrowth && c.inc > 0)) {
-            g.append('text').attr('x', barW + 5).attr('y', y + bh / 2 + 3)
-              .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#333').text(label);
-            endX = barW + 8 + label.length * 4.5;
-          }
+          g.append('text').attr('x', endX + 4).attr('y', y + bh / 2 + 3)
+            .attr('font-size', '8.5px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+            .text(label);
+          endX += 8 + label.length * 5;
           catTotal += c.total;
           maxEnd = Math.max(maxEnd, endX);
         });
-        // Cumulative category total floating past the category's bars,
+        // Cumulative category total in a pill past the category's bars,
         // vertically centred on the category band.
         if (catTotal > 0) {
-          g.append('text').attr('x', maxEnd + 10).attr('y', yBase + yOuter.bandwidth() / 2 + 3.5)
+          const cl2 = fmtGbp(catTotal);
+          const clw = cl2.length * 6 + 12;
+          const cy = yBase + yOuter.bandwidth() / 2;
+          g.append('rect').attr('x', maxEnd + 8).attr('y', cy - 7.5).attr('width', clw).attr('height', 15).attr('rx', 7.5)
+            .attr('fill', '#fff').attr('fill-opacity', 0.85).attr('stroke', '#ddd').attr('stroke-width', 0.5);
+          g.append('text').attr('x', maxEnd + 8 + clw / 2).attr('y', cy + 3.5).attr('text-anchor', 'middle')
             .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#1a1a2e')
-            .text(fmtGbp(catTotal));
+            .text(cl2);
         }
       }
     } else {
@@ -2451,15 +2486,23 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
                 .style('cursor', 'pointer')
                 .on('mouseenter', hoverSeg(`${cat} · ${d.name} · ${segNames[si]}`, `${fmtGbp(sv)} · ${c.segNs[si]} SKU${c.segNs[si] !== 1 ? 's' : ''}`))
                 .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
-              // Segment name inside when the segment is tall enough.
-              if (sy1 - sy0 >= 10 && bw > 22) {
+              // Segment name inside when the segment is tall enough;
+              // value on a second line when there is room for both.
+              const segH = sy1 - sy0;
+              if (segH >= 10 && bw > 22) {
                 const maxChars = Math.max(2, Math.floor((bw - 4) / 3.8));
                 const sl = segNames[si].length > maxChars ? segNames[si].slice(0, Math.max(1, maxChars - 1)) + '…' : segNames[si];
-                const st = g.append('text').attr('x', x + bw / 2).attr('y', (sy0 + sy1) / 2 + 2.2).attr('text-anchor', 'middle')
+                const segTextFill = d3.hsl(segFill).l > 0.62 ? '#444' : 'rgba(255,255,255,0.95)';
+                const twoLine = segH >= 20;
+                const st = g.append('text').attr('x', x + bw / 2).attr('y', (sy0 + sy1) / 2 + (twoLine ? -1.5 : 2.2)).attr('text-anchor', 'middle')
                   .attr('font-size', '6.5px').attr('font-weight', '600')
-                  .attr('fill', d3.hsl(segFill).l > 0.62 ? '#444' : 'rgba(255,255,255,0.95)')
-                  .style('pointer-events', 'none').text(sl);
-                st.append('title').text(segNames[si]);
+                  .attr('fill', segTextFill).style('pointer-events', 'none').text(sl);
+                st.append('title').text(`${segNames[si]} — ${fmtGbp(sv)}`);
+                if (twoLine) {
+                  g.append('text').attr('x', x + bw / 2).attr('y', (sy0 + sy1) / 2 + 7).attr('text-anchor', 'middle')
+                    .attr('font-size', '6px').attr('font-weight', '700')
+                    .attr('fill', segTextFill).style('pointer-events', 'none').text(fmtGbp(sv));
+                }
               }
               cv += sv;
             });
@@ -2483,21 +2526,17 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
           const gt = g.append('text').attr('x', x + bw / 2).attr('y', iH + 12).attr('text-anchor', 'middle')
             .attr('font-size', '7px').attr('font-weight', '600').attr('fill', '#555').text(gl);
           gt.append('title').text(d.name);
-          // Value pill inside the top of the bar; a short bar with no
-          // growth block gets a plain dark label above instead.
+          // Bar total in a pill above the bar (above the growth block
+          // and its "+N" annotation when those are shown).
           const label = fmtGbp(c.total);
           const labelW = label.length * 5.5 + 10;
-          if (iH - yScale(c.total) > 26) {
-            g.append('rect').attr('x', x + bw / 2 - labelW / 2).attr('y', yScale(c.total) + 5).attr('width', labelW).attr('height', 13).attr('rx', 6.5)
-              .attr('fill', '#fff').attr('fill-opacity', 0.8).style('pointer-events', 'none');
-            g.append('text').attr('x', x + bw / 2).attr('y', yScale(c.total) + 14).attr('text-anchor', 'middle')
-              .attr('font-size', '8.5px').attr('font-weight', '700').attr('fill', '#1a1a2e')
-              .style('pointer-events', 'none').text(label);
-          } else if (!(showGrowth && c.inc > 0)) {
-            g.append('text').attr('x', x + bw / 2).attr('y', yScale(c.total) - 4).attr('text-anchor', 'middle')
-              .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#333').text(label);
-            barTop = yScale(c.total) - 12;
-          }
+          const pillBottom = showGrowth && c.inc > 0 ? yScale(c.total + c.inc) - 12 : yScale(c.total) - 2;
+          g.append('rect').attr('x', x + bw / 2 - labelW / 2).attr('y', pillBottom - 13).attr('width', labelW).attr('height', 13).attr('rx', 6.5)
+            .attr('fill', '#fff').attr('fill-opacity', 0.8).style('pointer-events', 'none');
+          g.append('text').attr('x', x + bw / 2).attr('y', pillBottom - 3.5).attr('text-anchor', 'middle')
+            .attr('font-size', '8.5px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+            .style('pointer-events', 'none').text(label);
+          barTop = pillBottom - 15;
           catTotal += c.total;
           topY = Math.min(topY, barTop);
         });
@@ -2516,7 +2555,63 @@ function GrowthGroupChart({ groups, compounds, restName, plans, catalogue, shelf
         }
       }
     }
-  }, [data, groups.length, compounds.length, segNames, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale]);
+
+    // Summary overlay: cumulative totals card in the top-right corner —
+    // grand total, per-group cross-category totals, and (in compound
+    // view) compound-group cross-category totals.
+    if (showSummary) {
+      const grand = data.reduce((sm, d) => {
+        for (const e of d.catMap.values()) sm += e.total;
+        return sm;
+      }, 0);
+      const groupTotals = data.map((d) => {
+        let t = 0;
+        for (const e of d.catMap.values()) t += e.total;
+        return { name: d.name, total: t };
+      });
+      const segTotals = segNames.map((name, si) => {
+        let t = 0;
+        for (const d of data) for (const e of d.catMap.values()) t += e.segs[si] ?? 0;
+        return { name, total: t };
+      });
+      type Row = { label: string; value?: string; header?: boolean; bold?: boolean };
+      const rows: Row[] = [
+        { label: growthMetric === 'revenue' ? 'Total Revenue' : 'Total OM £', value: fmtGbp(grand), bold: true },
+        { label: 'Groups', header: true },
+        ...groupTotals.map((t) => ({ label: t.name, value: fmtGbp(t.total) })),
+      ];
+      if (compound) {
+        rows.push({ label: 'Compound groups', header: true });
+        rows.push(...segTotals.filter((t) => t.total > 0).map((t) => ({ label: t.name, value: fmtGbp(t.total) })));
+      }
+      const rowH = 11, headH = 12, pad = 8;
+      const clip = (s: string) => s.length > 22 ? s.slice(0, 21) + '…' : s;
+      const w = Math.max(120, ...rows.map((r) => clip(r.label).length * 4.4 + (r.value ? r.value.length * 5 : 0) + 26));
+      const h = pad * 2 + rows.reduce((sm, r) => sm + (r.header ? headH : rowH), 0);
+      const panel = g.append('g').attr('transform', `translate(${iW - w},0)`);
+      panel.append('rect').attr('x', 0).attr('y', 0).attr('width', w).attr('height', h).attr('rx', 5)
+        .attr('fill', '#fff').attr('fill-opacity', 0.92).attr('stroke', '#ddd').attr('stroke-width', 0.75);
+      let ry = pad;
+      for (const r of rows) {
+        if (r.header) {
+          ry += headH;
+          panel.append('text').attr('x', 8).attr('y', ry - 3)
+            .attr('font-size', '6.5px').attr('font-weight', '700').attr('fill', '#999')
+            .attr('letter-spacing', '0.5').text(r.label.toUpperCase());
+          panel.append('line').attr('x1', 8).attr('x2', w - 8).attr('y1', ry - 12).attr('y2', ry - 12)
+            .attr('stroke', '#eee').attr('stroke-width', 0.75);
+        } else {
+          ry += rowH;
+          const lt = panel.append('text').attr('x', 8).attr('y', ry - 3)
+            .attr('font-size', '8px').attr('font-weight', r.bold ? '700' : '400')
+            .attr('fill', r.bold ? '#1a1a2e' : '#555').text(clip(r.label));
+          if (r.label.length > 22) lt.append('title').text(r.label);
+          panel.append('text').attr('x', w - 8).attr('y', ry - 3).attr('text-anchor', 'end')
+            .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#1a1a2e').text(r.value ?? '');
+        }
+      }
+    }
+  }, [data, groups.length, compounds.length, segNames, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale, showSummary]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>

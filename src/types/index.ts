@@ -525,7 +525,7 @@ export interface Project {
     scatterConfig?: { logX?: boolean; logY?: boolean; maxX?: string; maxY?: string; dotSize?: number; contours?: boolean };
     activeSheet?: string;
     categoryColors?: Record<string, string>;
-    growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[] };
+    growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[]; summary?: boolean };
     /** Named plan groups for the Growth by Group sheet (e.g. Core /
      * Duo). */
     planGroups?: { id: string; name: string; planIds: string[] }[];
