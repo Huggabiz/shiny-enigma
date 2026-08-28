@@ -525,7 +525,7 @@ export interface Project {
     scatterConfig?: { logX?: boolean; logY?: boolean; maxX?: string; maxY?: string; dotSize?: number; contours?: boolean };
     activeSheet?: string;
     categoryColors?: Record<string, string>;
-    growthConfig?: { pct?: number; metric?: string; combined?: boolean; hiddenCats?: string[] };
+    growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[] };
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;

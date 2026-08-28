@@ -267,6 +267,8 @@ export function AnalyseView() {
   const [growthMetric, setGrowthMetricState] = useState<'margin' | 'revenue'>(
     () => (av?.growthConfig?.metric === 'revenue' ? 'revenue' : 'margin'));
   const [showCombinedNewness, setShowCombinedNewnessState] = useState(() => av?.growthConfig?.combined ?? true);
+  const [showGrowthUplift, setShowGrowthUpliftState] = useState(() => av?.growthConfig?.uplift ?? true);
+  const [growthVertical, setGrowthVerticalState] = useState(() => av?.growthConfig?.vertical ?? false);
   // Growth-sheet-specific category hiding — independent of the legend
   // hidden-set the other sheets share, and persisted with the project.
   const [growthHiddenCats, setGrowthHiddenCats] = useState<Set<string>>(
@@ -305,18 +307,21 @@ export function AnalyseView() {
     return n;
   }, [selectedPlans, shelfSide]);
 
-  const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; hiddenCats?: string[] }) => {
+  const persistGrowth = useCallback((patch: { pct?: number; metric?: 'margin' | 'revenue'; combined?: boolean; uplift?: boolean; vertical?: boolean; hiddenCats?: string[] }) => {
     const current = {
       pct: growthPct, metric: growthMetric, combined: showCombinedNewness,
+      uplift: showGrowthUplift, vertical: growthVertical,
       hiddenCats: Array.from(growthHiddenCats),
       ...patch,
     };
     setAnalyseConfig({ growthConfig: current });
-  }, [growthPct, growthMetric, showCombinedNewness, growthHiddenCats, setAnalyseConfig]);
+  }, [growthPct, growthMetric, showCombinedNewness, showGrowthUplift, growthVertical, growthHiddenCats, setAnalyseConfig]);
 
   const setGrowthPct = (v: number) => { setGrowthPctState(v); persistGrowth({ pct: v }); };
   const setGrowthMetric = (m: 'margin' | 'revenue') => { setGrowthMetricState(m); persistGrowth({ metric: m }); };
   const setShowCombinedNewness = (v: boolean) => { setShowCombinedNewnessState(v); persistGrowth({ combined: v }); };
+  const setShowGrowthUplift = (v: boolean) => { setShowGrowthUpliftState(v); persistGrowth({ uplift: v }); };
+  const setGrowthVertical = (v: boolean) => { setGrowthVerticalState(v); persistGrowth({ vertical: v }); };
   const toggleGrowthCat = (cat: string) => {
     setGrowthHiddenCats((prev) => {
       const n = new Set(prev);
@@ -455,7 +460,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -554,10 +559,20 @@ export function AnalyseView() {
                 <input type="number" min="1" max="100" step="1" className="analyse-config-input" style={{ width: 44 }}
                   value={growthPct} onChange={(e) => setGrowthPct(Math.max(1, Number(e.target.value) || 5))} />
               </label>
-              <label className="analyse-config-item" title="Summary bar concatenating every category's growth block into one combined annual newness requirement">
-                <input type="checkbox" checked={showCombinedNewness} onChange={(e) => setShowCombinedNewness(e.target.checked)} />
-                Combined newness
+              <label className="analyse-config-item" title="Show the dashed growth-uplift block, SKU-requirement annotations, and combined newness">
+                <input type="checkbox" checked={showGrowthUplift} onChange={(e) => setShowGrowthUplift(e.target.checked)} />
+                Growth uplift
               </label>
+              {showGrowthUplift && (
+                <label className="analyse-config-item" title="Summary bar concatenating every category's growth block into one combined annual newness requirement">
+                  <input type="checkbox" checked={showCombinedNewness} onChange={(e) => setShowCombinedNewness(e.target.checked)} />
+                  Combined newness
+                </label>
+              )}
+              <div className="analyse-metric-toggle" role="tablist">
+                <button role="tab" className={!growthVertical ? 'active' : ''} onClick={() => setGrowthVertical(false)}>Horizontal</button>
+                <button role="tab" className={growthVertical ? 'active' : ''} onClick={() => setGrowthVertical(true)}>Vertical</button>
+              </div>
               {sharedSkuCount > 0 && (
                 <>
                   <div className="analyse-config-separator" />
@@ -1373,20 +1388,30 @@ function ParetoChart({ plans, catalogue, shelfSide, catColors, textScale, hidden
   );
 }
 
-// ---------- Growth (stacked existing + incremental, SKU-unit ticks) ----------
+// ---------- Growth charts (shared helpers) ----------
 
-function GrowthChart({ plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showCombined }: {
+/** Tick step so SKU-unit divisions bunch to a ~1.8px minimum spacing
+ * instead of merging into a solid block — a dense hatch still reads
+ * as "many SKUs" rather than "one". Returns 0 when no ticks fit. */
+function unitTickStep(unitPx: number): number {
+  if (unitPx <= 0.05) return 0;
+  return unitPx >= 3 ? 1 : Math.ceil(1.8 / unitPx);
+}
+
+interface GrowthChartProps {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
   growthPct: number; growthMetric: 'margin' | 'revenue';
-  showCombined: boolean;
-}) {
+  showCombined: boolean; showGrowth: boolean; vertical: boolean;
+}
+
+// ---------- Growth (stacked existing + incremental, SKU-unit ticks) ----------
+
+function GrowthChart({ plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showCombined, showGrowth, vertical }: GrowthChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  // Per-category totals of the chosen metric across the selected
-  // plans' shelf (deduped by product).
   const cats = useMemo(() => {
     const seen = new Set<string>();
     const map = new Map<string, { total: number; n: number }>();
@@ -1412,162 +1437,235 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, textScale, hidden
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
-    // Layout at a proportionally SMALLER internal size, then let the
-    // viewBox scale it back up — text, margins, axes, and spacing all
-    // grow together so enlarged text genuinely gets its room.
     const width = dims.width / textScale;
     const height = dims.height / textScale;
-    const margin = { top: 20, right: 130, bottom: 36, left: 130 };
+    const margin = vertical
+      ? { top: 34, right: 20, bottom: 56, left: 64 }
+      : { top: 20, right: 130, bottom: 36, left: 130 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || cats.length === 0) return;
 
     const rows = cats.map((c) => {
-      const inc = c.total * (growthPct / 100);
-      return { ...c, inc, skusNeeded: c.avg > 0 ? Math.ceil(inc / c.avg) : 0 };
+      const inc = showGrowth ? c.total * (growthPct / 100) : 0;
+      return { ...c, inc, skusNeeded: showGrowth && c.avg > 0 ? Math.ceil(inc / c.avg) : 0 };
     });
-
-    const maxX = d3.max(rows, (r) => r.total + r.inc) ?? 0;
-    const xScale = d3.scaleLinear().domain([0, maxX * 1.02]).range([0, iW]);
-    // The combined-newness bar is a sentinel band in the same scale so
-    // its height is IDENTICAL to the category bars.
+    const combinedShown = showCombined && showGrowth && rows.length > 0;
     const COMBINED_KEY = '__combined__';
-    const domain = showCombined ? [...rows.map((r) => r.cat), COMBINED_KEY] : rows.map((r) => r.cat);
-    const yScale = d3.scaleBand<string>().domain(domain).range([0, iH]).padding(0.3);
+    const domain = combinedShown ? [...rows.map((r) => r.cat), COMBINED_KEY] : rows.map((r) => r.cat);
+    const maxV = d3.max(rows, (r) => r.total + r.inc) ?? 0;
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+    const metricLabel = `${growthMetric === 'revenue' ? 'Revenue' : 'Operating Margin'} (£)${showGrowth ? ` — existing + ${growthPct}% growth` : ''}`;
 
-    g.append('g').attr('transform', `translate(0,${iH})`)
-      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickFormat((d) => fmtGbp(+d)))
-      .selectAll('text').attr('font-size', '8px');
-    g.append('g').call(d3.axisLeft(yScale).tickFormat((d) => d === COMBINED_KEY ? '' : d)).selectAll('text').attr('font-size', '9px').attr('font-weight', '600');
-    g.append('text').attr('x', iW / 2).attr('y', iH + 30).attr('text-anchor', 'middle')
-      .attr('font-size', '9px').attr('fill', '#666')
-      .text(`${growthMetric === 'revenue' ? 'Revenue' : 'Operating Margin'} (£) — existing + ${growthPct}% growth`);
-    g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`)
-      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickSize(-iH).tickFormat(() => ''))
-      .selectAll('line').attr('stroke', '#eee');
-    g.selectAll('.gx .domain').remove();
+    const hoverSeg = (label: string, value: string) => (ev: MouseEvent) => {
+      const rc = wrapperRef.current?.getBoundingClientRect();
+      if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label, value, depth: growthMetric === 'revenue' ? 'Revenue' : 'OM £' });
+    };
+    const moveSeg = (ev: MouseEvent) => {
+      const rc = wrapperRef.current?.getBoundingClientRect();
+      if (rc) setTooltip((pv) => pv ? { ...pv, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null);
+    };
 
-    for (const r of rows) {
-      const y = yScale(r.cat)!;
-      const bh = yScale.bandwidth();
-      const base = catColors.get(r.cat) ?? '#999';
-      const incColor = d3.interpolateLab(base, '#ffffff')(0.55);
+    if (!vertical) {
+      const xScale = d3.scaleLinear().domain([0, maxV * 1.02]).range([0, iW]);
+      const yScale = d3.scaleBand<string>().domain(domain).range([0, iH]).padding(0.3);
 
-      // Existing segment.
-      g.append('rect').attr('x', 0).attr('y', y).attr('width', xScale(r.total)).attr('height', bh)
-        .attr('fill', base).attr('fill-opacity', 0.9).attr('rx', 2)
-        .style('cursor', 'pointer')
-        .on('mouseenter', (ev: MouseEvent) => {
-          const rc = wrapperRef.current?.getBoundingClientRect();
-          if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label: `${r.cat} — existing`, value: `${fmtGbp(r.total)} · ${r.n} SKUs · avg ${fmtGbp(r.avg)}/SKU`, depth: growthMetric === 'revenue' ? 'Revenue' : 'OM £' });
-        })
-        .on('mousemove', (ev: MouseEvent) => { const rc = wrapperRef.current?.getBoundingClientRect(); if (rc) setTooltip((p) => p ? { ...p, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null); })
-        .on('mouseleave', () => setTooltip(null));
+      g.append('g').attr('transform', `translate(0,${iH})`)
+        .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickFormat((d) => fmtGbp(+d)))
+        .selectAll('text').attr('font-size', '8px');
+      g.append('g').call(d3.axisLeft(yScale).tickFormat((d) => d === COMBINED_KEY ? '' : d)).selectAll('text').attr('font-size', '9px').attr('font-weight', '600');
+      g.append('text').attr('x', iW / 2).attr('y', iH + 30).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', '#666').text(metricLabel);
+      g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`)
+        .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickSize(-iH).tickFormat(() => ''))
+        .selectAll('line').attr('stroke', '#eee');
+      g.selectAll('.gx .domain').remove();
 
-      // Incremental segment.
-      g.append('rect').attr('x', xScale(r.total)).attr('y', y)
-        .attr('width', Math.max(0, xScale(r.total + r.inc) - xScale(r.total))).attr('height', bh)
-        .attr('fill', incColor).attr('stroke', base).attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('rx', 2)
-        .style('cursor', 'pointer')
-        .on('mouseenter', (ev: MouseEvent) => {
-          const rc = wrapperRef.current?.getBoundingClientRect();
-          if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label: `${r.cat} — +${growthPct}% growth`, value: `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} new SKU${r.skusNeeded !== 1 ? 's' : ''} @ avg ${fmtGbp(r.avg)}/SKU`, depth: growthMetric === 'revenue' ? 'Revenue' : 'OM £' });
-        })
-        .on('mousemove', (ev: MouseEvent) => { const rc = wrapperRef.current?.getBoundingClientRect(); if (rc) setTooltip((p) => p ? { ...p, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null); })
-        .on('mouseleave', () => setTooltip(null));
-
-      // SKU-unit separators: one tick every avg-per-SKU along the whole
-      // bar, so the growth block visually spans "N SKUs" worth. Skipped
-      // when they'd be sub-pixel noise.
-      const unitPx = xScale(r.avg);
-      const units = Math.floor((r.total + r.inc) / r.avg);
-      if (unitPx >= 3 && units <= 400) {
-        for (let u = 1; u <= units; u++) {
-          const ux = xScale(u * r.avg);
-          const inGrowth = u * r.avg > r.total;
-          g.append('line').attr('x1', ux).attr('x2', ux).attr('y1', y).attr('y2', y + bh)
-            .attr('stroke', '#fff').attr('stroke-width', inGrowth ? 1.5 : 1)
-            .attr('opacity', inGrowth ? 0.95 : 0.75);
-        }
-      }
-
-      // Right-hand annotation: the headline SKU requirement.
-      g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 3)
-        .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
-        .text(`+${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`);
-      g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 13)
-        .attr('font-size', '7.5px').attr('fill', '#888')
-        .text(`@ ${fmtGbp(r.avg)}/SKU`);
-
-      // In-bar value label for the existing segment when it fits —
-      // dark text on a translucent white pill so it stays readable
-      // over the SKU-unit division ticks.
-      if (xScale(r.total) > 70) {
-        const label = fmtGbp(r.total);
-        const labelW = label.length * 6.5 + 12;
-        const labelH = 16;
-        g.append('rect').attr('x', 6).attr('y', y + bh / 2 - labelH / 2)
-          .attr('width', labelW).attr('height', labelH).attr('rx', labelH / 2)
-          .attr('fill', '#fff').attr('fill-opacity', 0.8);
-        g.append('text').attr('x', 6 + labelW / 2).attr('y', y + bh / 2 + 3.5)
-          .attr('text-anchor', 'middle')
-          .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#1a1a2e')
-          .text(label);
-      }
-    }
-
-    // Combined annual newness — every category's growth block laid end
-    // to end in one summary bar, each segment sub-ticked by its own
-    // avg-SKU width. Answers "what does X% growth cost in total new
-    // SKUs across the portfolio this year?".
-    if (showCombined && rows.length > 0) {
-      const comboY = yScale(COMBINED_KEY)!;
-      const comboBh = yScale.bandwidth();
-      const totalInc = rows.reduce((s, r) => s + r.inc, 0);
-      const totalSkus = rows.reduce((s, r) => s + r.skusNeeded, 0);
-
-      g.append('line').attr('x1', 0).attr('x2', iW)
-        .attr('y1', comboY - yScale.step() * 0.15).attr('y2', comboY - yScale.step() * 0.15)
-        .attr('stroke', '#ddd').attr('stroke-width', 0.5);
-      g.append('text').attr('x', -8).attr('y', comboY + comboBh / 2 + 3).attr('text-anchor', 'end')
-        .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
-        .text('Combined newness');
-
-      let cx = 0;
-      for (const r of rows) {
-        const segW = xScale(r.inc);
-        if (segW <= 0) continue;
-        const base = catColors.get(r.cat) ?? '#999';
-        const segColor = d3.interpolateLab(base, '#ffffff')(0.45);
-        g.append('rect').attr('x', cx).attr('y', comboY).attr('width', segW).attr('height', comboBh)
-          .attr('fill', segColor).attr('stroke', base).attr('stroke-width', 1)
-          .style('cursor', 'pointer')
-          .on('mouseenter', (ev: MouseEvent) => {
-            const rc = wrapperRef.current?.getBoundingClientRect();
-            if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label: `${r.cat} — newness`, value: `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`, depth: 'Combined annual newness' });
-          })
-          .on('mousemove', (ev: MouseEvent) => { const rc = wrapperRef.current?.getBoundingClientRect(); if (rc) setTooltip((p) => p ? { ...p, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null); })
-          .on('mouseleave', () => setTooltip(null));
-
-        // SKU ticks within this category's segment.
-        const unitPx = xScale(r.avg);
-        if (unitPx >= 3 && r.skusNeeded <= 200) {
-          for (let u = 1; u < r.skusNeeded; u++) {
-            const ux = cx + xScale(u * r.avg);
-            if (ux >= cx + segW) break;
-            g.append('line').attr('x1', ux).attr('x2', ux).attr('y1', comboY).attr('y2', comboY + comboBh)
-              .attr('stroke', '#fff').attr('stroke-width', 1).attr('opacity', 0.9);
+      const drawTicks = (x0: number, x1: number, y: number, bh: number, unitPx: number, startUnit: number, heavy: boolean) => {
+        const step = unitTickStep(unitPx);
+        if (step === 0) return;
+        let drawn = 0;
+        for (let u = startUnit + step; drawn < 1000; u += step) {
+          const ux = u * unitPx;
+          if (ux >= x1) break;
+          if (ux > x0) {
+            g.append('line').attr('x1', ux).attr('x2', ux).attr('y1', y).attr('y2', y + bh)
+              .attr('stroke', '#fff').attr('stroke-width', heavy ? 1.5 : 1).attr('opacity', heavy ? 0.95 : 0.75);
+            drawn++;
           }
         }
-        cx += segW;
+      };
+
+      for (const r of rows) {
+        const y = yScale(r.cat)!;
+        const bh = yScale.bandwidth();
+        const base = catColors.get(r.cat) ?? '#999';
+        const incColor = d3.interpolateLab(base, '#ffffff')(0.55);
+        const unitPx = xScale(r.avg);
+
+        g.append('rect').attr('x', 0).attr('y', y).attr('width', xScale(r.total)).attr('height', bh)
+          .attr('fill', base).attr('fill-opacity', 0.9).attr('rx', 2).style('cursor', 'pointer')
+          .on('mouseenter', hoverSeg(`${r.cat} — existing`, `${fmtGbp(r.total)} · ${r.n} SKUs · avg ${fmtGbp(r.avg)}/SKU`))
+          .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+        drawTicks(0, xScale(r.total), y, bh, unitPx, 0, false);
+
+        if (showGrowth && r.inc > 0) {
+          g.append('rect').attr('x', xScale(r.total)).attr('y', y)
+            .attr('width', Math.max(0, xScale(r.total + r.inc) - xScale(r.total))).attr('height', bh)
+            .attr('fill', incColor).attr('stroke', base).attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('rx', 2)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} — +${growthPct}% growth`, `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} new SKU${r.skusNeeded !== 1 ? 's' : ''} @ avg ${fmtGbp(r.avg)}/SKU`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+          drawTicks(xScale(r.total), xScale(r.total + r.inc), y, bh, unitPx, Math.floor(r.total / r.avg), true);
+
+          g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 3)
+            .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
+            .text(`+${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`);
+          g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 13)
+            .attr('font-size', '7.5px').attr('fill', '#888')
+            .text(`@ ${fmtGbp(r.avg)}/SKU`);
+        }
+
+        if (xScale(r.total) > 70) {
+          const label = fmtGbp(r.total);
+          const labelW = label.length * 6.5 + 12;
+          g.append('rect').attr('x', 6).attr('y', y + bh / 2 - 8).attr('width', labelW).attr('height', 16).attr('rx', 8)
+            .attr('fill', '#fff').attr('fill-opacity', 0.8);
+          g.append('text').attr('x', 6 + labelW / 2).attr('y', y + bh / 2 + 3.5).attr('text-anchor', 'middle')
+            .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#1a1a2e').text(label);
+        }
       }
 
-      g.append('text').attr('x', cx + 6).attr('y', comboY + comboBh / 2 + 3)
-        .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
-        .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
+      if (combinedShown) {
+        const comboY = yScale(COMBINED_KEY)!;
+        const comboBh = yScale.bandwidth();
+        const totalInc = rows.reduce((sm, r) => sm + r.inc, 0);
+        const totalSkus = rows.reduce((sm, r) => sm + r.skusNeeded, 0);
+        g.append('line').attr('x1', 0).attr('x2', iW)
+          .attr('y1', comboY - yScale.step() * 0.15).attr('y2', comboY - yScale.step() * 0.15)
+          .attr('stroke', '#ddd').attr('stroke-width', 0.5);
+        g.append('text').attr('x', -8).attr('y', comboY + comboBh / 2 + 3).attr('text-anchor', 'end')
+          .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333').text('Combined newness');
+        let cx = 0;
+        for (const r of rows) {
+          const segW = xScale(r.inc);
+          if (segW <= 0) continue;
+          const base = catColors.get(r.cat) ?? '#999';
+          g.append('rect').attr('x', cx).attr('y', comboY).attr('width', segW).attr('height', comboBh)
+            .attr('fill', d3.interpolateLab(base, '#ffffff')(0.45)).attr('stroke', base).attr('stroke-width', 1)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} — newness`, `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+          const unitPx = xScale(r.avg);
+          const step = unitTickStep(unitPx);
+          if (step > 0) {
+            let drawn = 0;
+            for (let u = step; u * unitPx < segW && drawn < 500; u += step) {
+              g.append('line').attr('x1', cx + u * unitPx).attr('x2', cx + u * unitPx)
+                .attr('y1', comboY).attr('y2', comboY + comboBh)
+                .attr('stroke', '#fff').attr('stroke-width', 1).attr('opacity', 0.9);
+              drawn++;
+            }
+          }
+          cx += segW;
+        }
+        g.append('text').attr('x', cx + 6).attr('y', comboY + comboBh / 2 + 3)
+          .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
+          .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
+      }
+    } else {
+      // ---------- Vertical orientation ----------
+      const xScale = d3.scaleBand<string>().domain(domain).range([0, iW]).padding(0.3);
+      const yScale = d3.scaleLinear().domain([0, maxV * 1.08]).range([iH, 0]);
+
+      const xAxisG = g.append('g').attr('transform', `translate(0,${iH})`)
+        .call(d3.axisBottom(xScale).tickFormat((d) => d === COMBINED_KEY ? 'Combined' : d));
+      xAxisG.selectAll('text').attr('font-size', '8.5px').attr('font-weight', '600')
+        .attr('text-anchor', 'end').attr('transform', 'rotate(-30)').attr('dx', '-4px').attr('dy', '4px');
+      g.append('g').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickFormat((d) => fmtGbp(+d))).selectAll('text').attr('font-size', '8px');
+      g.append('text').attr('x', -iH / 2).attr('y', -50).attr('text-anchor', 'middle').attr('transform', 'rotate(-90)')
+        .attr('font-size', '9px').attr('fill', '#666').text(metricLabel);
+      g.append('g').attr('class', 'gy')
+        .call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickSize(-iW).tickFormat(() => ''))
+        .selectAll('line').attr('stroke', '#eee');
+      g.selectAll('.gy .domain').remove();
+
+      const drawHTicks = (x: number, bw: number, vFrom: number, vTo: number, unit: number, startUnit: number, heavy: boolean) => {
+        const unitPx = yScale(0) - yScale(unit);
+        const step = unitTickStep(unitPx);
+        if (step === 0) return;
+        let drawn = 0;
+        for (let u = startUnit + step; drawn < 1000; u += step) {
+          const v = u * unit;
+          if (v >= vTo) break;
+          if (v > vFrom) {
+            g.append('line').attr('x1', x).attr('x2', x + bw).attr('y1', yScale(v)).attr('y2', yScale(v))
+              .attr('stroke', '#fff').attr('stroke-width', heavy ? 1.5 : 1).attr('opacity', heavy ? 0.95 : 0.75);
+            drawn++;
+          }
+        }
+      };
+
+      for (const r of rows) {
+        const x = xScale(r.cat)!;
+        const bw = xScale.bandwidth();
+        const base = catColors.get(r.cat) ?? '#999';
+        const incColor = d3.interpolateLab(base, '#ffffff')(0.55);
+
+        g.append('rect').attr('x', x).attr('y', yScale(r.total)).attr('width', bw).attr('height', iH - yScale(r.total))
+          .attr('fill', base).attr('fill-opacity', 0.9).attr('rx', 2).style('cursor', 'pointer')
+          .on('mouseenter', hoverSeg(`${r.cat} — existing`, `${fmtGbp(r.total)} · ${r.n} SKUs · avg ${fmtGbp(r.avg)}/SKU`))
+          .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+        drawHTicks(x, bw, 0, r.total, r.avg, 0, false);
+
+        if (showGrowth && r.inc > 0) {
+          g.append('rect').attr('x', x).attr('y', yScale(r.total + r.inc)).attr('width', bw)
+            .attr('height', Math.max(0, yScale(r.total) - yScale(r.total + r.inc)))
+            .attr('fill', incColor).attr('stroke', base).attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('rx', 2)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} — +${growthPct}% growth`, `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} new SKU${r.skusNeeded !== 1 ? 's' : ''} @ avg ${fmtGbp(r.avg)}/SKU`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+          drawHTicks(x, bw, r.total, r.total + r.inc, r.avg, Math.floor(r.total / r.avg), true);
+
+          g.append('text').attr('x', x + bw / 2).attr('y', yScale(r.total + r.inc) - 14).attr('text-anchor', 'middle')
+            .attr('font-size', '8.5px').attr('font-weight', '700').attr('fill', '#333')
+            .text(`+${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`);
+          g.append('text').attr('x', x + bw / 2).attr('y', yScale(r.total + r.inc) - 5).attr('text-anchor', 'middle')
+            .attr('font-size', '7px').attr('fill', '#888').text(`@ ${fmtGbp(r.avg)}`);
+        }
+
+        if (iH - yScale(r.total) > 42 && bw > 34) {
+          const label = fmtGbp(r.total);
+          const labelW = Math.min(label.length * 6 + 10, bw - 2);
+          g.append('rect').attr('x', x + bw / 2 - labelW / 2).attr('y', iH - 22).attr('width', labelW).attr('height', 15).attr('rx', 7.5)
+            .attr('fill', '#fff').attr('fill-opacity', 0.8);
+          g.append('text').attr('x', x + bw / 2).attr('y', iH - 11).attr('text-anchor', 'middle')
+            .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#1a1a2e').text(label);
+        }
+      }
+
+      if (combinedShown) {
+        const x = xScale(COMBINED_KEY)!;
+        const bw = xScale.bandwidth();
+        const totalInc = rows.reduce((sm, r) => sm + r.inc, 0);
+        const totalSkus = rows.reduce((sm, r) => sm + r.skusNeeded, 0);
+        let cy = 0; // cumulative value from bottom
+        for (const r of rows) {
+          if (r.inc <= 0) continue;
+          const base = catColors.get(r.cat) ?? '#999';
+          const y0 = yScale(cy + r.inc), y1 = yScale(cy);
+          g.append('rect').attr('x', x).attr('y', y0).attr('width', bw).attr('height', Math.max(0, y1 - y0))
+            .attr('fill', d3.interpolateLab(base, '#ffffff')(0.45)).attr('stroke', base).attr('stroke-width', 1)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} — newness`, `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+          cy += r.inc;
+        }
+        g.append('text').attr('x', x + bw / 2).attr('y', yScale(cy) - 5).attr('text-anchor', 'middle')
+          .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#333')
+          .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
+      }
     }
-  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined, textScale]);
+  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined, showGrowth, vertical, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -1579,24 +1677,13 @@ function GrowthChart({ plans, catalogue, shelfSide, catColors, textScale, hidden
 
 // ---------- Growth by Plan (category bars stacked by range plan) ----------
 
-function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showCombined }: {
-  plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
-  catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
-  growthPct: number; growthMetric: 'margin' | 'revenue';
-  showCombined: boolean;
-}) {
+function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showCombined, showGrowth, vertical }: GrowthChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  // Per category → per plan totals of the chosen metric, with
-  // FIRST-PLAN-WINS dedupe: a SKU present in several selected plans is
-  // attributed to the first plan (in selection order) that contains
-  // it. Plan segments therefore sum exactly to the deduped category
-  // totals, and every aggregate (totals, averages, increments, SKU
-  // counts) reconciles with the Growth sheet. Later plans' segments
-  // show their INCREMENTAL contribution. The skip sequence below
-  // mirrors GrowthChart exactly so the two sheets match to the penny.
+  // FIRST-PLAN-WINS dedupe — mirrors GrowthChart's skip sequence
+  // exactly so both sheets reconcile to the penny (see v1.26.5).
   const cats = useMemo(() => {
     const map = new Map<string, Map<string, { total: number; n: number }>>();
     const seen = new Set<string>();
@@ -1619,199 +1706,264 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, textScale, hi
     }
     return Array.from(map.entries()).map(([cat, pm]) => {
       const segs = plans
-        .map((p) => ({ plan: p.name, ...(pm.get(p.name) ?? { total: 0, n: 0 }) }))
-        .filter((s) => s.total > 0)
-        .map((s) => ({ ...s, avg: s.total / s.n }));
-      const total = segs.reduce((s, x) => s + x.total, 0);
-      const n = segs.reduce((s, x) => s + x.n, 0);
+        .map((pl) => ({ plan: pl.name, ...(pm.get(pl.name) ?? { total: 0, n: 0 }) }))
+        .filter((sg) => sg.total > 0)
+        .map((sg) => ({ ...sg, avg: sg.total / sg.n }));
+      const total = segs.reduce((sm, x) => sm + x.total, 0);
+      const n = segs.reduce((sm, x) => sm + x.n, 0);
       return { cat, segs, total, n, avg: n > 0 ? total / n : 0 };
     }).sort((a, b) => b.total - a.total);
   }, [plans, catalogue, shelfSide, growthMetric, hiddenCats]);
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
-    // Layout at a proportionally SMALLER internal size, then let the
-    // viewBox scale it back up — text, margins, axes, and spacing all
-    // grow together so enlarged text genuinely gets its room.
     const width = dims.width / textScale;
     const height = dims.height / textScale;
-    const margin = { top: 20, right: 130, bottom: 36, left: 130 };
+    const margin = vertical
+      ? { top: 34, right: 20, bottom: 56, left: 64 }
+      : { top: 20, right: 130, bottom: 36, left: 130 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20 || cats.length === 0) return;
 
     const rows = cats.map((c) => {
-      const inc = c.total * (growthPct / 100);
-      return { ...c, inc, skusNeeded: c.avg > 0 ? Math.ceil(inc / c.avg) : 0 };
+      const inc = showGrowth ? c.total * (growthPct / 100) : 0;
+      return { ...c, inc, skusNeeded: showGrowth && c.avg > 0 ? Math.ceil(inc / c.avg) : 0 };
     });
-
-    const maxX = d3.max(rows, (r) => r.total + r.inc) ?? 0;
-    const xScale = d3.scaleLinear().domain([0, maxX * 1.02]).range([0, iW]);
+    const combinedShown = showCombined && showGrowth && rows.length > 0;
     const COMBINED_KEY = '__combined__';
-    const domain = showCombined ? [...rows.map((r) => r.cat), COMBINED_KEY] : rows.map((r) => r.cat);
-    const yScale = d3.scaleBand<string>().domain(domain).range([0, iH]).padding(0.3);
+    const domain = combinedShown ? [...rows.map((r) => r.cat), COMBINED_KEY] : rows.map((r) => r.cat);
+    const maxV = d3.max(rows, (r) => r.total + r.inc) ?? 0;
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+    const metricLabel = `${growthMetric === 'revenue' ? 'Revenue' : 'Operating Margin'} (£) by range plan${showGrowth ? ` — existing + ${growthPct}% growth` : ''}`;
 
-    g.append('g').attr('transform', `translate(0,${iH})`)
-      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickFormat((d) => fmtGbp(+d)))
-      .selectAll('text').attr('font-size', '8px');
-    g.append('g').call(d3.axisLeft(yScale).tickFormat((d) => d === COMBINED_KEY ? '' : d)).selectAll('text').attr('font-size', '9px').attr('font-weight', '600');
-    g.append('text').attr('x', iW / 2).attr('y', iH + 30).attr('text-anchor', 'middle')
-      .attr('font-size', '9px').attr('fill', '#666')
-      .text(`${growthMetric === 'revenue' ? 'Revenue' : 'Operating Margin'} (£) by range plan — existing + ${growthPct}% growth`);
-    g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`)
-      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickSize(-iH).tickFormat(() => ''))
-      .selectAll('line').attr('stroke', '#eee');
-    g.selectAll('.gx .domain').remove();
+    const hoverSeg = (label: string, value: string) => (ev: MouseEvent) => {
+      const rc = wrapperRef.current?.getBoundingClientRect();
+      if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label, value, depth: growthMetric === 'revenue' ? 'Revenue' : 'OM £' });
+    };
+    const moveSeg = (ev: MouseEvent) => {
+      const rc = wrapperRef.current?.getBoundingClientRect();
+      if (rc) setTooltip((pv) => pv ? { ...pv, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null);
+    };
 
-    // Plans are labelled BENEATH each bar: every segment gets its plan
-    // name under its left edge, alternating between two label lanes so
-    // adjacent narrow segments never collide. A subtle boundary tick
-    // ties each label to its segment. Names truncate (with a hover
-    // tooltip) only when the same lane's next label leaves no room.
+    if (!vertical) {
+      const xScale = d3.scaleLinear().domain([0, maxV * 1.02]).range([0, iW]);
+      const yScale = d3.scaleBand<string>().domain(domain).range([0, iH]).padding(0.3);
 
-    for (const r of rows) {
-      const y = yScale(r.cat)!;
-      const bh = yScale.bandwidth();
-      const base = catColors.get(r.cat) ?? '#999';
-      const incColor = d3.interpolateLab(base, '#ffffff')(0.55);
+      g.append('g').attr('transform', `translate(0,${iH})`)
+        .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickFormat((d) => fmtGbp(+d)))
+        .selectAll('text').attr('font-size', '8px');
+      g.append('g').call(d3.axisLeft(yScale).tickFormat((d) => d === COMBINED_KEY ? '' : d)).selectAll('text').attr('font-size', '9px').attr('font-weight', '600');
+      g.append('text').attr('x', iW / 2).attr('y', iH + 30).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', '#666').text(metricLabel);
+      g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`)
+        .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 90)).tickSize(-iH).tickFormat(() => ''))
+        .selectAll('line').attr('stroke', '#eee');
+      g.selectAll('.gx .domain').remove();
 
-      // Plan segments, laid end to end — all in the plain category colour.
-      const segLabels: { start: number; plan: string }[] = [];
-      let cx = 0;
-      for (const s of r.segs) {
-        const segW = xScale(s.total);
-        if (segW <= 0) continue;
-        g.append('rect').attr('x', cx).attr('y', y).attr('width', segW).attr('height', bh)
-          .attr('fill', base).attr('fill-opacity', 0.9)
-          .attr('stroke', '#fff').attr('stroke-width', 1.5)
-          .style('cursor', 'pointer')
-          .on('mouseenter', (ev: MouseEvent) => {
-            const rc = wrapperRef.current?.getBoundingClientRect();
-            if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label: `${r.cat} · ${s.plan}`, value: `${fmtGbp(s.total)} · ${s.n} SKUs · avg ${fmtGbp(s.avg)}/SKU`, depth: growthMetric === 'revenue' ? 'Revenue' : 'OM £' });
-          })
-          .on('mousemove', (ev: MouseEvent) => { const rc = wrapperRef.current?.getBoundingClientRect(); if (rc) setTooltip((p) => p ? { ...p, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null); })
-          .on('mouseleave', () => setTooltip(null));
-
-        // This segment's OWN avg-per-SKU ticks (relative to segment start).
-        const unitPx = xScale(s.avg);
-        if (unitPx >= 3 && s.n <= 400) {
-          for (let u = 1; u < s.n; u++) {
-            const ux = cx + xScale(u * s.avg);
-            if (ux >= cx + segW) break;
-            g.append('line').attr('x1', ux).attr('x2', ux).attr('y1', y).attr('y2', y + bh)
-              .attr('stroke', '#fff').attr('stroke-width', 0.75).attr('opacity', 0.7);
-          }
-        }
-
-        segLabels.push({ start: cx, plan: s.plan });
-        cx += segW;
-      }
-
-      // Below-bar plan labels, two staggered lanes (even indices on
-      // lane 1, odd on lane 2). Truncation only against the next label
-      // in the SAME lane, so short adjacent segments still get room.
-      segLabels.forEach((sl, i) => {
-        const laneY = y + bh + 8 + (i % 2) * 8;
-        const sameLaneNext = segLabels[i + 2];
-        const maxW = (sameLaneNext ? sameLaneNext.start : iW + 110) - sl.start - 6;
-        const maxChars = Math.max(3, Math.floor(maxW / 4.3));
-        const label = sl.plan.length > maxChars ? sl.plan.slice(0, maxChars - 1) + '…' : sl.plan;
-        g.append('line').attr('x1', sl.start + 0.5).attr('x2', sl.start + 0.5)
-          .attr('y1', y + bh).attr('y2', laneY - 6)
-          .attr('stroke', '#ccc').attr('stroke-width', 0.6);
-        const t = g.append('text').attr('x', sl.start + 3).attr('y', laneY)
-          .attr('font-size', '7px').attr('font-weight', '600').attr('fill', '#666').text(label);
-        t.append('title').text(sl.plan);
-      });
-
-      // Growth increment — category level, same style as the Growth sheet.
-      g.append('rect').attr('x', cx).attr('y', y)
-        .attr('width', Math.max(0, xScale(r.total + r.inc) - cx)).attr('height', bh)
-        .attr('fill', incColor).attr('stroke', base).attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('rx', 2)
-        .style('cursor', 'pointer')
-        .on('mouseenter', (ev: MouseEvent) => {
-          const rc = wrapperRef.current?.getBoundingClientRect();
-          if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label: `${r.cat} — +${growthPct}% growth`, value: `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} new SKU${r.skusNeeded !== 1 ? 's' : ''} @ avg ${fmtGbp(r.avg)}/SKU`, depth: growthMetric === 'revenue' ? 'Revenue' : 'OM £' });
-        })
-        .on('mousemove', (ev: MouseEvent) => { const rc = wrapperRef.current?.getBoundingClientRect(); if (rc) setTooltip((p) => p ? { ...p, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null); })
-        .on('mouseleave', () => setTooltip(null));
-
-      const gUnitPx = xScale(r.avg);
-      if (gUnitPx >= 3 && r.skusNeeded <= 200) {
-        for (let u = 1; u < r.skusNeeded; u++) {
-          const ux = cx + xScale(u * r.avg);
-          if (ux >= xScale(r.total + r.inc)) break;
-          g.append('line').attr('x1', ux).attr('x2', ux).attr('y1', y).attr('y2', y + bh)
-            .attr('stroke', '#fff').attr('stroke-width', 1.5).attr('opacity', 0.95);
-        }
-      }
-
-      g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 3)
-        .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
-        .text(`+${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`);
-      g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 13)
-        .attr('font-size', '7.5px').attr('fill', '#888')
-        .text(`@ ${fmtGbp(r.avg)}/SKU`);
-
-      if (xScale(r.total) > 70) {
-        const label = fmtGbp(r.total);
-        const labelW = label.length * 6.5 + 12;
-        const labelH = 16;
-        g.append('rect').attr('x', 6).attr('y', y + bh / 2 - labelH / 2)
-          .attr('width', labelW).attr('height', labelH).attr('rx', labelH / 2)
-          .attr('fill', '#fff').attr('fill-opacity', 0.8);
-        g.append('text').attr('x', 6 + labelW / 2).attr('y', y + bh / 2 + 3.5)
-          .attr('text-anchor', 'middle')
-          .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#1a1a2e')
-          .text(label);
-      }
-    }
-
-    // Combined newness — identical to the Growth sheet.
-    if (showCombined && rows.length > 0) {
-      const comboY = yScale(COMBINED_KEY)!;
-      const comboBh = yScale.bandwidth();
-      const totalInc = rows.reduce((s, r) => s + r.inc, 0);
-      const totalSkus = rows.reduce((s, r) => s + r.skusNeeded, 0);
-
-      g.append('line').attr('x1', 0).attr('x2', iW)
-        .attr('y1', comboY - yScale.step() * 0.15).attr('y2', comboY - yScale.step() * 0.15)
-        .attr('stroke', '#ddd').attr('stroke-width', 0.5);
-      g.append('text').attr('x', -8).attr('y', comboY + comboBh / 2 + 3).attr('text-anchor', 'end')
-        .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
-        .text('Combined newness');
-
-      let cx = 0;
       for (const r of rows) {
-        const segW = xScale(r.inc);
-        if (segW <= 0) continue;
+        const y = yScale(r.cat)!;
+        const bh = yScale.bandwidth();
         const base = catColors.get(r.cat) ?? '#999';
-        g.append('rect').attr('x', cx).attr('y', comboY).attr('width', segW).attr('height', comboBh)
-          .attr('fill', d3.interpolateLab(base, '#ffffff')(0.45)).attr('stroke', base).attr('stroke-width', 1)
-          .style('cursor', 'pointer')
-          .on('mouseenter', (ev: MouseEvent) => {
-            const rc = wrapperRef.current?.getBoundingClientRect();
-            if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label: `${r.cat} — newness`, value: `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`, depth: 'Combined annual newness' });
-          })
-          .on('mousemove', (ev: MouseEvent) => { const rc = wrapperRef.current?.getBoundingClientRect(); if (rc) setTooltip((p) => p ? { ...p, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null); })
-          .on('mouseleave', () => setTooltip(null));
-        const unitPx = xScale(r.avg);
-        if (unitPx >= 3 && r.skusNeeded <= 200) {
-          for (let u = 1; u < r.skusNeeded; u++) {
-            const ux = cx + xScale(u * r.avg);
-            if (ux >= cx + segW) break;
-            g.append('line').attr('x1', ux).attr('x2', ux).attr('y1', comboY).attr('y2', comboY + comboBh)
-              .attr('stroke', '#fff').attr('stroke-width', 1).attr('opacity', 0.9);
+        const incColor = d3.interpolateLab(base, '#ffffff')(0.55);
+
+        const segLabels: { start: number; plan: string }[] = [];
+        let cx = 0;
+        for (const sg of r.segs) {
+          const segW = xScale(sg.total);
+          if (segW <= 0) continue;
+          g.append('rect').attr('x', cx).attr('y', y).attr('width', segW).attr('height', bh)
+            .attr('fill', base).attr('fill-opacity', 0.9).attr('stroke', '#fff').attr('stroke-width', 1.5)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} · ${sg.plan}`, `${fmtGbp(sg.total)} · ${sg.n} SKUs · avg ${fmtGbp(sg.avg)}/SKU`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+
+          const unitPx = xScale(sg.avg);
+          const step = unitTickStep(unitPx);
+          if (step > 0) {
+            let drawn = 0;
+            for (let u = step; u * unitPx < segW && drawn < 800; u += step) {
+              g.append('line').attr('x1', cx + u * unitPx).attr('x2', cx + u * unitPx).attr('y1', y).attr('y2', y + bh)
+                .attr('stroke', '#fff').attr('stroke-width', 0.75).attr('opacity', 0.7);
+              drawn++;
+            }
           }
+          segLabels.push({ start: cx, plan: sg.plan });
+          cx += segW;
         }
-        cx += segW;
+
+        segLabels.forEach((sl, i) => {
+          const laneY = y + bh + 8 + (i % 2) * 8;
+          const sameLaneNext = segLabels[i + 2];
+          const maxW = (sameLaneNext ? sameLaneNext.start : iW + 110) - sl.start - 6;
+          const maxChars = Math.max(3, Math.floor(maxW / 4.3));
+          const label = sl.plan.length > maxChars ? sl.plan.slice(0, maxChars - 1) + '…' : sl.plan;
+          g.append('line').attr('x1', sl.start + 0.5).attr('x2', sl.start + 0.5)
+            .attr('y1', y + bh).attr('y2', laneY - 6).attr('stroke', '#ccc').attr('stroke-width', 0.6);
+          const t = g.append('text').attr('x', sl.start + 3).attr('y', laneY)
+            .attr('font-size', '7px').attr('font-weight', '600').attr('fill', '#666').text(label);
+          t.append('title').text(sl.plan);
+        });
+
+        if (showGrowth && r.inc > 0) {
+          g.append('rect').attr('x', cx).attr('y', y)
+            .attr('width', Math.max(0, xScale(r.total + r.inc) - cx)).attr('height', bh)
+            .attr('fill', incColor).attr('stroke', base).attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('rx', 2)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} — +${growthPct}% growth`, `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} new SKU${r.skusNeeded !== 1 ? 's' : ''} @ avg ${fmtGbp(r.avg)}/SKU`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+          const gUnitPx = xScale(r.avg);
+          const gStep = unitTickStep(gUnitPx);
+          if (gStep > 0) {
+            let drawn = 0;
+            for (let u = Math.floor(r.total / r.avg) + gStep; drawn < 500; u += gStep) {
+              const ux = u * gUnitPx;
+              if (ux >= xScale(r.total + r.inc)) break;
+              if (ux > cx) {
+                g.append('line').attr('x1', ux).attr('x2', ux).attr('y1', y).attr('y2', y + bh)
+                  .attr('stroke', '#fff').attr('stroke-width', 1.5).attr('opacity', 0.95);
+                drawn++;
+              }
+            }
+          }
+          g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 3)
+            .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
+            .text(`+${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`);
+          g.append('text').attr('x', xScale(r.total + r.inc) + 6).attr('y', y + bh / 2 + 13)
+            .attr('font-size', '7.5px').attr('fill', '#888').text(`@ ${fmtGbp(r.avg)}/SKU`);
+        }
+
+        if (xScale(r.total) > 70) {
+          const label = fmtGbp(r.total);
+          const labelW = label.length * 6.5 + 12;
+          g.append('rect').attr('x', 6).attr('y', y + bh / 2 - 8).attr('width', labelW).attr('height', 16).attr('rx', 8)
+            .attr('fill', '#fff').attr('fill-opacity', 0.8);
+          g.append('text').attr('x', 6 + labelW / 2).attr('y', y + bh / 2 + 3.5).attr('text-anchor', 'middle')
+            .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#1a1a2e').text(label);
+        }
       }
-      g.append('text').attr('x', cx + 6).attr('y', comboY + comboBh / 2 + 3)
-        .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
-        .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
+
+      if (combinedShown) {
+        const comboY = yScale(COMBINED_KEY)!;
+        const comboBh = yScale.bandwidth();
+        const totalInc = rows.reduce((sm, r) => sm + r.inc, 0);
+        const totalSkus = rows.reduce((sm, r) => sm + r.skusNeeded, 0);
+        g.append('line').attr('x1', 0).attr('x2', iW)
+          .attr('y1', comboY - yScale.step() * 0.15).attr('y2', comboY - yScale.step() * 0.15)
+          .attr('stroke', '#ddd').attr('stroke-width', 0.5);
+        g.append('text').attr('x', -8).attr('y', comboY + comboBh / 2 + 3).attr('text-anchor', 'end')
+          .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333').text('Combined newness');
+        let cx = 0;
+        for (const r of rows) {
+          const segW = xScale(r.inc);
+          if (segW <= 0) continue;
+          const base = catColors.get(r.cat) ?? '#999';
+          g.append('rect').attr('x', cx).attr('y', comboY).attr('width', segW).attr('height', comboBh)
+            .attr('fill', d3.interpolateLab(base, '#ffffff')(0.45)).attr('stroke', base).attr('stroke-width', 1)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} — newness`, `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+          cx += segW;
+        }
+        g.append('text').attr('x', cx + 6).attr('y', comboY + comboBh / 2 + 3)
+          .attr('font-size', '9px').attr('font-weight', '700').attr('fill', '#333')
+          .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
+      }
+    } else {
+      // ---------- Vertical orientation ----------
+      const xScale = d3.scaleBand<string>().domain(domain).range([0, iW]).padding(0.3);
+      const yScale = d3.scaleLinear().domain([0, maxV * 1.08]).range([iH, 0]);
+
+      const xAxisG = g.append('g').attr('transform', `translate(0,${iH})`)
+        .call(d3.axisBottom(xScale).tickFormat((d) => d === COMBINED_KEY ? 'Combined' : d));
+      xAxisG.selectAll('text').attr('font-size', '8.5px').attr('font-weight', '600')
+        .attr('text-anchor', 'end').attr('transform', 'rotate(-30)').attr('dx', '-4px').attr('dy', '4px');
+      g.append('g').call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickFormat((d) => fmtGbp(+d))).selectAll('text').attr('font-size', '8px');
+      g.append('text').attr('x', -iH / 2).attr('y', -50).attr('text-anchor', 'middle').attr('transform', 'rotate(-90)')
+        .attr('font-size', '9px').attr('fill', '#666').text(metricLabel);
+      g.append('g').attr('class', 'gy')
+        .call(d3.axisLeft(yScale).ticks(Math.floor(iH / 40)).tickSize(-iW).tickFormat(() => ''))
+        .selectAll('line').attr('stroke', '#eee');
+      g.selectAll('.gy .domain').remove();
+
+      for (const r of rows) {
+        const x = xScale(r.cat)!;
+        const bw = xScale.bandwidth();
+        const base = catColors.get(r.cat) ?? '#999';
+        const incColor = d3.interpolateLab(base, '#ffffff')(0.55);
+
+        // Plan segments stacked bottom-up in selection order.
+        let cv = 0;
+        for (const sg of r.segs) {
+          const y0 = yScale(cv + sg.total), y1 = yScale(cv);
+          const segH = Math.max(0, y1 - y0);
+          if (segH <= 0) { cv += sg.total; continue; }
+          g.append('rect').attr('x', x).attr('y', y0).attr('width', bw).attr('height', segH)
+            .attr('fill', base).attr('fill-opacity', 0.9).attr('stroke', '#fff').attr('stroke-width', 1.5)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} · ${sg.plan}`, `${fmtGbp(sg.total)} · ${sg.n} SKUs · avg ${fmtGbp(sg.avg)}/SKU`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+
+          const unitPx = yScale(0) - yScale(sg.avg);
+          const step = unitTickStep(unitPx);
+          if (step > 0) {
+            let drawn = 0;
+            for (let u = step; u * sg.avg < sg.total && drawn < 800; u += step) {
+              const vy = yScale(cv + u * sg.avg);
+              g.append('line').attr('x1', x).attr('x2', x + bw).attr('y1', vy).attr('y2', vy)
+                .attr('stroke', '#fff').attr('stroke-width', 0.75).attr('opacity', 0.7);
+              drawn++;
+            }
+          }
+          // Plan name inside the segment when tall enough.
+          if (segH >= 12 && bw > 30) {
+            const maxChars = Math.max(3, Math.floor((bw - 6) / 4.3));
+            const label = sg.plan.length > maxChars ? sg.plan.slice(0, maxChars - 1) + '…' : sg.plan;
+            const t = g.append('text').attr('x', x + bw / 2).attr('y', (y0 + y1) / 2 + 2.5)
+              .attr('text-anchor', 'middle').attr('font-size', '7px').attr('font-weight', '600')
+              .attr('fill', 'rgba(255,255,255,0.95)').style('pointer-events', 'none').text(label);
+            t.append('title').text(sg.plan);
+          }
+          cv += sg.total;
+        }
+
+        if (showGrowth && r.inc > 0) {
+          const y0 = yScale(r.total + r.inc), y1 = yScale(r.total);
+          g.append('rect').attr('x', x).attr('y', y0).attr('width', bw).attr('height', Math.max(0, y1 - y0))
+            .attr('fill', incColor).attr('stroke', base).attr('stroke-width', 1).attr('stroke-dasharray', '3,2').attr('rx', 2)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} — +${growthPct}% growth`, `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} new SKU${r.skusNeeded !== 1 ? 's' : ''} @ avg ${fmtGbp(r.avg)}/SKU`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+          g.append('text').attr('x', x + bw / 2).attr('y', y0 - 14).attr('text-anchor', 'middle')
+            .attr('font-size', '8.5px').attr('font-weight', '700').attr('fill', '#333')
+            .text(`+${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`);
+          g.append('text').attr('x', x + bw / 2).attr('y', y0 - 5).attr('text-anchor', 'middle')
+            .attr('font-size', '7px').attr('fill', '#888').text(`@ ${fmtGbp(r.avg)}`);
+        }
+      }
+
+      if (combinedShown) {
+        const x = xScale(COMBINED_KEY)!;
+        const bw = xScale.bandwidth();
+        const totalInc = rows.reduce((sm, r) => sm + r.inc, 0);
+        const totalSkus = rows.reduce((sm, r) => sm + r.skusNeeded, 0);
+        let cv = 0;
+        for (const r of rows) {
+          if (r.inc <= 0) continue;
+          const base = catColors.get(r.cat) ?? '#999';
+          const y0 = yScale(cv + r.inc), y1 = yScale(cv);
+          g.append('rect').attr('x', x).attr('y', y0).attr('width', bw).attr('height', Math.max(0, y1 - y0))
+            .attr('fill', d3.interpolateLab(base, '#ffffff')(0.45)).attr('stroke', base).attr('stroke-width', 1)
+            .style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${r.cat} — newness`, `${fmtGbp(r.inc)} ≈ ${r.skusNeeded} SKU${r.skusNeeded !== 1 ? 's' : ''}`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+          cv += r.inc;
+        }
+        g.append('text').attr('x', x + bw / 2).attr('y', yScale(cv) - 5).attr('text-anchor', 'middle')
+          .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#333')
+          .text(`+${totalSkus} SKUs · ${fmtGbp(totalInc)}`);
+      }
     }
-  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined, plans, textScale]);
+  }, [cats, dims, wrapperRef, catColors, growthPct, growthMetric, showCombined, showGrowth, vertical, plans, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
