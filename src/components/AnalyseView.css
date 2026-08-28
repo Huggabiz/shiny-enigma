@@ -387,3 +387,16 @@
   border-top: 2px solid #1976d2;
   z-index: 1;
 }
+
+/* Dropdown trigger buttons reused from the (dark) toolbar are restyled
+   for the light config bar — the toolbar's white-on-translucent text is
+   near-invisible on the grey backdrop here. */
+.analyse-chart-config .toolbar-btn {
+  background: #fff;
+  color: #333;
+  border: 1px solid #c5c5c5;
+}
+
+.analyse-chart-config .toolbar-btn:hover {
+  background: #ececec;
+}
