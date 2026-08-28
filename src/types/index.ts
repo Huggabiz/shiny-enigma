@@ -540,6 +540,10 @@ export interface Project {
     /** Stacking position of the catch-all segment, expressed as the
      * number of compound groups stacked before it (default: last). */
     compoundRestIndex?: number;
+    /** Custom section titles used in the summary overlay (defaults
+     * "Groups" / "Compound groups"). */
+    planGroupsTitle?: string;
+    compoundGroupsTitle?: string;
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;
