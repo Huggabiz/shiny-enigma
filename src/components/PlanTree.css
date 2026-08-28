@@ -416,3 +416,74 @@
 .plan-tree-multiplan-check.variant {
   margin-left: 2px;
 }
+
+/* Growth-by-Group assignment chips: one small toggle box per group,
+   shown on plan rows only while the Analyse view is on the Growth by
+   Group sheet. Filled = plan belongs to that group. */
+.plan-tree-group-chips {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.plan-tree-group-chip {
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  border: 1px solid #b0bec5;
+  background: #fff;
+  color: #90a4ae;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+}
+
+.plan-tree-group-chip:hover {
+  border-color: #546e7a;
+  color: #455a64;
+}
+
+.plan-tree-group-chip.on {
+  background: #455a64;
+  border-color: #455a64;
+  color: #fff;
+}
+
+/* Legend under the panel header decoding chip letters to group names. */
+.plan-tree-group-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  align-items: center;
+  padding: 5px 12px 4px;
+  font-size: 10px;
+  color: #78909c;
+  border-bottom: 1px solid #eee;
+}
+
+.plan-tree-group-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.plan-tree-group-legend b {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: #455a64;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+}

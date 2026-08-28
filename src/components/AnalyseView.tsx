@@ -277,11 +277,11 @@ export function AnalyseView() {
   const [showCatFilter, setShowCatFilter] = useState(false);
 
   // Named plan groups (e.g. Core / Duo) for the Growth by Group sheet.
-  const [planGroups, setPlanGroupsState] = useState<{ id: string; name: string; planIds: string[] }[]>(
-    () => av?.planGroups ?? []);
+  // Read straight from the store (not local state) because the sidebar's
+  // per-plan group chips edit the same list.
+  const planGroups = useMemo(() => av?.planGroups ?? [], [av?.planGroups]);
   const [showGroupsDialog, setShowGroupsDialog] = useState(false);
   const setPlanGroups = (groups: { id: string; name: string; planIds: string[] }[]) => {
-    setPlanGroupsState(groups);
     setAnalyseConfig({ planGroups: groups });
   };
 
@@ -463,7 +463,6 @@ export function AnalyseView() {
       {showGroupsDialog && (
         <PlanGroupsDialog
           groups={planGroups}
-          allPlans={project.plans}
           onChange={setPlanGroups}
           onClose={() => setShowGroupsDialog(false)}
         />
@@ -1998,9 +1997,8 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, textScale, hi
 
 // ---------- Plan Groups dialog (Growth by Group) ----------
 
-function PlanGroupsDialog({ groups, allPlans, onChange, onClose }: {
+function PlanGroupsDialog({ groups, onChange, onClose }: {
   groups: { id: string; name: string; planIds: string[] }[];
-  allPlans: RangePlan[];
   onChange: (groups: { id: string; name: string; planIds: string[] }[]) => void;
   onClose: () => void;
 }) {
@@ -2009,33 +2007,26 @@ function PlanGroupsDialog({ groups, allPlans, onChange, onClose }: {
   };
   const rename = (id: string, name: string) => onChange(groups.map((g) => g.id === id ? { ...g, name } : g));
   const remove = (id: string) => onChange(groups.filter((g) => g.id !== id));
-  const togglePlan = (id: string, planId: string) => onChange(groups.map((g) => {
-    if (g.id !== id) return g;
-    return { ...g, planIds: g.planIds.includes(planId) ? g.planIds.filter((p) => p !== planId) : [...g.planIds, planId] };
-  }));
 
   return (
     <div className="slab-dialog-overlay" onClick={onClose}>
       <div className="slab-dialog" style={{ width: 420, maxHeight: '80vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
         <h3>Plan Groups</h3>
         <p style={{ margin: '0 0 10px', fontSize: 12, color: '#666' }}>
-          Name your groups (e.g. Core, Duo) and tick the range plans that belong to each.
-          A plan contributes to a group's bar only when it is also selected in the sidebar.
+          Create and name your groups here (e.g. Core, Duo). To assign range plans,
+          use the group boxes that appear next to each plan in the sidebar while the
+          Growth by Group sheet is open. A plan contributes to a group's bar only
+          when it is also ticked for this view.
         </p>
         {groups.map((g) => (
           <div key={g.id} style={{ border: '1px solid #e0e0e0', borderRadius: 6, padding: 10, marginBottom: 10 }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input className="slab-dialog-input" style={{ flex: 1 }} value={g.name}
                 onChange={(e) => rename(g.id, e.target.value)} placeholder="Group name" />
+              <span style={{ fontSize: 11, color: '#999', whiteSpace: 'nowrap' }}>
+                {g.planIds.length} plan{g.planIds.length === 1 ? '' : 's'}
+              </span>
               <button className="slab-dialog-btn cancel" onClick={() => remove(g.id)} title="Delete group">×</button>
-            </div>
-            <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {allPlans.map((p) => (
-                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#333', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={g.planIds.includes(p.id)} onChange={() => togglePlan(g.id, p.id)} />
-                  {p.name}
-                </label>
-              ))}
             </div>
           </div>
         ))}

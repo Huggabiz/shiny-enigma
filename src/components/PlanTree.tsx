@@ -19,13 +19,44 @@ export function PlanTree() {
     activeVariantId, setActiveVariant, addVariant, removeVariant,
     addFolder, removeFolder, renameFolder, setPlanFolder, reorderFolders,
     activeView, toggleMultiplanEntry, toggleMultiplanListEntry, toggleAnalyseEntry,
-    isUnlocked, viewerMode,
+    setAnalyseConfig, isUnlocked, viewerMode,
   } = useProjectStore();
   const isLocked = (!!project?.lockHash && !isUnlocked) || viewerMode;
   const isMultiplan = activeView === 'multiplan' || activeView === 'multiplan-list' || activeView === 'analyse';
   const isList = activeView === 'multiplan-list';
   const isAnalyse = activeView === 'analyse';
   const toggleEntry = isAnalyse ? toggleAnalyseEntry : isList ? toggleMultiplanListEntry : toggleMultiplanEntry;
+
+  // Growth-by-Group assignment chips: while the Analyse view is on the
+  // Growth by Group sheet, each plan row grows one small toggle box per
+  // defined group so plans are tagged in place rather than inside the
+  // Manage Groups dialog (which only creates/renames/deletes groups).
+  const planGroups = useMemo(
+    () => project?.analyseView?.planGroups ?? [],
+    [project?.analyseView?.planGroups]);
+  const showGroupChips = isAnalyse
+    && project?.analyseView?.activeSheet === 'growth-groups'
+    && planGroups.length > 0;
+  // One-letter chip labels, widened to two letters when first letters clash.
+  const groupChipLabels = useMemo(() => {
+    const firsts = planGroups.map((g) => (g.name.trim().charAt(0) || '?').toUpperCase());
+    return planGroups.map((g, i) =>
+      firsts.filter((x) => x === firsts[i]).length > 1
+        ? (g.name.trim().slice(0, 2) || '?').toUpperCase()
+        : firsts[i]);
+  }, [planGroups]);
+  const togglePlanGroup = (groupId: string, planId: string) => {
+    setAnalyseConfig({
+      planGroups: planGroups.map((g) => g.id === groupId
+        ? {
+            ...g,
+            planIds: g.planIds.includes(planId)
+              ? g.planIds.filter((id) => id !== planId)
+              : [...g.planIds, planId],
+          }
+        : g),
+    });
+  };
   // Fast lookup so each row can tell if its (planId, variantId|null)
   // pair is already in the multiplan view entries list.
   const multiplanKeySet = useMemo(() => {
@@ -204,6 +235,21 @@ export function PlanTree() {
               <div className="plan-tree-item-meta">{itemCount} products</div>
             </div>
           </div>
+          {showGroupChips && (
+            <div className="plan-tree-group-chips" onClick={(e) => e.stopPropagation()}>
+              {planGroups.map((g, i) => {
+                const on = g.planIds.includes(plan.id);
+                return (
+                  <button
+                    key={g.id}
+                    className={`plan-tree-group-chip ${on ? 'on' : ''}`}
+                    title={`${on ? 'Remove from' : 'Add to'} group "${g.name}"`}
+                    onClick={() => togglePlanGroup(g.id, plan.id)}
+                  >{groupChipLabels[i]}</button>
+                );
+              })}
+            </div>
+          )}
           {!isLocked && (
             <div className="plan-tree-item-actions">
               <button className="plan-tree-item-add-variant" onClick={(e) => { e.stopPropagation(); handleNewVariant(plan.id); }} title="Add variant">⊕</button>
@@ -380,6 +426,14 @@ export function PlanTree() {
           <button className="plan-tree-close" onClick={() => setShowPlanTree(false)}><CloseIcon size={10} color="#999" /></button>
         </div>
       </div>
+
+      {showGroupChips && (
+        <div className="plan-tree-group-legend" title="Click the boxes next to a plan to assign it to a group">
+          {planGroups.map((g, i) => (
+            <span key={g.id}><b>{groupChipLabels[i]}</b>{g.name}</span>
+          ))}
+        </div>
+      )}
 
       <div className="plan-tree-list">
         {folders.map((f) =>
