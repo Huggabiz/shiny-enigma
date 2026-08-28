@@ -450,10 +450,16 @@ export function AnalyseView() {
   const [snipStatus, setSnipStatus] = useState<string | null>(null);
 
   const handleSnip = useCallback(async () => {
-    if (!canvasRef.current) return;
+    const el = canvasRef.current;
+    if (!el) return;
+    // Hide the canvas frame during capture so the exported image has no
+    // border — borderColor (not border) so layout doesn't shift.
+    const prevBorderColor = el.style.borderColor;
+    el.style.borderColor = 'transparent';
     try {
       setSnipStatus('Capturing...');
-      const canvas = await html2canvas(canvasRef.current, { backgroundColor: '#ffffff', scale: 2 });
+      const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 });
+      el.style.borderColor = prevBorderColor;
       canvas.toBlob(async (blob) => {
         if (!blob) { setSnipStatus('Failed'); return; }
         try {
@@ -462,7 +468,10 @@ export function AnalyseView() {
         } catch { setSnipStatus('Failed'); }
         setTimeout(() => setSnipStatus(null), 1500);
       }, 'image/png');
-    } catch { setSnipStatus('Failed'); setTimeout(() => setSnipStatus(null), 1500); }
+    } catch {
+      el.style.borderColor = prevBorderColor;
+      setSnipStatus('Failed'); setTimeout(() => setSnipStatus(null), 1500);
+    }
   }, []);
 
   const scatterVisiblePoints = useMemo(() => {
