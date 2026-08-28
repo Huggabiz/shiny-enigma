@@ -534,9 +534,11 @@ export interface Project {
      * segments. SKUs whose ranking is in no bucket (or who have no
      * ranking) fall into a catch-all segment named by
      * compoundRestName. */
-    compoundGroups?: { id: string; name: string; rankings: string[] }[];
+    compoundGroups?: { id: string; name: string; rankings: string[]; hatch?: boolean }[];
     /** Display name for the catch-all compound segment (default "Other"). */
     compoundRestName?: string;
+    /** Cross-hatch the catch-all segment. */
+    compoundRestHatch?: boolean;
     /** Stacking position of the catch-all segment, expressed as the
      * number of compound groups stacked before it (default: last). */
     compoundRestIndex?: number;

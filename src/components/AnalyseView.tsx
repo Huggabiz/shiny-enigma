@@ -296,6 +296,7 @@ export function AnalyseView() {
   // segment, whose display name is also user-defined.
   const compoundGroups = useMemo(() => av?.compoundGroups ?? [], [av?.compoundGroups]);
   const compoundRestName = av?.compoundRestName ?? 'Other';
+  const compoundRestHatch = av?.compoundRestHatch ?? false;
   // Stacking position of the catch-all segment = number of compound
   // groups before it (defaults to last; clamped after deletions).
   const compoundRestIndex = Math.min(av?.compoundRestIndex ?? compoundGroups.length, compoundGroups.length);
@@ -506,6 +507,8 @@ export function AnalyseView() {
           onChange={(groups) => setAnalyseConfig({ compoundGroups: groups })}
           onReorder={(groups, restIdx) => setAnalyseConfig({ compoundGroups: groups, compoundRestIndex: restIdx })}
           onRestNameChange={(name) => setAnalyseConfig({ compoundRestName: name })}
+          restHatch={compoundRestHatch}
+          onRestHatchChange={(v) => setAnalyseConfig({ compoundRestHatch: v })}
           onClose={() => setShowCompoundDialog(false)}
         />
       )}
@@ -519,7 +522,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -2113,16 +2116,20 @@ function PlanGroupsDialog({ groups, title, onTitleChange, onChange, onClose }: {
 
 // ---------- Compound Groups dialog (Growth by Group segments) ----------
 
-function CompoundGroupsDialog({ groups, restName, restIndex, title, onTitleChange, availableRankings, onChange, onReorder, onRestNameChange, onClose }: {
-  groups: { id: string; name: string; rankings: string[] }[];
+type CompoundGroup = { id: string; name: string; rankings: string[]; hatch?: boolean };
+
+function CompoundGroupsDialog({ groups, restName, restIndex, title, onTitleChange, availableRankings, onChange, onReorder, onRestNameChange, restHatch, onRestHatchChange, onClose }: {
+  groups: CompoundGroup[];
   restName: string;
   restIndex: number;
   title: string;
   onTitleChange: (title: string) => void;
   availableRankings: string[];
-  onChange: (groups: { id: string; name: string; rankings: string[] }[]) => void;
-  onReorder: (groups: { id: string; name: string; rankings: string[] }[], restIndex: number) => void;
+  onChange: (groups: CompoundGroup[]) => void;
+  onReorder: (groups: CompoundGroup[], restIndex: number) => void;
   onRestNameChange: (name: string) => void;
+  restHatch: boolean;
+  onRestHatchChange: (v: boolean) => void;
   onClose: () => void;
 }) {
   // Combined display list: group cards plus the catch-all card at its
@@ -2191,12 +2198,16 @@ function CompoundGroupsDialog({ groups, restName, restIndex, title, onTitleChang
           if (it.kind === 'rest') {
             return (
               <div key="__rest__" style={{ border: '1px dashed #bbb', borderRadius: 6, padding: 10, marginBottom: 10, opacity: dragIdx === idx ? 0.5 : 1 }} {...dragProps}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#333' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#333' }}>
                   {handle}
                   Everything else appears as
                   <input className="slab-dialog-input" style={{ flex: 1 }} value={restName}
                     onChange={(e) => onRestNameChange(e.target.value)} placeholder="Other" />
-                </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#555', cursor: 'pointer', whiteSpace: 'nowrap' }} title="Cross-hatch this segment on the bars">
+                    <input type="checkbox" checked={restHatch} onChange={(e) => onRestHatchChange(e.target.checked)} />
+                    Hatch
+                  </label>
+                </div>
               </div>
             );
           }
@@ -2208,6 +2219,10 @@ function CompoundGroupsDialog({ groups, restName, restIndex, title, onTitleChang
                 {handle}
                 <input className="slab-dialog-input" style={{ flex: 1 }} value={g.name}
                   onChange={(e) => rename(g.id, e.target.value)} placeholder="Compound group name" />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#555', cursor: 'pointer', whiteSpace: 'nowrap' }} title="Cross-hatch this segment on the bars">
+                  <input type="checkbox" checked={!!g.hatch} onChange={() => onChange(groups.map((x) => x.id === g.id ? { ...x, hatch: !x.hatch } : x))} />
+                  Hatch
+                </label>
                 <button className="slab-dialog-btn cancel" onClick={() => remove(gi)} title="Delete compound group">×</button>
               </div>
               <div style={{ maxHeight: 140, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -2238,11 +2253,12 @@ function CompoundGroupsDialog({ groups, restName, restIndex, title, onTitleChang
 
 // ---------- Growth by Group (grouped bars per category) ----------
 
-function GrowthGroupChart({ groups, compounds, restName, restIndex, groupsTitle, compoundsTitle, plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showGrowth, vertical, showSummary }: {
+function GrowthGroupChart({ groups, compounds, restName, restIndex, restHatch, groupsTitle, compoundsTitle, plans, catalogue, shelfSide, catColors, textScale, hiddenCats, growthPct, growthMetric, showGrowth, vertical, showSummary }: {
   groups: { id: string; name: string; planIds: string[] }[];
-  compounds: { id: string; name: string; rankings: string[] }[];
+  compounds: { id: string; name: string; rankings: string[]; hatch?: boolean }[];
   restName: string;
   restIndex: number;
+  restHatch: boolean;
   groupsTitle: string;
   compoundsTitle: string;
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
@@ -2342,7 +2358,22 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, groupsTitle,
     const compound = compounds.length > 0;
     const segOrder = compounds.map((_, i) => i);
     segOrder.splice(Math.min(restIndex, compounds.length), 0, compounds.length);
+    // Shade is anchored to the group's position in the dialog list
+    // (pi), never to which segments happen to render in a bar — the
+    // same group is always the same shade in every category and bar.
     const segShade = (fill: string, pi: number) => d3.interpolateLab(fill, '#ffffff')(Math.min(0.6, pi * 0.2));
+    // Per-segment cross-hatch flags, indexed by aggregation index.
+    const hatchFlags = [...compounds.map((c) => !!c.hatch), restHatch];
+    if (compound && hatchFlags.some(Boolean)) {
+      const defs = svg.append('defs');
+      const mkHatch = (id: string, color: string) => {
+        const p = defs.append('pattern').attr('id', id).attr('width', 6).attr('height', 6).attr('patternUnits', 'userSpaceOnUse');
+        p.append('path').attr('d', 'M0,0 L6,6').attr('stroke', color).attr('stroke-width', 1);
+        p.append('path').attr('d', 'M0,6 L6,0').attr('stroke', color).attr('stroke-width', 1);
+      };
+      mkHatch('gg-hatch-w', 'rgba(255,255,255,0.55)');
+      mkHatch('gg-hatch-d', 'rgba(0,0,0,0.25)');
+    }
     const maxV = d3.max(categories.flatMap((cat) => data.map((_, gi) => { const c = cell(gi, cat); return c ? c.total + c.inc : 0; }))) ?? 0;
     if (maxV <= 0) return;
 
@@ -2420,6 +2451,11 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, groupsTitle,
                 .style('cursor', 'pointer')
                 .on('mouseenter', hoverSeg(`${cat} · ${d.name} · ${segNames[si]}`, `${fmtGbp(sv)} · ${c.segNs[si]} SKU${c.segNs[si] !== 1 ? 's' : ''}`))
                 .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+              if (hatchFlags[si]) {
+                g.append('rect').attr('x', x0).attr('y', y).attr('width', Math.max(0, x1 - x0)).attr('height', bh)
+                  .attr('fill', `url(#${d3.hsl(segFill).l > 0.62 ? 'gg-hatch-d' : 'gg-hatch-w'})`)
+                  .style('pointer-events', 'none');
+              }
               // Segment name (plus its value when it fits) inside the
               // segment, dodging the group name at the start of the bar.
               const lx0 = si === 0 ? x0 + groupLabelW + 4 : x0;
@@ -2534,17 +2570,25 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, groupsTitle,
               }
             }
           } else {
-            let cv = 0;
+            // Stack top-down: the first group in the dialog list is the
+            // TOP segment of the bar, so reading order matches the list.
+            let cvTop = 0;
             segOrder.forEach((si, pi) => {
               const sv = c.segs[si];
               if (sv <= 0) return;
-              const sy1 = yScale(cv), sy0 = yScale(cv + sv);
+              const vHi = c.total - cvTop, vLo = vHi - sv;
+              const sy0 = yScale(vHi), sy1 = yScale(vLo);
               const segFill = segShade(fill, pi);
               g.append('rect').attr('x', x).attr('y', sy0).attr('width', bw).attr('height', Math.max(0, sy1 - sy0))
                 .attr('fill', segFill).attr('fill-opacity', 0.95).attr('stroke', '#fff').attr('stroke-width', 0.75)
                 .style('cursor', 'pointer')
                 .on('mouseenter', hoverSeg(`${cat} · ${d.name} · ${segNames[si]}`, `${fmtGbp(sv)} · ${c.segNs[si]} SKU${c.segNs[si] !== 1 ? 's' : ''}`))
                 .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+              if (hatchFlags[si]) {
+                g.append('rect').attr('x', x).attr('y', sy0).attr('width', bw).attr('height', Math.max(0, sy1 - sy0))
+                  .attr('fill', `url(#${d3.hsl(segFill).l > 0.62 ? 'gg-hatch-d' : 'gg-hatch-w'})`)
+                  .style('pointer-events', 'none');
+              }
               // Segment name inside when the segment is tall enough;
               // value on a second line when there is room for both.
               const segH = sy1 - sy0;
@@ -2563,7 +2607,7 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, groupsTitle,
                     .attr('fill', segTextFill).style('pointer-events', 'none').text(fmtGbp(sv));
                 }
               }
-              cv += sv;
+              cvTop += sv;
             });
           }
           let barTop = yScale(c.total);
@@ -2670,7 +2714,7 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, groupsTitle,
         }
       }
     }
-  }, [data, groups.length, compounds.length, segNames, restIndex, groupsTitle, compoundsTitle, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale, showSummary]);
+  }, [data, groups.length, compounds, segNames, restIndex, restHatch, groupsTitle, compoundsTitle, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale, showSummary]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
