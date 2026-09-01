@@ -107,6 +107,19 @@ export function parseSpreadsheet(
     };
   });
 
+  // OM% normalisation: catalogue exports give the operating margin as a
+  // decimal fraction (0.3 = 30%). If every value in the file sits at or
+  // below 1.5 the column is fractional — scale it to percentage points.
+  // A file already in points (30 = 30%) is left untouched.
+  const omVals = products
+    .map((p) => p.operatingMarginPct)
+    .filter((v): v is number => v !== undefined && !Number.isNaN(v));
+  if (omVals.length > 0 && Math.max(...omVals.map(Math.abs)) <= 1.5) {
+    for (const p of products) {
+      if (p.operatingMarginPct !== undefined) p.operatingMarginPct *= 100;
+    }
+  }
+
   return { products, headers };
 }
 
