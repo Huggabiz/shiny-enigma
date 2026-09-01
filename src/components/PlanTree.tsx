@@ -35,7 +35,7 @@ export function PlanTree() {
     () => project?.analyseView?.planGroups ?? [],
     [project?.analyseView?.planGroups]);
   const showGroupChips = isAnalyse
-    && project?.analyseView?.activeSheet === 'growth-groups'
+    && (project?.analyseView?.activeSheet === 'growth-groups' || project?.analyseView?.activeSheet === 'margin-compare')
     && planGroups.length > 0;
   // One-letter chip labels, widened to two letters when first letters clash.
   const groupChipLabels = useMemo(() => {

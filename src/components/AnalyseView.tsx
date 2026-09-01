@@ -9,7 +9,7 @@ import './AnalyseView.css';
 
 type Metric = 'rrp' | 'revenue' | 'margin';
 type AspMode = 'standard' | 'weighted';
-type SheetId = 'icicle' | 'scatter' | 'lifecycle' | 'pareto' | 'growth' | 'growth-plans' | 'growth-groups' | 'sunburst';
+type SheetId = 'icicle' | 'scatter' | 'lifecycle' | 'pareto' | 'growth' | 'growth-plans' | 'growth-groups' | 'margin-compare' | 'sunburst';
 
 const SHEETS: { id: SheetId; label: string }[] = [
   { id: 'icicle', label: 'Icicle' },
@@ -19,6 +19,7 @@ const SHEETS: { id: SheetId; label: string }[] = [
   { id: 'growth', label: 'Growth' },
   { id: 'growth-plans', label: 'Growth by Plan' },
   { id: 'growth-groups', label: 'Growth by Group' },
+  { id: 'margin-compare', label: 'Margin Compare' },
   { id: 'sunburst', label: 'Sunburst' },
 ];
 
@@ -612,7 +613,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -833,6 +834,52 @@ export function AnalyseView() {
                 </div>
               )}
               <span className="analyse-config-item" style={{ cursor: 'default' }}>Bar segments are one avg-SKU wide — count the ticks in the growth block to read the SKU requirement</span>
+              <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
+                <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
+                  onChange={(e) => setAspect(Number(e.target.value))}
+                  onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
+                <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+                {activeAspect !== 0 && (
+                  <button className="analyse-aspect-reset" onClick={(e) => { e.preventDefault(); setAspect(0); }} title="Reset to 16:9">↺</button>
+                )}
+              </label>
+              <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
+                <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
+                <span>{activeTextScale.toFixed(2)}×</span>
+              </label>
+              <div className="analyse-config-separator" />
+              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
+            </div>
+          )}
+
+          {activeSheet === 'margin-compare' && (
+            <div className="analyse-chart-config">
+              <button className="analyse-snip-btn" onClick={() => setShowGroupsDialog(true)} title="Define named groups (e.g. Core / Duo) and assign range plans to them — this sheet compares the groups' avg OM% per sub-category">
+                Manage Groups ({planGroups.length})
+              </button>
+              <div className="analyse-config-separator" />
+              <div className="toolbar-dropdown-wrapper">
+                <button className="toolbar-btn" style={{ fontSize: 10, padding: '3px 9px' }} onClick={() => setShowCatFilter((v) => !v)}>
+                  Categories ({allCategories.length - growthHiddenCats.size}/{allCategories.length}) ▾
+                </button>
+                {showCatFilter && (
+                  <div className="toolbar-dropdown" onMouseLeave={() => setShowCatFilter(false)}
+                    style={{ bottom: '100%', top: 'auto', marginBottom: 4, maxHeight: 260, overflowY: 'auto' }}>
+                    {allCategories.map((cat) => (
+                      <label key={cat} className="dropdown-checkbox">
+                        <input type="checkbox" checked={!growthHiddenCats.has(cat)}
+                          onChange={() => toggleGrowthCat(cat)} />
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: catColors.get(cat) ?? '#999', display: 'inline-block', flexShrink: 0 }} />
+                          {cat}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="analyse-config-item" style={{ cursor: 'default' }}>Dot size = SKU count behind the average — small dots carry little confidence</span>
               <span style={{ flex: 1 }} />
               <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
                 <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
@@ -2906,6 +2953,189 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, restHatch, s
       }
     }
   }, [data, groups.length, compounds, segNames, restIndex, restHatch, shadeLightFirst, groupsTitle, compoundsTitle, dims, wrapperRef, catColors, growthPct, growthMetric, showGrowth, vertical, textScale, showSummary]);
+
+  return (
+    <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" />
+      <ChartTooltip tooltip={tooltip} />
+    </div>
+  );
+}
+
+// ---------- Margin Compare (avg OM% per sub-category, dumbbell) ----------
+
+const GROUP_DOT_COLORS = ['#1976d2', '#e65100', '#2e7d32', '#7b1fa2', '#c62828', '#00838f'];
+const MC_SEP = '\u001f';
+
+function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, textScale, hiddenCats }: {
+  groups: { id: string; name: string; planIds: string[] }[];
+  plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
+  catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { wrapperRef, dims, measureRef } = useMeasure();
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  // Per group (first-plan-wins within the group), per category/sub-cat:
+  // mean of operatingMarginPct over SKUs that carry a value, plus the
+  // SKU count that underpins it (the confidence signal).
+  const data = useMemo(() => {
+    const perGroup = groups.map((grp) => {
+      const groupPlans = plans.filter((p) => grp.planIds.includes(p.id));
+      const seen = new Set<string>();
+      const m = new Map<string, { sum: number; n: number }>();
+      for (const plan of groupPlans) {
+        const shelf = resolveShelf(plan, shelfSide);
+        if (!shelf) continue;
+        for (const item of shelf.items) {
+          const prod = getProductForItem(item, catalogue);
+          if (!prod || seen.has(prod.id)) continue;
+          seen.add(prod.id);
+          const om = prod.operatingMarginPct;
+          if (om === undefined || Number.isNaN(om)) continue;
+          const cat = prod.category || 'Uncategorised';
+          if (hiddenCats.has(cat)) continue;
+          const sub = prod.subCategory || 'Unspecified';
+          const key = cat + MC_SEP + sub;
+          const e = m.get(key) ?? { sum: 0, n: 0 };
+          e.sum += om; e.n++; m.set(key, e);
+        }
+      }
+      return { name: grp.name, m };
+    });
+    const keys = new Set<string>();
+    for (const g of perGroup) for (const k of g.m.keys()) keys.add(k);
+    const rows = Array.from(keys).map((key) => {
+      const [cat, sub] = key.split(MC_SEP);
+      const cells = perGroup.map((g) => {
+        const e = g.m.get(key);
+        return e ? { avg: e.sum / e.n, n: e.n } : null;
+      });
+      return { key, cat, sub, cells };
+    }).sort((a, b) => a.cat.localeCompare(b.cat) || a.sub.localeCompare(b.sub));
+    return { perGroup, rows };
+  }, [groups, plans, catalogue, shelfSide, hiddenCats]);
+
+  useEffect(() => {
+    const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
+    const width = dims.width / textScale;
+    const height = dims.height / textScale;
+    const margin = { top: 34, right: 100, bottom: 34, left: 170 };
+    const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
+    if (iW < 20 || iH < 20) return;
+
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+    const { rows } = data;
+
+    if (groups.length === 0 || rows.length === 0) {
+      g.append('text').attr('x', iW / 2).attr('y', iH / 2).attr('text-anchor', 'middle')
+        .attr('font-size', '12px').attr('fill', '#888')
+        .text(groups.length === 0
+          ? 'No groups defined - use Manage Groups below, then assign plans via the sidebar boxes.'
+          : 'No OM% data for the groups - check plans are selected and the catalogue carries Operating Margin % (reimport if values look like 0.3%).');
+      return;
+    }
+
+    const allAvgs = rows.flatMap((r) => r.cells.flatMap((c) => c ? [c.avg] : []));
+    let lo = Math.min(...allAvgs), hi = Math.max(...allAvgs);
+    if (hi - lo < 5) { const mid = (hi + lo) / 2; lo = mid - 2.5; hi = mid + 2.5; }
+    const pad = (hi - lo) * 0.08;
+    const xScale = d3.scaleLinear().domain([lo - pad, hi + pad]).range([0, iW]);
+    const yScale = d3.scaleBand<string>().domain(rows.map((r) => r.key)).range([0, iH]).padding(0.2);
+
+    // Legend: one fixed colour per group, consistent on every row.
+    let lx = 0;
+    const legendG = g.append('g').attr('transform', 'translate(0,-16)');
+    data.perGroup.forEach((grp, gi) => {
+      const sw = legendG.append('g').attr('transform', `translate(${lx},0)`);
+      sw.append('circle').attr('cx', 5).attr('cy', -2).attr('r', 4.5).attr('fill', GROUP_DOT_COLORS[gi % GROUP_DOT_COLORS.length]);
+      sw.append('text').attr('x', 13).attr('y', 1).attr('font-size', '9px').attr('font-weight', '600').attr('fill', '#444').text(grp.name);
+      lx += grp.name.length * 5.5 + 32;
+    });
+    legendG.append('text').attr('x', lx + 4).attr('y', 1).attr('font-size', '8px').attr('fill', '#999')
+      .text('dot size = SKU count behind the average');
+
+    g.append('g').attr('transform', `translate(0,${iH})`)
+      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 70)).tickFormat((d) => `${d}%`))
+      .selectAll('text').attr('font-size', '8px');
+    g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`)
+      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 70)).tickSize(-iH).tickFormat(() => ''))
+      .selectAll('line').attr('stroke', '#eee');
+    g.selectAll('.gx .domain').remove();
+    g.append('text').attr('x', iW / 2).attr('y', iH + 28).attr('text-anchor', 'middle')
+      .attr('font-size', '9px').attr('fill', '#666').text('Average Operating Margin %');
+
+    const hoverSeg = (label: string, value: string) => (ev: MouseEvent) => {
+      const rc = wrapperRef.current?.getBoundingClientRect();
+      if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label, value, depth: 'Avg OM %' });
+    };
+    const moveSeg = (ev: MouseEvent) => {
+      const rc = wrapperRef.current?.getBoundingClientRect();
+      if (rc) setTooltip((pv) => pv ? { ...pv, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null);
+    };
+
+    const dotR = (n: number) => Math.min(9, 3 + Math.sqrt(n) * 1.1);
+
+    rows.forEach((row, ri) => {
+      const yc = yScale(row.key)! + yScale.bandwidth() / 2;
+      // Zebra band for row separation.
+      if (ri % 2 === 1) {
+        g.append('rect').attr('x', -margin.left + 6).attr('y', yScale(row.key)!)
+          .attr('width', iW + margin.left - 6 + margin.right - 8).attr('height', yScale.bandwidth())
+          .attr('fill', '#000').attr('opacity', 0.025);
+      }
+      // Row label: sub-category bold, category beneath in grey with a
+      // category-colour swatch at the far left.
+      const subMax = Math.max(4, Math.floor((margin.left - 24) / 4.6));
+      const subLabel = row.sub.length > subMax ? row.sub.slice(0, subMax - 1) + '…' : row.sub;
+      const lt = g.append('text').attr('x', -10).attr('y', yc - 1).attr('text-anchor', 'end')
+        .attr('font-size', '8.5px').attr('font-weight', '600').attr('fill', '#333').text(subLabel);
+      lt.append('title').text(`${row.cat} › ${row.sub}`);
+      g.append('circle').attr('cx', -margin.left + 14).attr('cy', yc).attr('r', 3)
+        .attr('fill', catColors.get(row.cat) ?? '#999');
+      g.append('text').attr('x', -10).attr('y', yc + 8).attr('text-anchor', 'end')
+        .attr('font-size', '6.5px').attr('fill', '#999')
+        .text(row.cat.length > subMax ? row.cat.slice(0, subMax - 1) + '…' : row.cat);
+
+      const present = row.cells
+        .map((c, gi) => c ? { ...c, gi } : null)
+        .filter((c): c is { avg: number; n: number; gi: number } => !!c);
+      if (present.length === 0) return;
+      // Connector between the extremes.
+      if (present.length > 1) {
+        const xs = present.map((c) => xScale(c.avg));
+        g.append('line').attr('x1', Math.min(...xs)).attr('x2', Math.max(...xs))
+          .attr('y1', yc).attr('y2', yc).attr('stroke', '#bbb').attr('stroke-width', 1.5);
+      }
+      for (const c of present) {
+        const cx = xScale(c.avg);
+        const color = GROUP_DOT_COLORS[c.gi % GROUP_DOT_COLORS.length];
+        const r = dotR(c.n);
+        g.append('circle').attr('cx', cx).attr('cy', yc).attr('r', r)
+          .attr('fill', color).attr('stroke', '#fff').attr('stroke-width', 1).style('cursor', 'pointer')
+          .on('mouseenter', hoverSeg(`${data.perGroup[c.gi].name} — ${row.cat} › ${row.sub}`,
+            `${c.avg.toFixed(1)}% avg OM · ${c.n} SKU${c.n !== 1 ? 's' : ''}`))
+          .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+        // Value + n label: alternate above/below by group to avoid clashes.
+        const above = c.gi % 2 === 0;
+        const ly = above ? yc - r - 4 : yc + r + 9;
+        const vt = g.append('text').attr('x', cx).attr('y', ly).attr('text-anchor', 'middle')
+          .style('pointer-events', 'none');
+        vt.append('tspan').attr('font-size', '6.5px').attr('font-weight', '700').attr('fill', '#333')
+          .text(`${c.avg.toFixed(1)}%`);
+        vt.append('tspan').attr('font-size', '6px').attr('fill', '#999').attr('dx', 2)
+          .text(`n=${c.n}`);
+      }
+      // Delta annotation for exactly two groups with both present.
+      if (groups.length === 2 && row.cells[0] && row.cells[1]) {
+        const dv = row.cells[1].avg - row.cells[0].avg;
+        g.append('text').attr('x', iW + 10).attr('y', yc + 3)
+          .attr('font-size', '7.5px').attr('font-weight', '700')
+          .attr('fill', dv >= 0 ? '#2e7d32' : '#c62828')
+          .text(`Δ ${dv >= 0 ? '+' : ''}${dv.toFixed(1)}pt`);
+      }
+    });
+  }, [data, groups.length, dims, wrapperRef, catColors, textScale]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
