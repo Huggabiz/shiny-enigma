@@ -3141,6 +3141,54 @@ function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, te
           .text(`Δ ${dv >= 0 ? '+' : ''}${dv.toFixed(1)}pt`);
       }
     });
+
+    // Summary legend (top right): SKU-weighted average deviation over
+    // the sub-categories where BOTH groups of a pair have n>0 —
+    // each row's Δ weighted by its combined SKU count. Later groups
+    // are compared against the first.
+    if (data.perGroup.length >= 2) {
+      type SumRow = { label: string; value: string; color?: string };
+      const sumRows: SumRow[] = [];
+      for (let gi = 1; gi < data.perGroup.length; gi++) {
+        let wSum = 0, dSum = 0, k = 0;
+        for (const row of rows) {
+          const a = row.cells[0], b = row.cells[gi];
+          if (!a || !b) continue;
+          const w = a.n + b.n;
+          dSum += (b.avg - a.avg) * w;
+          wSum += w; k++;
+        }
+        if (k === 0) {
+          sumRows.push({ label: `${data.perGroup[gi].name} vs ${data.perGroup[0].name}`, value: 'no overlap' });
+        } else {
+          const wd = dSum / wSum;
+          sumRows.push({
+            label: `${data.perGroup[gi].name} vs ${data.perGroup[0].name} (${k} sub-cat${k !== 1 ? 's' : ''})`,
+            value: `${wd >= 0 ? '+' : ''}${wd.toFixed(1)}pt`,
+            color: wd >= 0 ? '#2e7d32' : '#c62828',
+          });
+        }
+      }
+      const title = 'Avg deviation · SKU-weighted';
+      const rowH = 11, pad = 8;
+      const w = Math.max(150, title.length * 4.6 + 16,
+        ...sumRows.map((r) => r.label.length * 4.4 + r.value.length * 5 + 30));
+      const h = pad * 2 + 12 + sumRows.length * rowH;
+      const panel = g.append('g').attr('transform', `translate(${iW - w},0)`);
+      panel.append('rect').attr('x', 0).attr('y', 0).attr('width', w).attr('height', h).attr('rx', 5)
+        .attr('fill', '#fff').attr('fill-opacity', 0.92).attr('stroke', '#ddd').attr('stroke-width', 0.75);
+      panel.append('text').attr('x', 8).attr('y', pad + 6)
+        .attr('font-size', '6.5px').attr('font-weight', '700').attr('fill', '#999')
+        .attr('letter-spacing', '0.5').text(title.toUpperCase());
+      let ry = pad + 12;
+      for (const r of sumRows) {
+        ry += rowH;
+        panel.append('text').attr('x', 8).attr('y', ry - 3)
+          .attr('font-size', '8px').attr('fill', '#555').text(r.label);
+        panel.append('text').attr('x', w - 8).attr('y', ry - 3).attr('text-anchor', 'end')
+          .attr('font-size', '8px').attr('font-weight', '700').attr('fill', r.color ?? '#888').text(r.value);
+      }
+    }
   }, [data, groups.length, dims, wrapperRef, catColors, textScale]);
 
   return (
