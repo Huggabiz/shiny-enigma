@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Product, Project, RangePlan, Shelf, ShelfItem, ShelfLabel, SankeyLink, CardFormat, SlideViewSize, PlanFolder, Lens } from '../types';
 import { DEFAULT_CARD_FORMAT, createEmptyPlan, getActivePlan, getStages, DEFAULT_DEV_LENS, LENS_PALETTE } from '../types';
 import { clearSession as clearFileSession } from '../utils/fileSession';
+import { normaliseCatalogueOm } from '../utils/fileImport';
 
 async function hashPassword(password: string): Promise<string> {
   const encoded = new TextEncoder().encode(password);
@@ -424,6 +425,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // ensure the built-in Dev lens always exists at index 0 so the UI
     // never has to special-case its presence.
     const ensured = ensureLenses(migrated);
+    // OM% migration — projects saved before v1.31.3 stored the margin
+    // as a decimal fraction (0.3 = 30%); scale to percentage points.
+    // No-op on already-corrected data.
+    if (ensured.catalogue?.length) normaliseCatalogueOm(ensured.catalogue);
     // Loading always drops any retained file handle — the shared-open
     // flow re-attaches its handle and session state AFTER calling this,
     // so a legacy load or new project can never silently write over the

@@ -3107,6 +3107,8 @@ function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, te
         g.append('line').attr('x1', Math.min(...xs)).attr('x2', Math.max(...xs))
           .attr('y1', yc).attr('y2', yc).attr('stroke', '#bbb').attr('stroke-width', 1.5);
       }
+      const minCx = Math.min(...present.map((c) => xScale(c.avg)));
+      const maxCx = Math.max(...present.map((c) => xScale(c.avg)));
       for (const c of present) {
         const cx = xScale(c.avg);
         const color = GROUP_DOT_COLORS[c.gi % GROUP_DOT_COLORS.length];
@@ -3116,20 +3118,24 @@ function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, te
           .on('mouseenter', hoverSeg(`${data.perGroup[c.gi].name} — ${row.cat} › ${row.sub}`,
             `${c.avg.toFixed(1)}% avg OM · ${c.n} SKU${c.n !== 1 ? 's' : ''}`))
           .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
-        // Value + n label: alternate above/below by group to avoid clashes.
-        const above = c.gi % 2 === 0;
-        const ly = above ? yc - r - 4 : yc + r + 9;
-        const vt = g.append('text').attr('x', cx).attr('y', ly).attr('text-anchor', 'middle')
+        // Value + n label: outside the dumbbell — left of the leftmost
+        // dot, right of the rightmost; any middle dots label above.
+        const isLeft = present.length > 1 && cx === minCx && cx !== maxCx;
+        const isRight = cx === maxCx;
+        const vt = g.append('text').attr('y', isLeft || isRight ? yc + 2.5 : yc - r - 4)
+          .attr('x', isLeft ? cx - r - 5 : isRight ? cx + r + 5 : cx)
+          .attr('text-anchor', isLeft ? 'end' : isRight ? 'start' : 'middle')
           .style('pointer-events', 'none');
         vt.append('tspan').attr('font-size', '6.5px').attr('font-weight', '700').attr('fill', '#333')
           .text(`${c.avg.toFixed(1)}%`);
         vt.append('tspan').attr('font-size', '6px').attr('fill', '#999').attr('dx', 2)
           .text(`n=${c.n}`);
       }
-      // Delta annotation for exactly two groups with both present.
+      // Delta annotation for exactly two groups with both present —
+      // anchored at the far right edge, clear of the dot labels.
       if (groups.length === 2 && row.cells[0] && row.cells[1]) {
         const dv = row.cells[1].avg - row.cells[0].avg;
-        g.append('text').attr('x', iW + 10).attr('y', yc + 3)
+        g.append('text').attr('x', iW + margin.right - 10).attr('y', yc + 3).attr('text-anchor', 'end')
           .attr('font-size', '7.5px').attr('font-weight', '700')
           .attr('fill', dv >= 0 ? '#2e7d32' : '#c62828')
           .text(`Δ ${dv >= 0 ? '+' : ''}${dv.toFixed(1)}pt`);

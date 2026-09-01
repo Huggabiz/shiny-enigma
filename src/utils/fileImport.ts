@@ -107,20 +107,25 @@ export function parseSpreadsheet(
     };
   });
 
-  // OM% normalisation: catalogue exports give the operating margin as a
-  // decimal fraction (0.3 = 30%). If every value in the file sits at or
-  // below 1.5 the column is fractional — scale it to percentage points.
-  // A file already in points (30 = 30%) is left untouched.
-  const omVals = products
+  normaliseCatalogueOm(products);
+
+  return { products, headers };
+}
+
+/** OM% normalisation: catalogue exports give the operating margin as a
+ * decimal fraction (0.3 = 30%). If every value in the set sits at or
+ * below 1.5 the column is fractional — scale it to percentage points.
+ * Data already in points (30 = 30%) is left untouched, and re-running
+ * is a no-op, so this is safe at both import and project load. */
+export function normaliseCatalogueOm(products: { operatingMarginPct?: number }[]): void {
+  const vals = products
     .map((p) => p.operatingMarginPct)
     .filter((v): v is number => v !== undefined && !Number.isNaN(v));
-  if (omVals.length > 0 && Math.max(...omVals.map(Math.abs)) <= 1.5) {
+  if (vals.length > 0 && Math.max(...vals.map(Math.abs)) <= 1.5) {
     for (const p of products) {
       if (p.operatingMarginPct !== undefined) p.operatingMarginPct *= 100;
     }
   }
-
-  return { products, headers };
 }
 
 export function readFile(file: File): Promise<ArrayBuffer> {
