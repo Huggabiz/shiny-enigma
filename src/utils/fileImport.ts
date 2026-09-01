@@ -113,17 +113,18 @@ export function parseSpreadsheet(
 }
 
 /** OM% normalisation: catalogue exports give the operating margin as a
- * decimal fraction (0.3 = 30%). If every value in the set sits at or
- * below 1.5 the column is fractional — scale it to percentage points.
- * Data already in points (30 = 30%) is left untouched, and re-running
- * is a no-op, so this is safe at both import and project load. */
+ * decimal fraction (0.3 = 30%). Any value whose magnitude is in
+ * (0, 1.5] is treated as fractional and scaled to percentage points;
+ * values above 1.5 are taken as already being points (30 = 30%).
+ * Per-value (not whole-column) so mixed data still converts, and
+ * re-running is a no-op — safe at both import and project load. The
+ * trade-off: a genuine margin of 1.5% or less in points data would be
+ * misread, which real retail margins don't hit. */
 export function normaliseCatalogueOm(products: { operatingMarginPct?: number }[]): void {
-  const vals = products
-    .map((p) => p.operatingMarginPct)
-    .filter((v): v is number => v !== undefined && !Number.isNaN(v));
-  if (vals.length > 0 && Math.max(...vals.map(Math.abs)) <= 1.5) {
-    for (const p of products) {
-      if (p.operatingMarginPct !== undefined) p.operatingMarginPct *= 100;
+  for (const p of products) {
+    const v = p.operatingMarginPct;
+    if (v !== undefined && !Number.isNaN(v) && v !== 0 && Math.abs(v) <= 1.5) {
+      p.operatingMarginPct = v * 100;
     }
   }
 }
