@@ -3007,6 +3007,9 @@ function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, te
           seen.add(prod.id);
           const om = prod.operatingMarginPct;
           if (om === undefined || Number.isNaN(om)) continue;
+          // Low-revenue SKUs distort the averages — only SKUs with
+          // more than £1,000 revenue contribute to this comparison.
+          if ((prod.revenue ?? 0) <= 1000) continue;
           const cat = prod.category || 'Uncategorised';
           if (hiddenCats.has(cat)) continue;
           const sub = prod.subCategory || 'Unspecified';
@@ -3071,7 +3074,7 @@ function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, te
       lx += grp.name.length * 5.5 + 32;
     });
     legendG.append('text').attr('x', lx + 4).attr('y', 1).attr('font-size', '8px').attr('fill', '#999')
-      .text('dot size = SKU count behind the average');
+      .text('dot size = SKU count behind the average · SKUs with ≤ £1,000 revenue excluded');
 
     g.append('g').attr('transform', `translate(0,${iH})`)
       .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 70)).tickFormat((d) => `${d}%`))
