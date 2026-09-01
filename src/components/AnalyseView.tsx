@@ -2270,11 +2270,13 @@ function GrowthPlanChart({ plans, catalogue, shelfSide, catColors, textScale, hi
 
 // ---------- Plan Groups dialog (Growth by Group) ----------
 
+type PlanGroup = { id: string; name: string; planIds: string[]; color?: string };
+
 function PlanGroupsDialog({ groups, title, onTitleChange, onChange, onClose }: {
-  groups: { id: string; name: string; planIds: string[] }[];
+  groups: PlanGroup[];
   title: string;
   onTitleChange: (title: string) => void;
-  onChange: (groups: { id: string; name: string; planIds: string[] }[]) => void;
+  onChange: (groups: PlanGroup[]) => void;
   onClose: () => void;
 }) {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -2316,6 +2318,14 @@ function PlanGroupsDialog({ groups, title, onTitleChange, onChange, onClose }: {
                 style={{ cursor: 'grab', color: '#aaa', fontSize: 14, userSelect: 'none' }} title="Drag to reorder">⠿</span>
               <input className="slab-dialog-input" style={{ flex: 1 }} value={g.name}
                 onChange={(e) => rename(g.id, e.target.value)} placeholder="Group name" />
+              <input type="color" value={validHex(g.color) ? g.color! : GROUP_DOT_COLORS[gi % GROUP_DOT_COLORS.length]}
+                onChange={(e) => onChange(groups.map((x) => x.id === g.id ? { ...x, color: e.target.value } : x))}
+                title="Dot colour on the Margin Compare sheet"
+                style={{ width: 26, height: 24, padding: 0, border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', background: '#fff' }} />
+              <input className="slab-dialog-input" style={{ width: 66 }} value={g.color ?? ''}
+                placeholder={GROUP_DOT_COLORS[gi % GROUP_DOT_COLORS.length]}
+                onChange={(e) => { const v = e.target.value.trim(); onChange(groups.map((x) => x.id === g.id ? { ...x, color: v || undefined } : x)); }}
+                title="Hex colour (e.g. #1976d2); leave blank for the default" />
               <span style={{ fontSize: 11, color: '#999', whiteSpace: 'nowrap' }}>
                 {g.planIds.length} plan{g.planIds.length === 1 ? '' : 's'}
               </span>
@@ -2967,8 +2977,12 @@ function GrowthGroupChart({ groups, compounds, restName, restIndex, restHatch, s
 const GROUP_DOT_COLORS = ['#1976d2', '#e65100', '#2e7d32', '#7b1fa2', '#c62828', '#00838f'];
 const MC_SEP = '\u001f';
 
+function validHex(c?: string): boolean {
+  return !!c && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c);
+}
+
 function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, textScale, hiddenCats }: {
-  groups: { id: string; name: string; planIds: string[] }[];
+  groups: { id: string; name: string; planIds: string[]; color?: string }[];
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
 }) {
@@ -3036,11 +3050,15 @@ function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, te
       return;
     }
 
-    const allAvgs = rows.flatMap((r) => r.cells.flatMap((c) => c ? [c.avg] : []));
-    let lo = Math.min(...allAvgs), hi = Math.max(...allAvgs);
-    if (hi - lo < 5) { const mid = (hi + lo) / 2; lo = mid - 2.5; hi = mid + 2.5; }
-    const pad = (hi - lo) * 0.08;
-    const xScale = d3.scaleLinear().domain([lo - pad, hi + pad]).range([0, iW]);
+    // Fixed 0–100% axis so sheets are comparable across projects and
+    // copies — margins always sit in the same place on the scale.
+    const xScale = d3.scaleLinear().domain([0, 100]).range([0, iW]);
+    // Group dot colour: custom hex from the Manage Groups dialog,
+    // else the built-in palette by group position.
+    const dotColor = (gi: number) => {
+      const c = groups[gi]?.color;
+      return validHex(c) ? c! : GROUP_DOT_COLORS[gi % GROUP_DOT_COLORS.length];
+    };
     const yScale = d3.scaleBand<string>().domain(rows.map((r) => r.key)).range([0, iH]).padding(0.2);
 
     // Legend: one fixed colour per group, consistent on every row.
@@ -3048,7 +3066,7 @@ function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, te
     const legendG = g.append('g').attr('transform', 'translate(0,-16)');
     data.perGroup.forEach((grp, gi) => {
       const sw = legendG.append('g').attr('transform', `translate(${lx},0)`);
-      sw.append('circle').attr('cx', 5).attr('cy', -2).attr('r', 4.5).attr('fill', GROUP_DOT_COLORS[gi % GROUP_DOT_COLORS.length]);
+      sw.append('circle').attr('cx', 5).attr('cy', -2).attr('r', 4.5).attr('fill', dotColor(gi));
       sw.append('text').attr('x', 13).attr('y', 1).attr('font-size', '9px').attr('font-weight', '600').attr('fill', '#444').text(grp.name);
       lx += grp.name.length * 5.5 + 32;
     });
@@ -3111,7 +3129,7 @@ function MarginCompareChart({ groups, plans, catalogue, shelfSide, catColors, te
       const maxCx = Math.max(...present.map((c) => xScale(c.avg)));
       for (const c of present) {
         const cx = xScale(c.avg);
-        const color = GROUP_DOT_COLORS[c.gi % GROUP_DOT_COLORS.length];
+        const color = dotColor(c.gi);
         const r = dotR(c.n);
         g.append('circle').attr('cx', cx).attr('cy', yc).attr('r', r)
           .attr('fill', color).attr('stroke', '#fff').attr('stroke-width', 1).style('cursor', 'pointer')

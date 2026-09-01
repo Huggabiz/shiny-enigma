@@ -531,8 +531,9 @@ export interface Project {
      * calculation — e.g. end-of-line rankings being closed out. */
     growthConfig?: { pct?: number; metric?: string; combined?: boolean; uplift?: boolean; vertical?: boolean; verticalBySheet?: Record<string, boolean>; upliftBySheet?: Record<string, boolean>; combinedBySheet?: Record<string, boolean>; hiddenCats?: string[]; summary?: boolean; arpsExclRankings?: string[] };
     /** Named plan groups for the Growth by Group sheet (e.g. Core /
-     * Duo). */
-    planGroups?: { id: string; name: string; planIds: string[] }[];
+     * Duo). color (hex) sets the group's dot colour on Margin
+     * Compare; unset falls back to the built-in palette. */
+    planGroups?: { id: string; name: string; planIds: string[]; color?: string }[];
     /** Compound groups for the Growth by Group sheet: named buckets of
      * Item Ranking values that split each group bar into stacked
      * segments. SKUs whose ranking is in no bucket (or who have no
