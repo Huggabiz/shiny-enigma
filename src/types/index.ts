@@ -554,6 +554,8 @@ export interface Project {
      * "Groups" / "Compound groups"). */
     planGroupsTitle?: string;
     compoundGroupsTitle?: string;
+    /** Regions plotted on the RRP Compare sheet (default all). */
+    rrpRegions?: string[];
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;
