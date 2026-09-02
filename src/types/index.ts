@@ -559,6 +559,9 @@ export interface Project {
     /** RRP Compare column sources: [left, right] as plan-group ids,
      * '' = all selected plans, '__none__' = column hidden. */
     rrpCols?: string[];
+    /** Target multiplier per region key (e.g. { aus: 2 }) drawn as a
+     * vertical dashed line in the region's colour on every column. */
+    rrpTargets?: Record<string, number>;
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;

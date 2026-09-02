@@ -366,6 +366,33 @@ export function AnalyseView() {
       return next;
     });
   };
+  // Per-currency target multipliers, kept as raw input strings so
+  // partial decimals type cleanly; valid numbers persist and plot.
+  const [rrpTargetInputs, setRrpTargetInputs] = useState<Record<string, string>>(() => {
+    const t = av?.rrpTargets ?? {};
+    return Object.fromEntries(Object.entries(t).map(([k, v]) => [k, String(v)]));
+  });
+  const rrpTargets = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [k, s] of Object.entries(rrpTargetInputs)) {
+      const v = parseFloat(s);
+      if (!Number.isNaN(v) && v > 0) out[k] = v;
+    }
+    return out;
+  }, [rrpTargetInputs]);
+  const setRrpTarget = (key: string, raw: string) => {
+    setRrpTargetInputs((prev) => {
+      const next = { ...prev, [key]: raw };
+      const nums: Record<string, number> = {};
+      for (const [k, s] of Object.entries(next)) {
+        const v = parseFloat(s);
+        if (!Number.isNaN(v) && v > 0) nums[k] = v;
+      }
+      setAnalyseConfig({ rrpTargets: nums });
+      return next;
+    });
+  };
+
   const rrpColumns = useMemo(() => {
     const resolve = (id: string, fallbackAll: boolean) => {
       if (id === '__none__') return null;
@@ -652,7 +679,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -908,6 +935,16 @@ export function AnalyseView() {
                 </select>
               </label>
               <span className="analyse-config-item" style={{ cursor: 'default' }}>Click a currency in the chart legend to hide/show it</span>
+              <div className="analyse-config-separator" />
+              <span className="analyse-config-item" style={{ cursor: 'default', fontWeight: 600 }} title="Target multiplier per currency — drawn as a vertical dashed line in that currency's colour on every column">Targets</span>
+              {RRP_REGIONS.map((r) => (
+                <label key={r.key} className="analyse-config-item" title={`Target ${r.label} multiplier vs UK RRP (blank = no line)`}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color, display: 'inline-block' }} />
+                  <input type="number" min="0" step="0.05" className="analyse-config-input" style={{ width: 48 }}
+                    value={rrpTargetInputs[r.key] ?? ''} placeholder="—"
+                    onChange={(e) => setRrpTarget(r.key, e.target.value)} />
+                </label>
+              ))}
               <div className="analyse-config-separator" />
               <div className="toolbar-dropdown-wrapper">
                 <button className="toolbar-btn" style={{ fontSize: 10, padding: '3px 9px' }} onClick={() => setShowCatFilter((v) => !v)}>
@@ -3324,12 +3361,13 @@ const RRP_REGIONS: { key: string; label: string; color: string; get: (p: Product
   { key: 'aus', label: 'AUS $', color: '#e65100', get: (p) => p.ausRrp },
 ];
 
-function RrpCompareChart({ columns, catalogue, shelfSide, catColors, textScale, hiddenCats, regions, onToggleRegion }: {
+function RrpCompareChart({ columns, catalogue, shelfSide, catColors, textScale, hiddenCats, regions, onToggleRegion, targets }: {
   columns: { name: string; plans: RangePlan[] }[];
   catalogue: Product[]; shelfSide: string;
   catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
   regions: Set<string>;
   onToggleRegion: (key: string) => void;
+  targets: Record<string, number>;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
@@ -3343,6 +3381,10 @@ function RrpCompareChart({ columns, catalogue, shelfSide, catColors, textScale, 
     const cols = columns.map((col) => {
       const seen = new Set<string>();
       const m = new Map<string, { sumUk: number; sumR: number[]; n: number }>();
+      // Column-level per-SKU averages: mean of each SKU's own ratio,
+      // so every SKU counts equally in the column summary card.
+      const ratioSum = RRP_REGIONS.map(() => 0);
+      let nTot = 0;
       for (const plan of col.plans) {
         const shelf = resolveShelf(plan, shelfSide);
         if (!shelf) continue;
@@ -3360,12 +3402,12 @@ function RrpCompareChart({ columns, catalogue, shelfSide, catColors, textScale, 
           const key = cat + MC_SEP + sub;
           const e = m.get(key) ?? { sumUk: 0, sumR: RRP_REGIONS.map(() => 0), n: 0 };
           e.sumUk += uk;
-          regionVals.forEach((v, ri) => { e.sumR[ri] += v!; });
-          e.n++;
+          regionVals.forEach((v, ri) => { e.sumR[ri] += v!; ratioSum[ri] += v! / uk; });
+          e.n++; nTot++;
           m.set(key, e);
         }
       }
-      return { name: col.name, m };
+      return { name: col.name, m, avgs: nTot > 0 ? ratioSum.map((s) => s / nTot) : null, nTot };
     });
     const keys = new Set<string>();
     for (const c of cols) for (const k of c.m.keys()) keys.add(k);
@@ -3419,9 +3461,13 @@ function RrpCompareChart({ columns, catalogue, shelfSide, catColors, textScale, 
       return;
     }
 
-    // Shared x-domain across every column so ratios line up visually.
+    // Shared x-domain across every column so ratios line up visually
+    // — target lines for visible currencies stay in frame too.
     const allRatios = rows.flatMap((r) => r.cells.flatMap((c) => c ? activeRegionIdx.map((ri) => c.ratios[ri]) : []));
-    let lo = Math.min(1, ...allRatios), hi = Math.max(1, ...allRatios);
+    const visibleTargets = activeRegionIdx
+      .map((ri) => targets[RRP_REGIONS[ri].key])
+      .filter((v): v is number => v !== undefined);
+    let lo = Math.min(1, ...allRatios, ...visibleTargets), hi = Math.max(1, ...allRatios, ...visibleTargets);
     const pad = Math.max(0.08, (hi - lo) * 0.1);
     const nCols = cols.length;
     const colGap = nCols > 1 ? 28 : 0;
@@ -3458,6 +3504,48 @@ function RrpCompareChart({ columns, catalogue, shelfSide, catColors, textScale, 
         .attr('stroke', '#555').attr('stroke-width', 1.25).attr('stroke-dasharray', '4,3');
       cg.append('text').attr('x', anchorX).attr('y', iH + 28).attr('text-anchor', 'middle')
         .attr('font-size', '7.5px').attr('font-weight', '700').attr('fill', '#555').text('UK = 1.0×');
+      // Target multiplier lines, per visible currency with a target.
+      for (const ri of activeRegionIdx) {
+        const region = RRP_REGIONS[ri];
+        const tv = targets[region.key];
+        if (tv === undefined) continue;
+        const tx = xScale(tv);
+        cg.append('line').attr('x1', tx).attr('x2', tx).attr('y1', -4).attr('y2', iH)
+          .attr('stroke', region.color).attr('stroke-width', 1.25)
+          .attr('stroke-dasharray', '2,3').attr('opacity', 0.7);
+        cg.append('text').attr('x', tx).attr('y', -6).attr('text-anchor', 'middle')
+          .attr('font-size', '6.5px').attr('font-weight', '700')
+          .attr('fill', region.color).attr('opacity', 0.85)
+          .text(`${tv}×`);
+      }
+      // Column summary card: per-SKU average multiplier per currency.
+      if (col.avgs) {
+        const cardRows = activeRegionIdx.map((ri) => ({
+          color: RRP_REGIONS[ri].color,
+          label: RRP_REGIONS[ri].label,
+          value: `${col.avgs![ri].toFixed(2)}×`,
+        }));
+        const title = `avg × / SKU (n=${col.nTot})`;
+        const rowH = 10.5, pad = 6;
+        const cw = Math.max(76, title.length * 4.2 + 12,
+          ...cardRows.map((r) => r.label.length * 4.4 + r.value.length * 4.8 + 26));
+        const ch = pad * 2 + 11 + cardRows.length * rowH;
+        const card = cg.append('g').attr('transform', `translate(${colW - cw - 4},2)`);
+        card.append('rect').attr('width', cw).attr('height', ch).attr('rx', 4)
+          .attr('fill', '#fff').attr('fill-opacity', 0.92).attr('stroke', '#ddd').attr('stroke-width', 0.75);
+        card.append('text').attr('x', 6).attr('y', pad + 5)
+          .attr('font-size', '6px').attr('font-weight', '700').attr('fill', '#999')
+          .attr('letter-spacing', '0.4').text(title.toUpperCase());
+        let cy2 = pad + 11;
+        for (const r of cardRows) {
+          cy2 += rowH;
+          card.append('circle').attr('cx', 10).attr('cy', cy2 - 6).attr('r', 3).attr('fill', r.color);
+          card.append('text').attr('x', 17).attr('y', cy2 - 3)
+            .attr('font-size', '7.5px').attr('fill', '#555').text(r.label);
+          card.append('text').attr('x', cw - 6).attr('y', cy2 - 3).attr('text-anchor', 'end')
+            .attr('font-size', '7.5px').attr('font-weight', '700').attr('fill', '#1a1a2e').text(r.value);
+        }
+      }
     });
 
     rows.forEach((row, ri2) => {
@@ -3512,7 +3600,7 @@ function RrpCompareChart({ columns, catalogue, shelfSide, catColors, textScale, 
         }
       });
     });
-  }, [data, dims, wrapperRef, catColors, textScale, regions, onToggleRegion]);
+  }, [data, dims, wrapperRef, catColors, textScale, regions, onToggleRegion, targets]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
