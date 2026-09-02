@@ -352,6 +352,32 @@ export function AnalyseView() {
       return n;
     });
   };
+  // RRP Compare columns: one dumbbell column per source, sharing the
+  // sub-category rails. '' = all selected plans, '__none__' = hidden.
+  const [rrpCols, setRrpColsState] = useState<[string, string]>(() => {
+    const stored = av?.rrpCols;
+    if (stored && stored.length === 2) return [stored[0], stored[1]];
+    return ['', '__none__'];
+  });
+  const setRrpCol = (idx: 0 | 1, v: string) => {
+    setRrpColsState((prev) => {
+      const next: [string, string] = idx === 0 ? [v, prev[1]] : [prev[0], v];
+      setAnalyseConfig({ rrpCols: next });
+      return next;
+    });
+  };
+  const rrpColumns = useMemo(() => {
+    const resolve = (id: string, fallbackAll: boolean) => {
+      if (id === '__none__') return null;
+      if (id === '') return { name: 'All plans', plans: selectedPlans };
+      const grp = planGroups.find((gr) => gr.id === id);
+      if (!grp) return fallbackAll ? { name: 'All plans', plans: selectedPlans } : null;
+      return { name: grp.name, plans: selectedPlans.filter((p) => grp.planIds.includes(p.id)) };
+    };
+    const cols = [resolve(rrpCols[0], true), resolve(rrpCols[1], false)]
+      .filter((c): c is { name: string; plans: RangePlan[] } => !!c);
+    return cols.length > 0 ? cols : [{ name: 'All plans', plans: selectedPlans }];
+  }, [rrpCols, planGroups, selectedPlans]);
 
   // Per-sheet text-size multiplier for presentation exports.
   const [textScales, setTextScales] = useState<Record<string, number>>(() => av?.textScales ?? {});
@@ -626,7 +652,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -868,16 +894,20 @@ export function AnalyseView() {
 
           {activeSheet === 'rrp-compare' && (
             <div className="analyse-chart-config">
-              <span className="analyse-config-item" style={{ cursor: 'default', fontWeight: 600 }}>Compare vs UK RRP (1.0×):</span>
-              {RRP_REGIONS.map((r) => (
-                <label key={r.key} className="analyse-config-item" title={`Plot ${r.label} RRP as a multiple of UK RRP`}>
-                  <input type="checkbox" checked={rrpRegions.has(r.key)} onChange={() => toggleRrpRegion(r.key)} />
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color, display: 'inline-block' }} />
-                    {r.label}
-                  </span>
-                </label>
-              ))}
+              <label className="analyse-config-item" title="Group shown in the left dumbbell column">Left
+                <select className="analyse-config-input" style={{ width: 110, textAlign: 'left' }} value={rrpCols[0]} onChange={(e) => setRrpCol(0, e.target.value)}>
+                  <option value="">All plans</option>
+                  {planGroups.map((gr) => <option key={gr.id} value={gr.id}>{gr.name}</option>)}
+                </select>
+              </label>
+              <label className="analyse-config-item" title="Group shown in the right dumbbell column (None = single column)">Right
+                <select className="analyse-config-input" style={{ width: 110, textAlign: 'left' }} value={rrpCols[1]} onChange={(e) => setRrpCol(1, e.target.value)}>
+                  <option value="__none__">None</option>
+                  <option value="">All plans</option>
+                  {planGroups.map((gr) => <option key={gr.id} value={gr.id}>{gr.name}</option>)}
+                </select>
+              </label>
+              <span className="analyse-config-item" style={{ cursor: 'default' }}>Click a currency in the chart legend to hide/show it</span>
               <div className="analyse-config-separator" />
               <div className="toolbar-dropdown-wrapper">
                 <button className="toolbar-btn" style={{ fontSize: 10, padding: '3px 9px' }} onClick={() => setShowCatFilter((v) => !v)}>
@@ -899,7 +929,7 @@ export function AnalyseView() {
                   </div>
                 )}
               </div>
-              <span className="analyse-config-item" style={{ cursor: 'default' }}>Ratios are value-weighted (Σ region RRP ÷ Σ UK RRP per sub-cat)</span>
+              <span className="analyse-config-item" style={{ cursor: 'default' }}>Only SKUs priced in every region count · ratios value-weighted (Σ region ÷ Σ UK)</span>
               <span style={{ flex: 1 }} />
               <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
                 <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
@@ -3294,112 +3324,111 @@ const RRP_REGIONS: { key: string; label: string; color: string; get: (p: Product
   { key: 'aus', label: 'AUS $', color: '#e65100', get: (p) => p.ausRrp },
 ];
 
-function RrpCompareChart({ plans, catalogue, shelfSide, catColors, textScale, hiddenCats, regions }: {
-  plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
+function RrpCompareChart({ columns, catalogue, shelfSide, catColors, textScale, hiddenCats, regions, onToggleRegion }: {
+  columns: { name: string; plans: RangePlan[] }[];
+  catalogue: Product[]; shelfSide: string;
   catColors: Map<string, string>; textScale: number; hiddenCats: Set<string>;
   regions: Set<string>;
+  onToggleRegion: (key: string) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  // Per category/sub-cat, per selected region: value-weighted ratio
-  // Σ(region RRP) / Σ(UK RRP) over SKUs priced in BOTH, with the
-  // SKU-pair count as the confidence signal. SKUs are deduped across
-  // the selected plans (first plan wins).
+  // Per column (group), per category/sub-cat: value-weighted ratio
+  // Σ(region RRP) / Σ(UK RRP). ONLY SKUs priced in every region (UK,
+  // US, EU, AUS) count, so every region's dot in a sub-cat rests on
+  // the same SKU set. SKUs dedupe within a column (first plan wins).
   const data = useMemo(() => {
-    const active = RRP_REGIONS.filter((r) => regions.has(r.key));
-    const seen = new Set<string>();
-    const m = new Map<string, { sumUk: number[]; sumR: number[]; n: number[] }>();
-    for (const plan of plans) {
-      const shelf = resolveShelf(plan, shelfSide);
-      if (!shelf) continue;
-      for (const item of shelf.items) {
-        const prod = getProductForItem(item, catalogue);
-        if (!prod || seen.has(prod.id)) continue;
-        seen.add(prod.id);
-        const uk = prod.rrp;
-        if (!uk || uk <= 0) continue;
-        const cat = prod.category || 'Uncategorised';
-        if (hiddenCats.has(cat)) continue;
-        const sub = prod.subCategory || 'Unspecified';
-        const key = cat + MC_SEP + sub;
-        const e = m.get(key) ?? {
-          sumUk: active.map(() => 0), sumR: active.map(() => 0), n: active.map(() => 0),
-        };
-        active.forEach((r, ri) => {
-          const v = r.get(prod);
-          if (v === undefined || Number.isNaN(v) || v <= 0) return;
-          e.sumUk[ri] += uk; e.sumR[ri] += v; e.n[ri]++;
-        });
-        m.set(key, e);
+    const cols = columns.map((col) => {
+      const seen = new Set<string>();
+      const m = new Map<string, { sumUk: number; sumR: number[]; n: number }>();
+      for (const plan of col.plans) {
+        const shelf = resolveShelf(plan, shelfSide);
+        if (!shelf) continue;
+        for (const item of shelf.items) {
+          const prod = getProductForItem(item, catalogue);
+          if (!prod || seen.has(prod.id)) continue;
+          seen.add(prod.id);
+          const uk = prod.rrp;
+          if (!uk || uk <= 0) continue;
+          const regionVals = RRP_REGIONS.map((r) => r.get(prod));
+          if (regionVals.some((v) => v === undefined || Number.isNaN(v) || v <= 0)) continue;
+          const cat = prod.category || 'Uncategorised';
+          if (hiddenCats.has(cat)) continue;
+          const sub = prod.subCategory || 'Unspecified';
+          const key = cat + MC_SEP + sub;
+          const e = m.get(key) ?? { sumUk: 0, sumR: RRP_REGIONS.map(() => 0), n: 0 };
+          e.sumUk += uk;
+          regionVals.forEach((v, ri) => { e.sumR[ri] += v!; });
+          e.n++;
+          m.set(key, e);
+        }
       }
-    }
-    const rows = Array.from(m.entries()).map(([key, e]) => {
+      return { name: col.name, m };
+    });
+    const keys = new Set<string>();
+    for (const c of cols) for (const k of c.m.keys()) keys.add(k);
+    const rows = Array.from(keys).map((key) => {
       const [cat, sub] = key.split(MC_SEP);
-      const cells = active.map((_, ri) => e.n[ri] > 0
-        ? { ratio: e.sumR[ri] / e.sumUk[ri], n: e.n[ri] }
-        : null);
+      const cells = cols.map((c) => {
+        const e = c.m.get(key);
+        return e ? { ratios: RRP_REGIONS.map((_, ri) => e.sumR[ri] / e.sumUk), n: e.n } : null;
+      });
       return { key, cat, sub, cells };
-    }).filter((r) => r.cells.some(Boolean))
-      .sort((a, b) => a.cat.localeCompare(b.cat) || a.sub.localeCompare(b.sub));
-    return { active, rows };
-  }, [plans, catalogue, shelfSide, hiddenCats, regions]);
+    }).sort((a, b) => a.cat.localeCompare(b.cat) || a.sub.localeCompare(b.sub));
+    return { cols, rows };
+  }, [columns, catalogue, shelfSide, hiddenCats]);
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
     const width = dims.width / textScale;
     const height = dims.height / textScale;
-    const margin = { top: 34, right: 60, bottom: 34, left: 170 };
+    const margin = { top: 46, right: 26, bottom: 34, left: 170 };
     const iW = width - margin.left - margin.right, iH = height - margin.top - margin.bottom;
     if (iW < 20 || iH < 20) return;
 
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
-    const { active, rows } = data;
+    const { cols, rows } = data;
+    const activeRegionIdx = RRP_REGIONS.map((r, ri) => regions.has(r.key) ? ri : -1).filter((ri) => ri >= 0);
 
-    if (active.length === 0 || rows.length === 0) {
+    // Clickable legend: every region listed, dimmed when hidden.
+    let lx = 0;
+    const legendG = g.append('g').attr('transform', 'translate(0,-32)');
+    RRP_REGIONS.forEach((r) => {
+      const on = regions.has(r.key);
+      const sw = legendG.append('g').attr('transform', `translate(${lx},0)`)
+        .style('cursor', 'pointer').attr('opacity', on ? 1 : 0.35)
+        .on('click', () => onToggleRegion(r.key));
+      sw.append('circle').attr('cx', 5).attr('cy', -2).attr('r', 4.5).attr('fill', r.color);
+      sw.append('text').attr('x', 13).attr('y', 1).attr('font-size', '9px').attr('font-weight', '600').attr('fill', '#444')
+        .text(r.label);
+      if (!on) sw.append('line').attr('x1', 11).attr('x2', 13 + r.label.length * 5.5).attr('y1', -2).attr('y2', -2).attr('stroke', '#888').attr('stroke-width', 1);
+      sw.append('title').text(`${on ? 'Hide' : 'Show'} ${r.label}`);
+      lx += r.label.length * 5.5 + 32;
+    });
+    legendG.append('text').attr('x', lx + 4).attr('y', 1).attr('font-size', '8px').attr('fill', '#999')
+      .text('× UK RRP · SKUs priced in every region only · click to toggle');
+
+    if (rows.length === 0 || activeRegionIdx.length === 0) {
       g.append('text').attr('x', iW / 2).attr('y', iH / 2).attr('text-anchor', 'middle')
         .attr('font-size', '12px').attr('fill', '#888')
-        .text(active.length === 0
-          ? 'No regions selected - tick US / EU / AUS in the bar below.'
-          : 'No comparable pricing - SKUs need both a UK RRP and a regional RRP.');
+        .text(activeRegionIdx.length === 0
+          ? 'All currencies hidden - click one in the legend above.'
+          : 'No comparable pricing - SKUs need a UK, US, EU and AUS RRP to count.');
       return;
     }
 
-    const allRatios = rows.flatMap((r) => r.cells.flatMap((c) => c ? [c.ratio] : []));
+    // Shared x-domain across every column so ratios line up visually.
+    const allRatios = rows.flatMap((r) => r.cells.flatMap((c) => c ? activeRegionIdx.map((ri) => c.ratios[ri]) : []));
     let lo = Math.min(1, ...allRatios), hi = Math.max(1, ...allRatios);
     const pad = Math.max(0.08, (hi - lo) * 0.1);
-    const xScale = d3.scaleLinear().domain([lo - pad, hi + pad]).range([0, iW]);
+    const nCols = cols.length;
+    const colGap = nCols > 1 ? 28 : 0;
+    const colW = (iW - colGap * (nCols - 1)) / nCols;
+    const xScale = d3.scaleLinear().domain([lo - pad, hi + pad]).range([0, colW]);
     const yScale = d3.scaleBand<string>().domain(rows.map((r) => r.key)).range([0, iH]).padding(0.2);
-
-    // Legend for the exported image.
-    let lx = 0;
-    const legendG = g.append('g').attr('transform', 'translate(0,-16)');
-    for (const r of active) {
-      const sw = legendG.append('g').attr('transform', `translate(${lx},0)`);
-      sw.append('circle').attr('cx', 5).attr('cy', -2).attr('r', 4.5).attr('fill', r.color);
-      sw.append('text').attr('x', 13).attr('y', 1).attr('font-size', '9px').attr('font-weight', '600').attr('fill', '#444').text(r.label);
-      lx += r.label.length * 5.5 + 32;
-    }
-    legendG.append('text').attr('x', lx + 4).attr('y', 1).attr('font-size', '8px').attr('fill', '#999')
-      .text('× UK RRP, value-weighted · dot size = SKU pairs');
-
-    g.append('g').attr('transform', `translate(0,${iH})`)
-      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 70)).tickFormat((d) => `${(+d).toFixed(2)}×`))
-      .selectAll('text').attr('font-size', '8px');
-    g.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`)
-      .call(d3.axisBottom(xScale).ticks(Math.floor(iW / 70)).tickSize(-iH).tickFormat(() => ''))
-      .selectAll('line').attr('stroke', '#eee');
-    g.selectAll('.gx .domain').remove();
-    g.append('text').attr('x', iW / 2).attr('y', iH + 28).attr('text-anchor', 'middle')
-      .attr('font-size', '9px').attr('fill', '#666').text('Regional RRP as a multiple of UK RRP');
-
-    // The UK anchor: a locked reference line at 1.0×.
-    const anchorX = xScale(1);
-    g.append('line').attr('x1', anchorX).attr('x2', anchorX).attr('y1', -6).attr('y2', iH)
-      .attr('stroke', '#555').attr('stroke-width', 1.25).attr('stroke-dasharray', '4,3');
-    g.append('text').attr('x', anchorX).attr('y', -20).attr('text-anchor', 'middle')
-      .attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#555').text('UK RRP = 1.0×');
+    const colX = (ci: number) => ci * (colW + colGap);
 
     const hoverSeg = (label: string, value: string) => (ev: MouseEvent) => {
       const rc = wrapperRef.current?.getBoundingClientRect();
@@ -3410,15 +3439,35 @@ function RrpCompareChart({ plans, catalogue, shelfSide, catColors, textScale, hi
       if (rc) setTooltip((pv) => pv ? { ...pv, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null);
     };
 
-    const dotR = (n: number) => Math.min(9, 3 + Math.sqrt(n) * 1.1);
+    // Per-column chrome: header, axis, gridlines, anchor line.
+    cols.forEach((col, ci) => {
+      const cg = g.append('g').attr('transform', `translate(${colX(ci)},0)`);
+      if (nCols > 1 || col.name !== 'All plans') {
+        cg.append('text').attr('x', colW / 2).attr('y', -14).attr('text-anchor', 'middle')
+          .attr('font-size', '10px').attr('font-weight', '700').attr('fill', '#1a1a2e').text(col.name);
+      }
+      cg.append('g').attr('transform', `translate(0,${iH})`)
+        .call(d3.axisBottom(xScale).ticks(Math.floor(colW / 60)).tickFormat((d) => `${(+d).toFixed(2)}×`))
+        .selectAll('text').attr('font-size', '8px');
+      const gx = cg.append('g').attr('class', 'gx').attr('transform', `translate(0,${iH})`)
+        .call(d3.axisBottom(xScale).ticks(Math.floor(colW / 60)).tickSize(-iH).tickFormat(() => ''));
+      gx.selectAll('line').attr('stroke', '#eee');
+      gx.select('.domain').remove();
+      const anchorX = xScale(1);
+      cg.append('line').attr('x1', anchorX).attr('x2', anchorX).attr('y1', -4).attr('y2', iH)
+        .attr('stroke', '#555').attr('stroke-width', 1.25).attr('stroke-dasharray', '4,3');
+      cg.append('text').attr('x', anchorX).attr('y', iH + 28).attr('text-anchor', 'middle')
+        .attr('font-size', '7.5px').attr('font-weight', '700').attr('fill', '#555').text('UK = 1.0×');
+    });
 
-    rows.forEach((row, ri) => {
+    rows.forEach((row, ri2) => {
       const yc = yScale(row.key)! + yScale.bandwidth() / 2;
-      if (ri % 2 === 1) {
+      if (ri2 % 2 === 1) {
         g.append('rect').attr('x', -margin.left + 6).attr('y', yScale(row.key)!)
           .attr('width', iW + margin.left - 6 + margin.right - 8).attr('height', yScale.bandwidth())
           .attr('fill', '#000').attr('opacity', 0.025);
       }
+      // Shared row labels down the left edge.
       const subMax = Math.max(4, Math.floor((margin.left - 24) / 4.6));
       const subLabel = row.sub.length > subMax ? row.sub.slice(0, subMax - 1) + '…' : row.sub;
       const lt = g.append('text').attr('x', -10).attr('y', yc - 1).attr('text-anchor', 'end')
@@ -3430,41 +3479,40 @@ function RrpCompareChart({ plans, catalogue, shelfSide, catColors, textScale, hi
         .attr('font-size', '6.5px').attr('fill', '#999')
         .text(row.cat.length > subMax ? row.cat.slice(0, subMax - 1) + '…' : row.cat);
 
-      const present = row.cells
-        .map((c, ci) => c ? { ...c, ci } : null)
-        .filter((c): c is { ratio: number; n: number; ci: number } => !!c);
-      if (present.length === 0) return;
-      // Connector spanning the anchor and every dot on the row.
-      const xs = [...present.map((c) => xScale(c.ratio)), anchorX];
-      g.append('line').attr('x1', Math.min(...xs)).attr('x2', Math.max(...xs))
-        .attr('y1', yc).attr('y2', yc).attr('stroke', '#bbb').attr('stroke-width', 1.5);
-      // Anchor tick on the row.
-      g.append('circle').attr('cx', anchorX).attr('cy', yc).attr('r', 2).attr('fill', '#555');
-
-      const minCx = Math.min(...present.map((c) => xScale(c.ratio)));
-      const maxCx = Math.max(...present.map((c) => xScale(c.ratio)));
-      for (const c of present) {
-        const cx = xScale(c.ratio);
-        const region = active[c.ci];
-        const r = dotR(c.n);
-        g.append('circle').attr('cx', cx).attr('cy', yc).attr('r', r)
-          .attr('fill', region.color).attr('stroke', '#fff').attr('stroke-width', 1).style('cursor', 'pointer')
-          .on('mouseenter', hoverSeg(`${region.label} — ${row.cat} › ${row.sub}`,
-            `${c.ratio.toFixed(2)}× UK RRP · ${c.n} SKU${c.n !== 1 ? 's' : ''} priced in both`))
-          .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
-        const isLeft = present.length > 1 && cx === minCx && cx !== maxCx;
-        const isRight = cx === maxCx;
-        const vt = g.append('text').attr('y', isLeft || isRight ? yc + 2.5 : yc - r - 4)
-          .attr('x', isLeft ? cx - r - 5 : isRight ? cx + r + 5 : cx)
-          .attr('text-anchor', isLeft ? 'end' : isRight ? 'start' : 'middle')
-          .style('pointer-events', 'none');
-        vt.append('tspan').attr('font-size', '6.5px').attr('font-weight', '700').attr('fill', '#333')
-          .text(`${c.ratio.toFixed(2)}×`);
-        vt.append('tspan').attr('font-size', '6px').attr('fill', '#999').attr('dx', 2)
-          .text(`n=${c.n}`);
-      }
+      cols.forEach((col, ci) => {
+        const cell = row.cells[ci];
+        if (!cell) return;
+        const ox = colX(ci);
+        const anchorX = xScale(1);
+        const dots = activeRegionIdx.map((rgi) => ({ rgi, cx: xScale(cell.ratios[rgi]) }));
+        if (dots.length === 0) return;
+        const xs = [...dots.map((d) => d.cx), anchorX];
+        g.append('line').attr('x1', ox + Math.min(...xs)).attr('x2', ox + Math.max(...xs))
+          .attr('y1', yc).attr('y2', yc).attr('stroke', '#bbb').attr('stroke-width', 1.5);
+        g.append('circle').attr('cx', ox + anchorX).attr('cy', yc).attr('r', 2).attr('fill', '#555');
+        const minCx = Math.min(...dots.map((d) => d.cx));
+        const maxCx = Math.max(...dots.map((d) => d.cx));
+        for (const dt of dots) {
+          const region = RRP_REGIONS[dt.rgi];
+          const ratio = cell.ratios[dt.rgi];
+          g.append('circle').attr('cx', ox + dt.cx).attr('cy', yc).attr('r', 4.5)
+            .attr('fill', region.color).attr('stroke', '#fff').attr('stroke-width', 1).style('cursor', 'pointer')
+            .on('mouseenter', hoverSeg(`${region.label} — ${col.name} — ${row.cat} › ${row.sub}`,
+              `${ratio.toFixed(2)}× UK RRP · ${cell.n} fully-priced SKU${cell.n !== 1 ? 's' : ''}`))
+            .on('mousemove', moveSeg).on('mouseleave', () => setTooltip(null));
+          const isLeft = dots.length > 1 && dt.cx === minCx && dt.cx !== maxCx;
+          const isRight = dt.cx === maxCx;
+          g.append('text')
+            .attr('y', isLeft || isRight ? yc + 2.5 : yc - 9)
+            .attr('x', ox + (isLeft ? dt.cx - 9 : isRight ? dt.cx + 9 : dt.cx))
+            .attr('text-anchor', isLeft ? 'end' : isRight ? 'start' : 'middle')
+            .attr('font-size', '6.5px').attr('font-weight', '700').attr('fill', '#333')
+            .style('pointer-events', 'none')
+            .text(`${ratio.toFixed(2)}×`);
+        }
+      });
     });
-  }, [data, dims, wrapperRef, catColors, textScale]);
+  }, [data, dims, wrapperRef, catColors, textScale, regions, onToggleRegion]);
 
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>

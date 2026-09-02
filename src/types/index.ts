@@ -556,6 +556,9 @@ export interface Project {
     compoundGroupsTitle?: string;
     /** Regions plotted on the RRP Compare sheet (default all). */
     rrpRegions?: string[];
+    /** RRP Compare column sources: [left, right] as plan-group ids,
+     * '' = all selected plans, '__none__' = column hidden. */
+    rrpCols?: string[];
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;
