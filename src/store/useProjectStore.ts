@@ -184,6 +184,7 @@ interface ProjectStore {
   addSetBoard: (name: string) => void;
   removeSetBoard: (boardId: string) => void;
   renameSetBoard: (boardId: string, name: string) => void;
+  setSetBoardSlideSize: (boardId: string, size: import('../types').SlideViewSize) => void;
   setActiveSetBoard: (boardId: string) => void;
   addSetBoardItem: (boardId: string, item: import('../types').SetBoardItem) => void;
   removeSetBoardItem: (boardId: string, itemId: string) => void;
@@ -798,6 +799,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const { project } = get();
     if (!project) return;
     const boards = (project.setBoards ?? []).map((b) => b.id === boardId ? { ...b, name, matrixLayout: b.matrixLayout ? { ...b.matrixLayout, title: name } : undefined } : b);
+    set({ project: { ...project, setBoards: boards, updatedAt: new Date().toISOString() } });
+  },
+
+  setSetBoardSlideSize: (boardId, size) => {
+    const { project } = get();
+    if (!project) return;
+    const boards = (project.setBoards ?? []).map((b) => b.id === boardId ? { ...b, slideSize: size } : b);
     set({ project: { ...project, setBoards: boards, updatedAt: new Date().toISOString() } });
   },
 

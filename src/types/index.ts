@@ -646,6 +646,9 @@ export interface SetBoard {
   name: string;
   items: SetBoardItem[];
   matrixLayout?: MatrixLayout;
+  /** Persisted slide-size choice for this board — manual selections
+   * survive navigation instead of resetting to auto. */
+  slideSize?: SlideViewSize;
 }
 
 // Helper to get the active plan from a project

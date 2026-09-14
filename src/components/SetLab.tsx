@@ -11,6 +11,7 @@ import { SlideCanvasControls, fitSlideToWidth } from './SlideCanvasControls';
 import { CloseIcon } from './Icons';
 import { BASE_GAP, computeMatrixLayout, computeMatrixAutoTier, MAX_CARD_WIDTH, TIER_LADDER } from '../utils/matrixLayout';
 import { anonDisplay } from '../utils/anonymise';
+import { groupSetBoardByCell, exportSetBoardToExcel } from '../utils/exportSetBoard';
 import type { Product, SetBoard, SetBoardItem, SetItemKind, MatrixLayout } from '../types';
 import './SetLab.css';
 
@@ -82,9 +83,10 @@ export function SetLab() {
   const {
     project, addSetBoard, removeSetBoard, renameSetBoard, setActiveSetBoard,
     addSetBoardItem, removeSetBoardItem, updateSetBoardItem,
-    updateSetBoardMatrix, setSetBoardMatrixAssignment,
+    updateSetBoardMatrix, setSetBoardMatrixAssignment, setSetBoardSlideSize,
     slideBaseScale, slideBaseScaleMode, setSlideBaseScale, setSlideBaseScaleMode, cardFormat,
   } = useProjectStore();
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
 
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [editingAxis, setEditingAxis] = useState<{ axis: 'x' | 'y'; index: number } | null>(null);
@@ -106,6 +108,21 @@ export function SetLab() {
     [activeBoard?.matrixLayout, activeBoard?.name],
   );
 
+  // Nested cell → set → products structure for the List view.
+  const cellGroups = useMemo(() => activeBoard ? groupSetBoardByCell(activeBoard) : [], [activeBoard]);
+  const [exporting, setExporting] = useState(false);
+  const handleExportBoard = async () => {
+    if (!activeBoard || exporting) return;
+    setExporting(true);
+    try {
+      await exportSetBoardToExcel(activeBoard, catalogue);
+    } catch {
+      alert('Export failed — see the browser console for details.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
@@ -116,18 +133,26 @@ export function SetLab() {
     return () => observer.disconnect();
   }, [activeBoard?.id]);
 
-  // Board opened/created/switched: start in auto-size mode and fit the
-  // slide to the viewport, matching the range view's convention. Two
-  // RAFs let the new board's DOM mount before measuring.
+  // Board opened/created/switched: restore the board's persisted slide
+  // size — a manual choice sticks across navigation instead of
+  // resetting to auto; boards without a stored choice start in auto
+  // and fit to the viewport. Two RAFs let the new board's DOM mount
+  // before measuring.
   const activeBoardId = activeBoard?.id;
   useEffect(() => {
     if (!activeBoardId) return;
+    const stored = useProjectStore.getState().project?.setBoards?.find((b) => b.id === activeBoardId)?.slideSize;
+    if (stored?.mode === 'manual' && stored.scale) {
+      setSlideBaseScaleMode('manual');
+      setSlideBaseScale(stored.scale);
+      return;
+    }
     setSlideBaseScaleMode('auto');
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => fitSlideToWidth('.range-view-scroll'));
     });
     return () => cancelAnimationFrame(id);
-  }, [activeBoardId, setSlideBaseScaleMode]);
+  }, [activeBoardId, setSlideBaseScaleMode, setSlideBaseScale]);
 
   const uiScale = slideBaseScale;
   const scaledRowHeaderW = Math.round(ROW_HEADER_WIDTH * uiScale);
@@ -430,18 +455,80 @@ export function SetLab() {
 
         <div className="range-design-canvas">
           <div className="range-design-title-bar">
+            <div className="slab-view-toggle" role="tablist">
+              <button role="tab" className={viewMode === 'board' ? 'active' : ''} onClick={() => setViewMode('board')}>Board</button>
+              <button role="tab" className={viewMode === 'list' ? 'active' : ''} onClick={() => setViewMode('list')}>List</button>
+            </div>
+            {viewMode === 'list' && activeBoard && (
+              <button className="slab-export-btn" disabled={exporting} onClick={handleExportBoard}
+                title="Download this board as an Excel file — cell, set, and product rows with embedded images">
+                {exporting ? 'Exporting…' : 'Export to Excel'}
+              </button>
+            )}
             <div className="range-design-canvas-controls" style={{ marginLeft: 'auto' }}>
-              <SlideCanvasControls
-                scrollAreaSelector=".range-view-scroll"
-                onSizeChange={(mode, scale) => {
-                  setSlideBaseScaleMode(mode);
-                  if (mode === 'manual' && scale) setSlideBaseScale(scale);
-                }}
-              />
+              {viewMode === 'board' && (
+                <SlideCanvasControls
+                  scrollAreaSelector=".range-view-scroll"
+                  onSizeChange={(mode, scale) => {
+                    setSlideBaseScaleMode(mode);
+                    if (mode === 'manual' && scale) setSlideBaseScale(scale);
+                    // Persist per board so the choice survives navigation.
+                    if (activeBoard) {
+                      setSetBoardSlideSize(activeBoard.id,
+                        mode === 'manual' && scale ? { mode: 'manual', scale } : { mode: 'auto', scale: slideBaseScale });
+                    }
+                  }}
+                />
+              )}
             </div>
           </div>
 
-          {activeBoard ? (
+          {activeBoard && viewMode === 'list' ? (
+            <div className="slab-list-scroll">
+              <div className="slab-list-title">{activeBoard.name}</div>
+              {cellGroups.length === 0 && (
+                <div className="slab-empty-canvas">Nothing on this board yet — add sets or bundles in the Board view.</div>
+              )}
+              {cellGroups.map((gr) => (
+                <div key={`${gr.row}-${gr.col}`} className="slab-list-cell">
+                  <div className="slab-list-cell-label">{gr.label}</div>
+                  {gr.items.map((it) => {
+                    const totalQty = it.components.reduce((s, c) => s + c.quantity, 0);
+                    const totalRrp = it.components.reduce((s, c) => {
+                      const p = catalogue.find((x) => x.id === c.productId);
+                      return s + (p?.rrp ?? 0) * c.quantity;
+                    }, 0);
+                    return (
+                      <div key={it.id} className="slab-list-set">
+                        <div className="slab-list-set-header">
+                          <span className={`slab-set-kind ${it.kind}`}>{it.kind}</span>
+                          <span className="slab-list-set-name">{it.name}</span>
+                          <span className="slab-list-set-meta">{totalQty} item{totalQty !== 1 ? 's' : ''} · £{totalRrp.toFixed(2)}</span>
+                        </div>
+                        {it.components.map((c) => {
+                          const p = catalogue.find((x) => x.id === c.productId);
+                          if (!p) return null;
+                          const anon = anonDisplay(p, catalogue);
+                          return (
+                            <div key={c.productId} className="slab-list-product">
+                              {p.imageUrl
+                                ? <img className="slab-list-thumb" src={p.imageUrl} alt="" loading="lazy" />
+                                : <div className="slab-list-thumb placeholder" />}
+                              <span className="slab-list-sku">{p.sku}</span>
+                              <span className="slab-list-prod-name">{anon.name}</span>
+                              <span className="slab-list-qty">×{c.quantity}</span>
+                              <span className="slab-list-rrp">£{(p.rrp || 0).toFixed(2)}{c.quantity > 1 ? ` · £${((p.rrp || 0) * c.quantity).toFixed(2)}` : ''}</span>
+                            </div>
+                          );
+                        })}
+                        {it.components.length === 0 && <div className="slab-list-empty-set">no products yet</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ) : activeBoard ? (
             <div className="slide-scroll-area range-view-scroll">
               <div className="slide-scroll-spacer">
                 <div className="slide-canvas-wrapper">
