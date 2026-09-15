@@ -78,24 +78,83 @@ async function fetchImage(url: string): Promise<{ base64: string; extension: 'pn
 
 export async function exportSetBoardToExcel(board: SetBoard, catalogue: Product[]): Promise<void> {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet((board.name || 'Set Board').slice(0, 31));
+  wb.created = new Date();
+  const ws = wb.addWorksheet((board.name || 'Set Board').slice(0, 31), {
+    views: [{ showGridLines: false }],
+    properties: { defaultRowHeight: 15 },
+  });
+  // Groups collapse from a header ABOVE the detail rows, not a total
+  // below them.
+  ws.properties.outlineProperties = { summaryBelow: false, summaryRight: false };
+
+  // Palette — mirrors the app: dark ink, blue sets, orange bundles.
+  const INK = 'FF1A1A2E';
+  const SLATE = 'FF455A64';
+  const SET_BLUE = 'FF1976D2';
+  const BUNDLE_ORANGE = 'FFF57C00';
+  const BAND = 'FFF5F7FA';
+  const HAIRLINE = 'FFE8E8E8';
+  const GBP = '£#,##0.00';
+
+  // Column plan: A is a slim indent gutter so nested content reads as
+  // indented; the data lives in B–I.
   ws.columns = [
-    { header: 'Cell', key: 'cell', width: 26 },
-    { header: 'Set / Bundle', key: 'set', width: 28 },
-    { header: 'Kind', key: 'kind', width: 9 },
-    { header: 'Image', key: 'img', width: 9 },
-    { header: 'SKU', key: 'sku', width: 12 },
-    { header: 'Product', key: 'product', width: 42 },
-    { header: 'Qty', key: 'qty', width: 6 },
-    { header: 'Unit RRP', key: 'rrp', width: 11 },
-    { header: 'Line RRP', key: 'line', width: 11 },
+    { key: 'gutter', width: 2.2 },
+    { key: 'set', width: 32 },
+    { key: 'kind', width: 9.5 },
+    { key: 'img', width: 8.5 },
+    { key: 'sku', width: 13 },
+    { key: 'product', width: 46 },
+    { key: 'qty', width: 6.5 },
+    { key: 'rrp', width: 11 },
+    { key: 'line', width: 12 },
   ];
-  ws.getRow(1).font = { bold: true };
-  ws.views = [{ state: 'frozen', ySplit: 1 }];
 
   const groups = groupSetBoardByCell(board);
+  const boardQty = board.items.reduce((s, it) => s + it.components.reduce((q, c) => q + c.quantity, 0), 0);
+  const boardRrp = board.items.reduce((s, it) => s + it.components.reduce((q, c) => {
+    const p = catalogue.find((x) => x.id === c.productId);
+    return q + (p?.rrp ?? 0) * c.quantity;
+  }, 0), 0);
 
-  // Fetch each distinct image once, up front.
+  // ---- Title block ----
+  const titleRow = ws.addRow([]);
+  titleRow.height = 26;
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 9);
+  const titleCell = titleRow.getCell(1);
+  titleCell.value = board.name || 'Set Board';
+  titleCell.font = { bold: true, size: 16, color: { argb: INK } };
+  titleCell.alignment = { vertical: 'middle' };
+
+  const subRow = ws.addRow([]);
+  subRow.height = 14;
+  ws.mergeCells(subRow.number, 1, subRow.number, 9);
+  const subCell = subRow.getCell(1);
+  const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  subCell.value = `Set & Bundle board · exported ${dateStr} · ${board.items.length} set${board.items.length !== 1 ? 's' : ''} · ${boardQty} item${boardQty !== 1 ? 's' : ''} · total RRP £${boardRrp.toFixed(2)}`;
+  subCell.font = { size: 9, color: { argb: 'FF888888' } };
+
+  // Accent rule under the title block.
+  const ruleRow = ws.addRow([]);
+  ruleRow.height = 4;
+  ws.mergeCells(ruleRow.number, 1, ruleRow.number, 9);
+  ruleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: INK } };
+  ws.addRow([]).height = 6;
+
+  // ---- Column headers ----
+  const HEADERS = ['', 'Set / Bundle', 'Kind', 'Image', 'SKU', 'Product', 'Qty', 'Unit RRP', 'Line RRP'];
+  const headRow = ws.addRow(HEADERS);
+  headRow.height = 18;
+  headRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+    if (colNumber > 9) return;
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: SLATE } };
+    cell.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
+    cell.alignment = { vertical: 'middle', horizontal: colNumber >= 7 ? 'right' : 'left' };
+  });
+  headRow.getCell(7).alignment = { vertical: 'middle', horizontal: 'center' };
+  ws.views = [{ state: 'frozen', ySplit: headRow.number, showGridLines: false }];
+
+  // ---- Images (each distinct URL fetched once) ----
   const urls = new Set<string>();
   for (const gr of groups) {
     for (const it of gr.items) {
@@ -111,24 +170,47 @@ export async function exportSetBoardToExcel(board: SetBoard, catalogue: Product[
     if (img) imageIds.set(url, wb.addImage({ base64: img.base64, extension: img.extension }));
   }));
 
+  // ---- Body: cell band → set band → product rows, with Excel row
+  // grouping so sections and sets collapse from their headers ----
   for (const gr of groups) {
-    const cellRow = ws.addRow({ cell: gr.label });
-    cellRow.font = { bold: true, size: 12 };
-    cellRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+    ws.addRow([]).height = 6;
+    const cellRow = ws.addRow([]);
+    cellRow.height = 19;
+    ws.mergeCells(cellRow.number, 1, cellRow.number, 9);
+    const cc = cellRow.getCell(1);
+    cc.value = gr.label;
+    cc.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+    cc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: INK } };
+    cc.alignment = { vertical: 'middle', indent: 1 };
+
     for (const it of gr.items) {
       const totalQty = it.components.reduce((s, c) => s + c.quantity, 0);
       const totalRrp = it.components.reduce((s, c) => {
         const p = catalogue.find((x) => x.id === c.productId);
         return s + (p?.rrp ?? 0) * c.quantity;
       }, 0);
-      const setRow = ws.addRow({
-        set: it.name,
-        kind: it.kind === 'set' ? 'Set' : 'Bundle',
-        qty: totalQty,
-        line: totalRrp,
+      const kindColor = it.kind === 'set' ? SET_BLUE : BUNDLE_ORANGE;
+
+      const setRow = ws.addRow({ set: it.name, kind: it.kind === 'set' ? 'SET' : 'BUNDLE', qty: totalQty, line: totalRrp });
+      setRow.height = 17;
+      setRow.outlineLevel = 1;
+      setRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (colNumber > 9) return;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BAND } };
+        cell.border = { bottom: { style: 'thin', color: { argb: HAIRLINE } } };
       });
-      setRow.font = { bold: true };
-      setRow.getCell('line').numFmt = '£#,##0.00';
+      setRow.getCell('set').font = { bold: true, size: 10.5, color: { argb: INK } };
+      setRow.getCell('set').alignment = { vertical: 'middle' };
+      const kindCell = setRow.getCell('kind');
+      kindCell.font = { bold: true, size: 7.5, color: { argb: 'FFFFFFFF' } };
+      kindCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kindColor } };
+      kindCell.alignment = { vertical: 'middle', horizontal: 'center' };
+      setRow.getCell('qty').font = { bold: true, size: 10, color: { argb: INK } };
+      setRow.getCell('qty').alignment = { vertical: 'middle', horizontal: 'center' };
+      setRow.getCell('line').font = { bold: true, size: 10, color: { argb: INK } };
+      setRow.getCell('line').numFmt = GBP;
+      setRow.getCell('line').alignment = { vertical: 'middle', horizontal: 'right' };
+
       for (const c of it.components) {
         const p = catalogue.find((x) => x.id === c.productId);
         if (!p) continue;
@@ -139,14 +221,27 @@ export async function exportSetBoardToExcel(board: SetBoard, catalogue: Product[
           qty: c.quantity,
           rrp: p.rrp || '',
           line: (p.rrp || 0) * c.quantity,
-          // Un-embeddable image: leave the URL so nothing is lost.
+          // Un-embeddable image: keep the URL so nothing is lost.
           img: p.imageUrl && !hasImage ? p.imageUrl : '',
         });
-        r.getCell('rrp').numFmt = '£#,##0.00';
-        r.getCell('line').numFmt = '£#,##0.00';
-        r.alignment = { vertical: 'middle' };
+        r.outlineLevel = 2;
+        r.height = hasImage ? 40 : 16;
+        r.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          if (colNumber > 9) return;
+          cell.border = { bottom: { style: 'hair', color: { argb: HAIRLINE } } };
+          cell.alignment = { ...cell.alignment, vertical: 'middle' };
+        });
+        r.getCell('sku').font = { name: 'Consolas', size: 8.5, color: { argb: 'FF777777' } };
+        r.getCell('product').font = { size: 10, color: { argb: 'FF333333' } };
+        r.getCell('img').font = { size: 8, color: { argb: 'FF999999' } };
+        const qtyCell = r.getCell('qty');
+        qtyCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        if (c.quantity > 1) qtyCell.font = { bold: true, size: 10, color: { argb: SET_BLUE } };
+        r.getCell('rrp').numFmt = GBP;
+        r.getCell('rrp').font = { size: 10, color: { argb: 'FF555555' } };
+        r.getCell('line').numFmt = GBP;
+        r.getCell('line').font = { size: 10, color: { argb: 'FF333333' } };
         if (hasImage) {
-          r.height = 40; // points ≈ 53px, clears the 48px image
           ws.addImage(imageIds.get(p.imageUrl!)!, {
             tl: { col: 3.08, row: r.number - 1 + 0.05 },
             ext: { width: 48, height: 48 },
@@ -154,9 +249,28 @@ export async function exportSetBoardToExcel(board: SetBoard, catalogue: Product[
           });
         }
       }
+      if (it.components.length === 0) {
+        const empty = ws.addRow({ product: 'No products yet' });
+        empty.outlineLevel = 2;
+        empty.getCell('product').font = { italic: true, size: 9, color: { argb: 'FFAAAAAA' } };
+      }
     }
-    ws.addRow({});
   }
+
+  // ---- Board total ----
+  ws.addRow([]).height = 6;
+  const totalRow = ws.addRow({ set: 'Board total', qty: boardQty, line: boardRrp });
+  totalRow.height = 18;
+  totalRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+    if (colNumber > 9) return;
+    cell.border = { top: { style: 'double', color: { argb: INK } } };
+  });
+  totalRow.getCell('set').font = { bold: true, size: 11, color: { argb: INK } };
+  totalRow.getCell('qty').font = { bold: true, size: 10.5, color: { argb: INK } };
+  totalRow.getCell('qty').alignment = { horizontal: 'center' };
+  totalRow.getCell('line').font = { bold: true, size: 11, color: { argb: INK } };
+  totalRow.getCell('line').numFmt = GBP;
+  totalRow.getCell('line').alignment = { horizontal: 'right' };
 
   const buf = await wb.xlsx.writeBuffer();
   saveAs(
