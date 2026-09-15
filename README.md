@@ -27,6 +27,11 @@ locking. The toolbar shows a "⚠ Solo mode" badge when this applies.
   timestamp every 5 minutes. If a lock hasn't been refreshed for
   15+ minutes (crashed browser, closed laptop), other users are
   offered a take-over when they press Check Out.
+- **Refreshed or reopened mid-check-out?** A page refresh or a new
+  tab starts a new browser session, so the file shows as "checked out
+  by you in another session". Reopen the file and press **Resume
+  Check-Out** to move your check-out to the current window and carry
+  on editing — no need to wait for the lock to go stale.
 - **Identity** is a display name you enter once (stored in the
   browser, changeable by clearing site data). It is advisory
   courtesy, not security.

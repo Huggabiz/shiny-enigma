@@ -206,14 +206,28 @@ export function Toolbar({ activeView }: ToolbarProps) {
       }
       const lock = meta.checkOut ?? null;
       if (lock && !isMyLock(lock)) {
-        if (!lockIsStale(lock)) {
+        // A lock under OUR OWN name but another session id is almost
+        // always this user's earlier browser session — a refresh or a
+        // new tab regenerates the session id and would otherwise trap
+        // them out of their own check-out until it went stale.
+        const myName = (getUserName() ?? '').trim().toLowerCase();
+        const sameName = !!myName && lock.userName.trim().toLowerCase() === myName;
+        if (sameName) {
+          const resume = confirm(
+            `This file is checked out under your name (${lock.userName}, ${lockAgeLabel(lock)}) ` +
+            'from a previous browser session — this happens after a page refresh or when reopening the file in a new tab or window.\n\n' +
+            'Resume the check-out here?\n\n' +
+            'Only continue if you are not still editing this file in another window — resuming moves the check-out to this one.');
+          if (!resume) return;
+        } else if (!lockIsStale(lock)) {
           alert(`Checked out by ${lock.userName} (${lockAgeLabel(lock)}). The file is read-only until they check it back in.`);
           setFileSession({ checkout: 'other', checkedOutBy: lock.userName });
           return;
+        } else {
+          const takeOver = confirm(
+            `The check-out by ${lock.userName} looks abandoned (last active ${lockAgeLabel(lock)}).\n\nTake over the check-out?`);
+          if (!takeOver) return;
         }
-        const takeOver = confirm(
-          `The check-out by ${lock.userName} looks abandoned (last active ${lockAgeLabel(lock)}).\n\nTake over the check-out?`);
-        if (!takeOver) return;
       }
       // Write the lock onto the file's CURRENT content (not our
       // in-memory copy), then verify we won any race.
@@ -361,12 +375,25 @@ export function Toolbar({ activeView }: ToolbarProps) {
                 </button>
               </>
             ) : fileSession.checkout === 'other' ? (
-              <>
-                <span className="file-status other" title="The file is checked out by someone else — read-only until they check in">
-                  🔒 {fileSession.checkedOutBy ?? 'Someone'} has this checked out
-                </span>
-                <button className="toolbar-btn small" onClick={handleCheckOut} title="Re-check the lock (offers take-over if it has gone stale)">Check Out</button>
-              </>
+              (() => {
+                const myName = (getUserName() ?? '').trim().toLowerCase();
+                const lockIsMyName = !!myName && (fileSession.checkedOutBy ?? '').trim().toLowerCase() === myName;
+                return lockIsMyName ? (
+                  <>
+                    <span className="file-status other" title="The check-out is under your name but from a previous browser session (a refresh or another tab). Resume it to carry on editing here.">
+                      🔒 Checked out by you in another session
+                    </span>
+                    <button className="toolbar-btn small primary" onClick={handleCheckOut} title="Move your check-out to this window and carry on editing">Resume Check-Out</button>
+                  </>
+                ) : (
+                  <>
+                    <span className="file-status other" title="The file is checked out by someone else — read-only until they check in">
+                      🔒 {fileSession.checkedOutBy ?? 'Someone'} has this checked out
+                    </span>
+                    <button className="toolbar-btn small" onClick={handleCheckOut} title="Re-check the lock (offers take-over if it has gone stale)">Check Out</button>
+                  </>
+                );
+              })()
             ) : (
               <>
                 <span className="file-status readonly" title="Shared file — read-only until you check it out">
