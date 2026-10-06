@@ -4297,12 +4297,18 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     // mini-lines as the row height allows. Solve the pitch so the full
     // width fits the canvas.
     const CAT_GAP = 8, SUB_GAP = 3, SUB_PAD = 3;
+    // In lens mode, each lens column carries a per-customer "n/total"
+    // stat strip on its right; width sized to the digit count.
+    const statWFor = (s: { color: string | null; key: string; recs: { sku: string }[] }) =>
+      mode === 'lens' && s.color && s.key !== 'Discon/Close'
+        ? (String(s.recs.length).length * 2 + 1) * 2.7 + 5
+        : 0;
     let p = 4.2;
     for (let iter = 0; iter < 5; iter++) {
       const L = Math.max(1, Math.floor((rowH - 3) / p));
       let total = 0;
       for (const c of cats) {
-        for (const s of c.subs) total += Math.ceil(s.recs.length / L) * p + SUB_PAD * 2 + SUB_GAP;
+        for (const s of c.subs) total += Math.ceil(s.recs.length / L) * p + SUB_PAD * 2 + statWFor(s) + SUB_GAP;
         total += CAT_GAP;
       }
       if (total <= iW || p <= 1.5) break;
@@ -4312,7 +4318,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     const dotR = Math.min(1.9, p * 0.38);
 
     // Column geometry.
-    type Col = { cat: string; sub: (typeof cats)[number]['subs'][number]; x: number; w: number; perLine: number; best: number };
+    type Col = { cat: string; sub: (typeof cats)[number]['subs'][number]; x: number; w: number; perLine: number; best: number; statW: number };
     const cols: Col[] = [];
     let cx = 0;
     const catSpans: { cat: string; x0: number; x1: number; n: number }[] = [];
@@ -4320,10 +4326,11 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
       const x0 = cx;
       for (const s of c.subs) {
         const perLine = Math.ceil(s.recs.length / L);
-        const w = perLine * p + SUB_PAD * 2;
+        const statW = statWFor(s);
+        const w = perLine * p + SUB_PAD * 2 + statW;
         // Best-covered customer within this subgroup (shown customers).
         const counts = customers.map((_, ci) => s.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0));
-        cols.push({ cat: c.cat, sub: s, x: cx, w, perLine, best: Math.max(1, ...counts) });
+        cols.push({ cat: c.cat, sub: s, x: cx, w, perLine, best: Math.max(1, ...counts), statW });
         cx += w + SUB_GAP;
       }
       catSpans.push({ cat: c.cat, x0, x1: cx - SUB_GAP, n: c.n });
@@ -4360,6 +4367,10 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
         g.append('rect').attr('x', col.x).attr('y', -40).attr('width', col.w).attr('height', iH + 40)
           .attr('fill', col.sub.color).attr('opacity', col.sub.key === 'Discon/Close' ? 0.06 : 0.09);
       }
+      if (col.statW > 0) {
+        g.append('line').attr('x1', col.x + col.w - col.statW).attr('x2', col.x + col.w - col.statW)
+          .attr('y1', 0).attr('y2', iH).attr('stroke', '#ddd').attr('stroke-width', 0.5);
+      }
       const label = g.append('text')
         .attr('transform', `translate(${col.x + col.w / 2 + 2},-6) rotate(-60)`)
         .attr('font-size', '5.5px').attr('font-weight', '600')
@@ -4395,6 +4406,14 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
 
       for (const col of cols) {
         const cnt = col.sub.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0);
+        // Lens stat strip: stocked/total for this customer, always
+        // shown (a 0/20 is exactly the signal the stat exists for).
+        if (col.statW > 0) {
+          g.append('text').attr('x', col.x + col.w - 2).attr('y', y + rowH / 2 + 2).attr('text-anchor', 'end')
+            .attr('font-size', '5px').attr('font-weight', '700')
+            .attr('fill', cnt === 0 ? '#c62828' : '#444')
+            .text(`${cnt}/${col.sub.recs.length}`);
+        }
         if (cnt === 0) continue;
         const color = ramp(cnt / col.best);
         col.sub.recs.forEach((r, i2) => {
