@@ -231,6 +231,7 @@ interface ProjectStore {
 
   // Catalogue actions
   setCatalogue: (products: Product[]) => void;
+  setRetailerSales: (data: import('../types').RetailerSales | undefined) => void;
   clearCatalogue: () => void;
   setFuturePricing: (productId: string, region: 'ukRrp' | 'usRrp' | 'euRrp' | 'ausRrp', value: number | undefined) => void;
 
@@ -1294,6 +1295,19 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   // Catalogue
+  setRetailerSales: (data) => {
+    if (editLocked(get)) {
+      const fs = get().fileSession;
+      alert(fs.active && fs.checkout !== 'mine'
+        ? 'The shared file is read-only — check it out before importing customer data.'
+        : 'The project is locked — unlock it before importing customer data.');
+      return;
+    }
+    const { project } = get();
+    if (!project) return;
+    set({ project: { ...project, retailerSales: data, updatedAt: new Date().toISOString() } });
+  },
+
   setCatalogue: (newProducts) => {
     if (editLocked(get)) {
       // A silently-ignored import is indistinguishable from a broken

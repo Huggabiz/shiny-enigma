@@ -4,12 +4,13 @@ import html2canvas from 'html2canvas';
 import { useProjectStore } from '../store/useProjectStore';
 import { getActivePlan, getStages } from '../types';
 import { launchAgeYears } from '../utils/launchSeason';
+import { parseRetailerSales } from '../utils/retailerImport';
 import type { Lens, MatrixCellAssignment, Product, RangePlan, Shelf, ShelfItem } from '../types';
 import './AnalyseView.css';
 
 type Metric = 'rrp' | 'revenue' | 'margin';
 type AspMode = 'standard' | 'weighted';
-type SheetId = 'dashboard' | 'icicle' | 'scatter' | 'lifecycle' | 'pareto' | 'growth' | 'growth-plans' | 'growth-groups' | 'margin-compare' | 'rrp-compare' | 'sunburst';
+type SheetId = 'dashboard' | 'icicle' | 'scatter' | 'lifecycle' | 'pareto' | 'growth' | 'growth-plans' | 'growth-groups' | 'margin-compare' | 'rrp-compare' | 'coverage' | 'sunburst';
 
 const SHEETS: { id: SheetId; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -22,6 +23,7 @@ const SHEETS: { id: SheetId; label: string }[] = [
   { id: 'growth-groups', label: 'Growth by Group' },
   { id: 'margin-compare', label: 'Margin Compare' },
   { id: 'rrp-compare', label: 'RRP Compare' },
+  { id: 'coverage', label: 'SKU Reach' },
   { id: 'sunburst', label: 'Sunburst' },
 ];
 
@@ -206,7 +208,7 @@ const DEFAULT_ICICLE: IcicleConfig = { metric: 'revenue', aspMode: 'standard', s
 const DEFAULT_SCATTER: ScatterConfig = { logX: false, logY: false, maxX: '', maxY: '', dotSize: 5, contours: false, xAxis: 'margin', ageShade: true };
 
 export function AnalyseView() {
-  const { project, clearAnalyseEntries, setAnalyseConfig } = useProjectStore();
+  const { project, clearAnalyseEntries, setAnalyseConfig, setRetailerSales } = useProjectStore();
 
   const av = project?.analyseView;
   const [shelfSide, setShelfSide] = useState('current');
@@ -392,6 +394,50 @@ export function AnalyseView() {
       setAnalyseConfig({ rrpTargets: nums });
       return next;
     });
+  };
+
+  // SKU Reach (coverage) sheet settings — persisted as one object.
+  const covConfig = av?.coverageConfig;
+  const [covMode, setCovModeState] = useState<'matrix' | 'lens'>(() => covConfig?.mode ?? 'matrix');
+  const [covLensIds, setCovLensIdsState] = useState<string[]>(() => covConfig?.lensIds ?? []);
+  const [covHideEol, setCovHideEolState] = useState<boolean>(() => covConfig?.hideEol ?? false);
+  const [covTopN, setCovTopNState] = useState<number>(() => covConfig?.topN ?? 30);
+  const persistCoverage = (patch: Partial<NonNullable<typeof covConfig>>) => {
+    setAnalyseConfig({ coverageConfig: { mode: covMode, lensIds: covLensIds, hideEol: covHideEol, topN: covTopN, ...patch } });
+  };
+  const setCovMode = (v: 'matrix' | 'lens') => { setCovModeState(v); persistCoverage({ mode: v }); };
+  const setCovHideEol = (v: boolean) => { setCovHideEolState(v); persistCoverage({ hideEol: v }); };
+  const setCovTopN = (v: number) => { setCovTopNState(v); persistCoverage({ topN: v }); };
+  const toggleCovLens = (id: string) => {
+    setCovLensIdsState((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      persistCoverage({ lensIds: next });
+      return next;
+    });
+  };
+  const [showCovLensPicker, setShowCovLensPicker] = useState(false);
+  const covImportRef = useRef<HTMLInputElement>(null);
+  const [covImportBusy, setCovImportBusy] = useState(false);
+  const projectLenses = useMemo(
+    () => (project?.lenses ?? []).filter((l) => !l.builtInKind),
+    [project?.lenses]);
+  const covLenses = useMemo(
+    () => covLensIds.map((id) => projectLenses.find((l) => l.id === id)).filter((l): l is Lens => !!l),
+    [covLensIds, projectLenses]);
+  const handleCovImport = async (file: File) => {
+    setCovImportBusy(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const { data, skipped } = parseRetailerSales(buf, file.name);
+      setRetailerSales(data);
+      const pairs = Object.values(data.bySku).reduce((s, a) => s + a.length, 0);
+      alert(`Imported ${data.customers.length} customers · ${Object.keys(data.bySku).length} SKUs · ${pairs} stocked pairs${skipped ? ` (${skipped} rows skipped)` : ''}.`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Import failed.');
+    } finally {
+      setCovImportBusy(false);
+      if (covImportRef.current) covImportRef.current.value = '';
+    }
   };
 
   // Dashboard scope: all selected plans, or one plan group's slice.
@@ -696,7 +742,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -936,6 +982,100 @@ export function AnalyseView() {
             </div>
           )}
 
+          {activeSheet === 'coverage' && (
+            <div className="analyse-chart-config">
+              <input ref={covImportRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleCovImport(f); }} />
+              <button className="analyse-snip-btn" disabled={covImportBusy} onClick={() => covImportRef.current?.click()}
+                title="Import the customer sales spreadsheet (Product Code, Customer Name, Qty). Stored separately from the catalogue — nothing else in the app depends on it.">
+                {covImportBusy ? 'Importing…' : project.retailerSales ? 'Re-import customer data' : 'Import customer data'}
+              </button>
+              {project.retailerSales && (
+                <>
+                  <span className="analyse-config-item" style={{ cursor: 'default', color: '#2e7d32' }}
+                    title={`Imported ${new Date(project.retailerSales.importedAt).toLocaleString()}${project.retailerSales.fileName ? ` from ${project.retailerSales.fileName}` : ''}`}>
+                    ✓ {project.retailerSales.customers.length} customers
+                  </span>
+                  <button className="analyse-snip-btn" style={{ color: '#c62828', borderColor: '#ffcdd2' }}
+                    onClick={() => { if (confirm('Remove the imported customer data from this project?')) setRetailerSales(undefined); }}>
+                    Clear
+                  </button>
+                </>
+              )}
+              <div className="analyse-config-separator" />
+              <label className="analyse-config-item" title="How many top customers (ranked by gross sales) to show">Top
+                <input type="number" min="5" max="60" step="1" className="analyse-config-input" style={{ width: 44 }}
+                  value={covTopN} onChange={(e) => setCovTopN(Math.max(5, Math.min(60, Number(e.target.value) || 30)))} />
+              </label>
+              <div className="analyse-metric-toggle" role="tablist" title="Second-level grouping inside each category">
+                <button role="tab" className={covMode === 'matrix' ? 'active' : ''} onClick={() => setCovMode('matrix')}>Matrix</button>
+                <button role="tab" className={covMode === 'lens' ? 'active' : ''} onClick={() => setCovMode('lens')}>Lenses</button>
+              </div>
+              {covMode === 'lens' && (
+                <div className="toolbar-dropdown-wrapper">
+                  <button className="toolbar-btn" style={{ fontSize: 10, padding: '3px 9px' }} onClick={() => setShowCovLensPicker((v) => !v)}>
+                    Lenses ({covLensIds.length}/{projectLenses.length}) ▾
+                  </button>
+                  {showCovLensPicker && (
+                    <div className="toolbar-dropdown" onMouseLeave={() => setShowCovLensPicker(false)}
+                      style={{ bottom: '100%', top: 'auto', marginBottom: 4, maxHeight: 260, overflowY: 'auto' }}>
+                      {projectLenses.length === 0 && <div style={{ padding: '6px 12px', fontSize: 11, color: '#888' }}>No lenses defined in this project.</div>}
+                      {projectLenses.map((l) => (
+                        <label key={l.id} className="dropdown-checkbox">
+                          <input type="checkbox" checked={covLensIds.includes(l.id)} onChange={() => toggleCovLens(l.id)} />
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: 'inline-block', flexShrink: 0 }} />
+                            {l.name}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <label className="analyse-config-item" title="Discontinued / close-out SKUs sit at the right of each category; tick to drop them from the view entirely">
+                <input type="checkbox" checked={covHideEol} onChange={(e) => setCovHideEol(e.target.checked)} />
+                Hide discon/close-out
+              </label>
+              <div className="analyse-config-separator" />
+              <div className="toolbar-dropdown-wrapper">
+                <button className="toolbar-btn" style={{ fontSize: 10, padding: '3px 9px' }} onClick={() => setShowCatFilter((v) => !v)}>
+                  Categories ({allCategories.length - growthHiddenCats.size}/{allCategories.length}) ▾
+                </button>
+                {showCatFilter && (
+                  <div className="toolbar-dropdown" onMouseLeave={() => setShowCatFilter(false)}
+                    style={{ bottom: '100%', top: 'auto', marginBottom: 4, maxHeight: 260, overflowY: 'auto' }}>
+                    {allCategories.map((cat) => (
+                      <label key={cat} className="dropdown-checkbox">
+                        <input type="checkbox" checked={!growthHiddenCats.has(cat)}
+                          onChange={() => toggleGrowthCat(cat)} />
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: catColors.get(cat) ?? '#999', display: 'inline-block', flexShrink: 0 }} />
+                          {cat}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
+                <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
+                  onChange={(e) => setAspect(Number(e.target.value))}
+                  onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
+                <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+                {activeAspect !== 0 && (
+                  <button className="analyse-aspect-reset" onClick={(e) => { e.preventDefault(); setAspect(0); }} title="Reset to 16:9">↺</button>
+                )}
+              </label>
+              <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project. Use when the chart will be shrunk in a presentation.">Text
+                <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
+                <span>{activeTextScale.toFixed(2)}×</span>
+              </label>
+              <div className="analyse-config-separator" />
+              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
+            </div>
+          )}
           {activeSheet === 'dashboard' && (
             <div className="analyse-chart-config">
               <label className="analyse-config-item" title="Slice the whole dashboard to one plan group, or all selected plans">Scope
@@ -4030,6 +4170,278 @@ function DashboardSheet({ plans, scopeName, catalogue, shelfSide, catColors, tex
   return (
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" />
+    </div>
+  );
+}
+
+
+// ---------- SKU Reach (customer coverage dot matrix) ----------
+
+function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, retailer, mode, lenses, hideEol, topN }: {
+  plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
+  textScale: number; hiddenCats: Set<string>;
+  retailer: import('../types').RetailerSales | undefined;
+  mode: 'matrix' | 'lens';
+  lenses: Lens[];
+  hideEol: boolean;
+  topN: number;
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { wrapperRef, dims, measureRef } = useMeasure();
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+
+  const data = useMemo(() => {
+    type SkuRec = { sku: string; name: string; eol: boolean; stocked: number[] };
+    type SubGroup = { key: string; color: string | null; recs: SkuRec[] };
+    type CatGroup = { cat: string; subs: SubGroup[]; n: number };
+
+    const customers = (retailer?.customers ?? []).slice(0, topN);
+    const nCust = customers.length;
+    const stockedFor = (sku: string): number[] => {
+      const pairs = retailer?.bySku[sku];
+      if (!pairs) return [];
+      return pairs.filter(([ci]) => ci < nCust).map(([ci]) => ci);
+    };
+
+    // SKUs from the selected plans — first plan wins, category filter
+    // honoured, matrix x-position and lens membership resolved here.
+    const lensSets = lenses.map((l) =>
+      new Set(l.scope === 'per-stage' ? (l.stageProductIds?.[shelfSide] ?? []) : l.productIds));
+    const seen = new Set<string>();
+    const matrixOrder: string[] = [];
+    type Raw = SkuRec & { cat: string; matrixX: string; lensIdx: number };
+    const raws: Raw[] = [];
+    for (const plan of plans) {
+      const shelf = resolveShelf(plan, shelfSide);
+      if (!shelf) continue;
+      const ml = shelf.matrixLayout;
+      for (const xl of ml?.xLabels ?? []) if (!matrixOrder.includes(xl)) matrixOrder.push(xl);
+      const assignByItem = new Map<string, MatrixCellAssignment>((ml?.assignments ?? []).map((a) => [a.itemId, a]));
+      for (const item of shelf.items) {
+        const prod = getProductForItem(item, catalogue);
+        if (!prod || seen.has(prod.id)) continue;
+        seen.add(prod.id);
+        const cat = prod.category || 'Uncategorised';
+        if (hiddenCats.has(cat)) continue;
+        const eol = /discon|close/i.test(prod.itemRanking ?? '');
+        if (eol && hideEol) continue;
+        const a = assignByItem.get(item.id);
+        const matrixX = a && ml ? (ml.xLabels[a.col] ?? 'Unplaced') : 'Unplaced';
+        let lensIdx = -1;
+        for (let i = 0; i < lensSets.length; i++) { if (lensSets[i].has(prod.id)) { lensIdx = i; break; } }
+        const sku = (prod.sku ?? '').trim().toUpperCase();
+        raws.push({ sku, name: prod.name, eol, stocked: stockedFor(sku), cat, matrixX, lensIdx });
+      }
+    }
+
+    // Category groups sorted by SKU count; inside each, the chosen
+    // second-level grouping, with EOL SKUs pulled to a far-right group.
+    const byCat = new Map<string, Raw[]>();
+    for (const r of raws) (byCat.get(r.cat) ?? byCat.set(r.cat, []).get(r.cat)!).push(r);
+    const sortRecs = (rs: Raw[]) => rs.sort((a, b) => b.stocked.length - a.stocked.length);
+    const cats: CatGroup[] = Array.from(byCat.entries())
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([cat, rs]) => {
+        const live = rs.filter((r) => !r.eol);
+        const eol = rs.filter((r) => r.eol);
+        const subs: SubGroup[] = [];
+        if (mode === 'matrix') {
+          const keys = [...matrixOrder, 'Unplaced'];
+          for (const k of keys) {
+            const inK = live.filter((r) => r.matrixX === k);
+            if (inK.length) subs.push({ key: k, color: null, recs: sortRecs(inK) });
+          }
+        } else {
+          lenses.forEach((l, i) => {
+            const inL = live.filter((r) => r.lensIdx === i);
+            if (inL.length) subs.push({ key: l.name, color: l.color, recs: sortRecs(inL) });
+          });
+          const other = live.filter((r) => r.lensIdx === -1);
+          if (other.length) subs.push({ key: lenses.length ? 'Other' : 'All', color: null, recs: sortRecs(other) });
+        }
+        if (eol.length) subs.push({ key: 'Discon/Close', color: '#c62828', recs: sortRecs(eol) });
+        return { cat, subs, n: rs.length };
+      })
+      .filter((c) => c.subs.length > 0);
+
+    return { customers, cats, totalSkus: raws.length };
+  }, [plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN]);
+
+  useEffect(() => {
+    const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
+    const W = dims.width / textScale;
+    const H = dims.height / textScale;
+    const margin = { top: 64, right: 40, bottom: 10, left: 128 };
+    const iW = W - margin.left - margin.right, iH = H - margin.top - margin.bottom;
+    if (iW < 60 || iH < 40) return;
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+    const { customers, cats, totalSkus } = data;
+
+    if (!retailer) {
+      g.append('text').attr('x', iW / 2).attr('y', iH / 2).attr('text-anchor', 'middle')
+        .attr('font-size', '12px').attr('fill', '#888')
+        .text('No customer data yet - use "Import customer data" in the bar below (Product Code / Customer Name / Qty).');
+      return;
+    }
+    if (customers.length === 0 || totalSkus === 0 || cats.length === 0) {
+      g.append('text').attr('x', iW / 2).attr('y', iH / 2).attr('text-anchor', 'middle')
+        .attr('font-size', '12px').attr('fill', '#888')
+        .text(totalSkus === 0 ? 'No SKUs in scope - select plans in the sidebar.' : 'No customers found in the imported data.');
+      return;
+    }
+
+    const nRows = customers.length;
+    const rowH = iH / nRows;
+
+    // Dot layout: within each subgroup column, dots wrap into as many
+    // mini-lines as the row height allows. Solve the pitch so the full
+    // width fits the canvas.
+    const CAT_GAP = 8, SUB_GAP = 3, SUB_PAD = 3;
+    let p = 4.2;
+    for (let iter = 0; iter < 5; iter++) {
+      const L = Math.max(1, Math.floor((rowH - 3) / p));
+      let total = 0;
+      for (const c of cats) {
+        for (const s of c.subs) total += Math.ceil(s.recs.length / L) * p + SUB_PAD * 2 + SUB_GAP;
+        total += CAT_GAP;
+      }
+      if (total <= iW || p <= 1.5) break;
+      p = Math.max(1.5, p * Math.sqrt(iW / total) * 0.98);
+    }
+    const L = Math.max(1, Math.floor((rowH - 3) / p));
+    const dotR = Math.min(1.9, p * 0.38);
+
+    // Column geometry.
+    type Col = { cat: string; sub: (typeof cats)[number]['subs'][number]; x: number; w: number; perLine: number; best: number };
+    const cols: Col[] = [];
+    let cx = 0;
+    const catSpans: { cat: string; x0: number; x1: number; n: number }[] = [];
+    for (const c of cats) {
+      const x0 = cx;
+      for (const s of c.subs) {
+        const perLine = Math.ceil(s.recs.length / L);
+        const w = perLine * p + SUB_PAD * 2;
+        // Best-covered customer within this subgroup (shown customers).
+        const counts = customers.map((_, ci) => s.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0));
+        cols.push({ cat: c.cat, sub: s, x: cx, w, perLine, best: Math.max(1, ...counts) });
+        cx += w + SUB_GAP;
+      }
+      catSpans.push({ cat: c.cat, x0, x1: cx - SUB_GAP, n: c.n });
+      cx += CAT_GAP;
+    }
+
+    const ramp = (f: number) => d3.interpolateRdYlGn(0.08 + 0.9 * Math.max(0, Math.min(1, f)));
+
+    // ---- Header: legend, category bands, subgroup labels ----
+    const lg = svg.append('defs').append('linearGradient').attr('id', 'cov-ramp');
+    lg.selectAll('stop').data([0, 0.25, 0.5, 0.75, 1]).enter().append('stop')
+      .attr('offset', (d) => `${d * 100}%`).attr('stop-color', (d) => ramp(d));
+    const legend = g.append('g').attr('transform', `translate(${-margin.left + 4},${-margin.top + 12})`);
+    legend.append('text').attr('x', 0).attr('y', 0).attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+      .text(`Top ${customers.length} customer range coverage`);
+    legend.append('text').attr('x', 0).attr('y', 10).attr('font-size', '6px').attr('fill', '#888')
+      .text('dot = SKU stocked (qty > 0)');
+    legend.append('text').attr('x', 0).attr('y', 18).attr('font-size', '6px').attr('fill', '#888').text('colour vs best customer in group:');
+    legend.append('rect').attr('x', 0).attr('y', 22).attr('width', 56).attr('height', 5).attr('rx', 2.5).attr('fill', 'url(#cov-ramp)');
+    legend.append('text').attr('x', 60).attr('y', 27).attr('font-size', '5.5px').attr('fill', '#888').text('none - best');
+
+    for (const span of catSpans) {
+      const t = g.append('text').attr('x', span.x0 + 1).attr('y', -52).attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+        .text(span.cat.length > Math.floor((span.x1 - span.x0) / 4.2) ? span.cat.slice(0, Math.max(2, Math.floor((span.x1 - span.x0) / 4.2) - 1)) + '…' : span.cat);
+      t.append('title').text(span.cat);
+      g.append('text').attr('x', span.x0 + 1).attr('y', -44).attr('font-size', '6px').attr('fill', '#888').text(`${span.n} SKUs`);
+      g.append('line').attr('x1', span.x1 + CAT_GAP / 2).attr('x2', span.x1 + CAT_GAP / 2).attr('y1', -56).attr('y2', iH)
+        .attr('stroke', '#999').attr('stroke-width', 0.75);
+    }
+
+    for (const col of cols) {
+      // Lens / EOL background tint over the full column height.
+      if (col.sub.color) {
+        g.append('rect').attr('x', col.x).attr('y', -40).attr('width', col.w).attr('height', iH + 40)
+          .attr('fill', col.sub.color).attr('opacity', col.sub.key === 'Discon/Close' ? 0.06 : 0.09);
+      }
+      const label = g.append('text')
+        .attr('transform', `translate(${col.x + col.w / 2 + 2},-6) rotate(-60)`)
+        .attr('font-size', '5.5px').attr('font-weight', '600')
+        .attr('fill', col.sub.key === 'Discon/Close' ? '#c62828' : '#666')
+        .text(col.sub.key.length > 14 ? col.sub.key.slice(0, 13) + '…' : col.sub.key);
+      label.append('title').text(`${col.cat} › ${col.sub.key} · ${col.sub.recs.length} SKUs`);
+      g.append('line').attr('x1', col.x - SUB_GAP / 2).attr('x2', col.x - SUB_GAP / 2).attr('y1', -2).attr('y2', iH)
+        .attr('stroke', '#e0e0e0').attr('stroke-width', 0.5).attr('stroke-dasharray', '2,2');
+    }
+
+    g.append('text').attr('x', iW + 6).attr('y', -6).attr('font-size', '6px').attr('font-weight', '700').attr('fill', '#888').text('SKUs');
+
+    // ---- Rows ----
+    customers.forEach((cust, ci) => {
+      const y = ci * rowH;
+      if (ci % 2 === 1) {
+        g.append('rect').attr('x', -margin.left + 2).attr('y', y).attr('width', iW + margin.left + margin.right - 6).attr('height', rowH)
+          .attr('fill', '#000').attr('opacity', 0.03);
+      }
+      const nm = g.append('text').attr('x', -18).attr('y', y + rowH / 2 + 2).attr('text-anchor', 'end')
+        .attr('font-size', `${Math.min(7.5, rowH * 0.55)}px`).attr('font-weight', '600').attr('fill', '#333')
+        .text(cust.name.length > 26 ? cust.name.slice(0, 25) + '…' : cust.name);
+      nm.append('title').text(`${cust.name} · gross ${fmtGbp(cust.gross)}`);
+
+      // Overall score vs the best-covered customer across all SKUs.
+      let myTotal = 0;
+      for (const col of cols) myTotal += col.sub.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0);
+      const bestTotal = Math.max(1, ...customers.map((_, cj) =>
+        cols.reduce((s, col) => s + col.sub.recs.reduce((k, r) => k + (r.stocked.includes(cj) ? 1 : 0), 0), 0)));
+      const od = g.append('circle').attr('cx', -9).attr('cy', y + rowH / 2).attr('r', Math.min(4.5, rowH * 0.3))
+        .attr('fill', ramp(myTotal / bestTotal)).attr('stroke', '#fff').attr('stroke-width', 0.5);
+      od.append('title').text(`${cust.name}: ${myTotal} of ${totalSkus} SKUs stocked`);
+
+      for (const col of cols) {
+        const cnt = col.sub.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0);
+        if (cnt === 0) continue;
+        const color = ramp(cnt / col.best);
+        col.sub.recs.forEach((r, i2) => {
+          if (!r.stocked.includes(ci)) return;
+          const line = Math.floor(i2 / col.perLine);
+          const pos = i2 % col.perLine;
+          g.append('circle')
+            .attr('cx', col.x + SUB_PAD + pos * p + p / 2)
+            .attr('cy', y + 2 + line * p + p / 2)
+            .attr('r', dotR).attr('fill', color);
+        });
+      }
+
+      g.append('text').attr('x', iW + 6).attr('y', y + rowH / 2 + 2)
+        .attr('font-size', '6.5px').attr('font-weight', '600').attr('fill', '#555').text(String(myTotal));
+    });
+
+    // Hover readout per subgroup cell via transparent rects (cheaper
+    // than a title on every dot).
+    customers.forEach((cust, ci) => {
+      const y = ci * rowH;
+      for (const col of cols) {
+        const cnt = col.sub.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0);
+        g.append('rect').attr('x', col.x).attr('y', y).attr('width', col.w).attr('height', rowH)
+          .attr('fill', 'transparent').style('cursor', 'default')
+          .on('mouseenter', (ev: MouseEvent) => {
+            const rc = wrapperRef.current?.getBoundingClientRect();
+            if (rc) setTooltip({
+              x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8,
+              label: `${cust.name} — ${col.cat} › ${col.sub.key}`,
+              value: `${cnt} of ${col.sub.recs.length} SKUs stocked (best customer: ${col.best})`,
+              depth: 'Coverage',
+            });
+          })
+          .on('mousemove', (ev: MouseEvent) => {
+            const rc = wrapperRef.current?.getBoundingClientRect();
+            if (rc) setTooltip((pv) => pv ? { ...pv, x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8 } : null);
+          })
+          .on('mouseleave', () => setTooltip(null));
+      }
+    });
+  }, [data, retailer, dims, wrapperRef, textScale]);
+
+  return (
+    <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" />
+      <ChartTooltip tooltip={tooltip} />
     </div>
   );
 }

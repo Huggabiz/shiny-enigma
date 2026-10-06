@@ -376,6 +376,18 @@ export interface Lens {
 
 /** Default Dev lens — auto-added on project load if missing. The blue
  * matches the existing `.matrix-card.dev-product` background. */
+/** Aggregated customer × SKU sales, imported from the "SKU Reach"
+ * spreadsheet. Compact on purpose — one entry per customer, and per
+ * SKU only the [customerIndex, qty] pairs with qty > 0. */
+export interface RetailerSales {
+  importedAt: string;
+  fileName?: string;
+  /** Sorted by gross sales descending at import time. */
+  customers: { name: string; gross: number; qty: number }[];
+  /** SKU code (trimmed, uppercased) → [customerIndex, qty][] */
+  bySku: Record<string, [number, number][]>;
+}
+
 export const DEFAULT_DEV_LENS: Lens = {
   id: 'lens-dev',
   name: 'Dev',
@@ -565,6 +577,17 @@ export interface Project {
     /** Dashboard sheet data scope: '' = all selected plans, else a
      * plan-group id. */
     dashboardScope?: string;
+    /** SKU Reach (customer coverage) sheet settings. */
+    coverageConfig?: {
+      /** Second-level x grouping inside each category. */
+      mode?: 'matrix' | 'lens';
+      /** Lenses shown as groups/backgrounds in lens mode, in order. */
+      lensIds?: string[];
+      /** Hide discontinued / close-out SKUs entirely. */
+      hideEol?: boolean;
+      /** How many top customers (by gross sales) to show. */
+      topN?: number;
+    };
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;
@@ -594,6 +617,11 @@ export interface Project {
    * layout independent of range plans. */
   setBoards?: SetBoard[];
   activeSetBoardId?: string;
+  /** Supplementary customer sales data for the SKU Reach sheet.
+   * Imported from its own spreadsheet and stored SEPARATELY from the
+   * catalogue on purpose: nothing else in the app reads it, so its
+   * absence (or staleness) can never affect existing systems. */
+  retailerSales?: RetailerSales;
   /** Shared-file collaboration metadata. Lives IN the saved JSON so
    * every collaborator's copy of the app can see who has the file
    * checked out and which revision it is. The lock is advisory —
