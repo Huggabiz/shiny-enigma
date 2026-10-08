@@ -4370,11 +4370,37 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
         g.append('line').attr('x1', col.x + col.w - col.statW).attr('x2', col.x + col.w - col.statW)
           .attr('y1', 0).attr('y2', iH).attr('stroke', '#ddd').attr('stroke-width', 0.5);
       }
+      // Angled label, word-wrapped onto parallel lines so full plan /
+      // lens names stay readable instead of ellipsizing.
+      const wrapLines = (() => {
+        const MAXC = 12, MAXL = 3;
+        const words = col.sub.key.split(/\s+/);
+        const lines: string[] = [];
+        let cur = '';
+        for (const w of words) {
+          if (!cur) cur = w;
+          else if ((cur + ' ' + w).length <= MAXC) cur += ' ' + w;
+          else { lines.push(cur); cur = w; }
+        }
+        if (cur) lines.push(cur);
+        const out: string[] = [];
+        for (const l of lines) {
+          let t = l;
+          while (t.length > MAXC + 3) { out.push(t.slice(0, MAXC + 2) + '-'); t = t.slice(MAXC + 2); }
+          out.push(t);
+        }
+        if (out.length > MAXL) { const kept = out.slice(0, MAXL); kept[MAXL - 1] += '…'; return kept; }
+        return out;
+      })();
       const label = g.append('text')
         .attr('transform', `translate(${col.x + col.w / 2 + 2},-6) rotate(-60)`)
         .attr('font-size', '5.5px').attr('font-weight', '600')
-        .attr('fill', col.sub.key === 'Discon/Close' ? '#c62828' : '#666')
-        .text(col.sub.key.length > 14 ? col.sub.key.slice(0, 13) + '…' : col.sub.key);
+        .attr('fill', col.sub.key === 'Discon/Close' ? '#c62828' : '#666');
+      // Anchor the LAST line on the column's baseline and stack earlier
+      // lines up-left into the header, so no line dips into the dots.
+      wrapLines.forEach((ln, li) => {
+        label.append('tspan').attr('x', 0).attr('dy', li === 0 ? -(wrapLines.length - 1) * 5.5 : 5.5).text(ln);
+      });
       label.append('title').text(`${col.cat} › ${col.sub.key} · ${col.sub.recs.length} SKUs`);
       g.append('line').attr('x1', col.x - SUB_GAP / 2).attr('x2', col.x - SUB_GAP / 2).attr('y1', -2).attr('y2', iH)
         .attr('stroke', '#e0e0e0').attr('stroke-width', 0.5).attr('stroke-dasharray', '2,2');
