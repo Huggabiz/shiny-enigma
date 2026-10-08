@@ -382,8 +382,10 @@ export interface Lens {
 export interface RetailerSales {
   importedAt: string;
   fileName?: string;
-  /** Sorted by gross sales descending at import time. */
-  customers: { name: string; gross: number; qty: number }[];
+  /** Sorted by gross sales descending at import time. segment is the
+   * customer's sales segment (BudgetLineSalesPerson[Segment]) when
+   * the import carries that column. */
+  customers: { name: string; gross: number; qty: number; segment?: string }[];
   /** SKU code (trimmed, uppercased) → [customerIndex, qty][] */
   bySku: Record<string, [number, number][]>;
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import html2canvas from 'html2canvas';
 import { useProjectStore } from '../store/useProjectStore';
@@ -423,6 +423,15 @@ export function AnalyseView() {
   const [oppCategory, setOppCategory] = useState('');
   const [oppMinScore, setOppMinScore] = useState(0.1);
   const [covShowOpps, setCovShowOpps] = useState(false);
+  const [oppSegment, setOppSegment] = useState('');
+  const [oppGroupSeg, setOppGroupSeg] = useState(false);
+  const oppSegments = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of (project?.retailerSales?.customers ?? []).slice(0, covTopN)) {
+      if (c.segment) set.add(c.segment);
+    }
+    return Array.from(set).sort();
+  }, [project?.retailerSales, covTopN]);
   const covImportRef = useRef<HTMLInputElement>(null);
   const [covImportBusy, setCovImportBusy] = useState(false);
   const projectLenses = useMemo(
@@ -440,7 +449,7 @@ export function AnalyseView() {
     });
     const opps = buildOpportunities(covData, covLenses, oppMinScore);
     const rows = opps.map((o, i) => ({
-      Rank: i + 1, Customer: o.customer, SKU: o.sku, Product: o.name,
+      Rank: i + 1, Customer: o.customer, Segment: o.segment, SKU: o.sku, Product: o.name,
       Category: o.cat, 'Range Plan': o.plan, Lens: o.lens ?? '',
       'Peers stocking': `${o.peers}/${o.nCust}`,
       'Customer category coverage': `${Math.round(o.affinity * 100)}%`,
@@ -770,7 +779,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppMinScore={oppMinScore} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppSegment={oppSegment} oppGroupSeg={oppGroupSeg} oppMinScore={oppMinScore} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -1061,6 +1070,20 @@ export function AnalyseView() {
                       {allCategories.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </label>
+                  {oppSegments.length > 0 && (
+                    <>
+                      <label className="analyse-config-item" title="Filter to one sales segment (BudgetLineSalesPerson[Segment] from the customer import)">Segment
+                        <select className="analyse-config-input" style={{ width: 100, textAlign: 'left' }} value={oppSegment} onChange={(e) => setOppSegment(e.target.value)}>
+                          <option value="">All</option>
+                          {oppSegments.map((sg) => <option key={sg} value={sg}>{sg}</option>)}
+                        </select>
+                      </label>
+                      <label className="analyse-config-item" title="Section the table by sales segment (rows still ranked by score within each)">
+                        <input type="checkbox" checked={oppGroupSeg} onChange={(e) => setOppGroupSeg(e.target.checked)} />
+                        Group by segment
+                      </label>
+                    </>
+                  )}
                   <label className="analyse-config-item" title="Hide gaps scoring below this — raise it to shorten the list to only the strongest asks">Min score
                     <input type="number" min="0" max="2" step="0.05" className="analyse-config-input" style={{ width: 48 }}
                       value={oppMinScore} onChange={(e) => setOppMinScore(Math.max(0, Number(e.target.value) || 0))} />
@@ -4264,7 +4287,7 @@ type CovSkuRec = { sku: string; name: string; eol: boolean; stocked: number[] };
 type CovSubGroup = { key: string; label: string | null; color: string | null; recs: CovSkuRec[]; tight?: boolean };
 type CovCatGroup = { cat: string; subs: CovSubGroup[]; n: number };
 type CovRaw = CovSkuRec & { cat: string; planName: string; lensIdx: number };
-interface CovData { customers: { name: string; gross: number; qty: number }[]; cats: CovCatGroup[]; totalSkus: number; raws: CovRaw[] }
+interface CovData { customers: { name: string; gross: number; qty: number; segment?: string }[]; cats: CovCatGroup[]; totalSkus: number; raws: CovRaw[] }
 
 function buildCoverageData(args: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string; hiddenCats: Set<string>;
@@ -4383,7 +4406,7 @@ function lensWeight(rank: number): number {
  * close-out SKUs never count as opportunities; scores below minScore
  * are dropped. */
 interface OppRow {
-  customer: string; sku: string; name: string; cat: string; plan: string;
+  customer: string; segment: string; sku: string; name: string; cat: string; plan: string;
   lens: string | null; peers: number; nCust: number; affinity: number; score: number;
 }
 
@@ -4415,7 +4438,7 @@ function buildOpportunities(data: CovData, lenses: Lens[], minScore = 0): OppRow
       const score = adoption * affinity * (r.lensIdx >= 0 ? lensWeight(r.lensIdx) : 1);
       if (score < minScore) continue;
       rows.push({
-        customer: customers[ci].name, sku: r.sku, name: r.name, cat: r.cat, plan: r.planName,
+        customer: customers[ci].name, segment: customers[ci].segment ?? '', sku: r.sku, name: r.name, cat: r.cat, plan: r.planName,
         lens: r.lensIdx >= 0 ? (lenses[r.lensIdx]?.name ?? null) : null,
         peers, nCust, affinity, score,
       });
@@ -4424,7 +4447,7 @@ function buildOpportunities(data: CovData, lenses: Lens[], minScore = 0): OppRow
   return rows.sort((a, b) => b.score - a.score);
 }
 
-function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, retailer, mode, lenses, hideEol, topN, view, oppCustomer, oppCategory, oppMinScore, showOpps }: {
+function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, retailer, mode, lenses, hideEol, topN, view, oppCustomer, oppCategory, oppSegment, oppGroupSeg, oppMinScore, showOpps }: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   textScale: number; hiddenCats: Set<string>;
   retailer: import('../types').RetailerSales | undefined;
@@ -4435,6 +4458,8 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
   view: 'dots' | 'opps';
   oppCustomer: string;
   oppCategory: string;
+  oppSegment: string;
+  oppGroupSeg: boolean;
   oppMinScore: number;
   showOpps: boolean;
 }) {
@@ -4757,9 +4782,15 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
   }, [data, retailer, dims, wrapperRef, textScale, view, showOpps, opps, oppMinScore]);
 
   if (view === 'opps') {
-    const shown = opps
-      .filter((o) => (!oppCustomer || o.customer === oppCustomer) && (!oppCategory || o.cat === oppCategory))
-      .slice(0, 100);
+    const filtered = opps.filter((o) =>
+      (!oppCustomer || o.customer === oppCustomer)
+      && (!oppCategory || o.cat === oppCategory)
+      && (!oppSegment || o.segment === oppSegment));
+    const shown = (oppGroupSeg
+      ? [...filtered].sort((a, b) => (a.segment || '~').localeCompare(b.segment || '~') || b.score - a.score)
+      : filtered
+    ).slice(0, 100);
+    const hasSegments = opps.some((o) => o.segment);
     const maxScore = opps[0]?.score || 1;
     const td: React.CSSProperties = { padding: '3px 8px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' };
     return (
@@ -4783,7 +4814,9 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
             <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 10.5, color: '#333' }}>
               <thead>
                 <tr style={{ textAlign: 'left', color: '#888', fontSize: 9 }}>
-                  <th style={td}>#</th><th style={td}>Customer</th><th style={td}>SKU</th>
+                  <th style={td}>#</th><th style={td}>Customer</th>
+                  {hasSegments && !oppGroupSeg && <th style={td}>Segment</th>}
+                  <th style={td}>SKU</th>
                   <th style={{ ...td, whiteSpace: 'normal' }}>Product</th><th style={td}>Category</th>
                   <th style={td}>Plan</th><th style={td}>Lens</th><th style={td}>Peers</th>
                   <th style={td}>Cat coverage</th><th style={td}>Score</th>
@@ -4791,14 +4824,30 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
               </thead>
               <tbody>
                 {shown.map((o, i) => (
-                  <tr key={`${o.customer}-${o.sku}`} style={{ background: i % 2 ? '#fafafa' : '#fff' }}>
+                  <Fragment key={`${o.customer}-${o.sku}`}>
+                    {oppGroupSeg && (i === 0 || shown[i - 1].segment !== o.segment) && (
+                      <tr>
+                        <td colSpan={10} style={{ padding: '6px 8px 3px', fontSize: 10, fontWeight: 700, color: '#1a1a2e', borderBottom: '1.5px solid #1a1a2e', background: '#f5f7fa' }}>
+                          {o.segment || 'No segment'}
+                        </td>
+                      </tr>
+                    )}
+                  <tr style={{ background: i % 2 ? '#fafafa' : '#fff' }}>
                     <td style={{ ...td, color: '#999' }}>{i + 1}</td>
                     <td style={{ ...td, fontWeight: 600 }}>{o.customer}</td>
+                    {hasSegments && !oppGroupSeg && <td style={{ ...td, color: '#777' }}>{o.segment}</td>}
                     <td style={{ ...td, fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 9.5, color: '#777' }}>{o.sku}</td>
                     <td style={{ ...td, whiteSpace: 'normal', maxWidth: 260 }}>{o.name}</td>
                     <td style={td}>{o.cat}</td>
                     <td style={td}>{o.plan}</td>
-                    <td style={td}>{o.lens ?? ''}</td>
+                    <td style={td}>
+                      {o.lens && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ width: 7, height: 7, borderRadius: 2, flexShrink: 0, background: lenses.find((l) => l.name === o.lens)?.color ?? '#999' }} />
+                          {o.lens}
+                        </span>
+                      )}
+                    </td>
                     <td style={td}>{o.peers}/{o.nCust}</td>
                     <td style={td}>{Math.round(o.affinity * 100)}%</td>
                     <td style={td}>
@@ -4809,6 +4858,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
                       }}>{o.score.toFixed(2)}</span>
                     </td>
                   </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

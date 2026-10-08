@@ -39,6 +39,9 @@ export function parseRetailerSales(buffer: ArrayBuffer, fileName?: string): { da
     ?? findHeader(headers, (n) => n.includes('qty') && !n.includes('previous'));
   const grossH = findHeader(headers, (n) => n.includes('gross sales') && n.includes('closed'))
     ?? findHeader(headers, (n) => n.includes('gross') && !n.includes('ly'));
+  // Optional: BudgetLineSalesPerson[Segment] — a sales segment per
+  // customer, used for grouping/filtering the gaps view.
+  const segH = findHeader(headers, (n) => n.includes('segment'));
   if (!codeH || !custH || !qtyH) {
     throw new Error(
       'Could not find the required columns. Need: Product Code, Customer Name, and a Qty (closed periods) column.\n' +
@@ -47,6 +50,7 @@ export function parseRetailerSales(buffer: ArrayBuffer, fileName?: string): { da
 
   // Aggregate: per customer totals, and per (customer, sku) qty.
   const custTotals = new Map<string, { gross: number; qty: number }>();
+  const custSegCounts = new Map<string, Map<string, number>>();
   const pairQty = new Map<string, number>();
   let skipped = 0;
   for (const row of rows) {
@@ -57,14 +61,28 @@ export function parseRetailerSales(buffer: ArrayBuffer, fileName?: string): { da
     if (!sku || !cust) { skipped++; continue; }
     const ct = custTotals.get(cust) ?? { gross: 0, qty: 0 };
     ct.gross += gross; ct.qty += qty; custTotals.set(cust, ct);
+    if (segH) {
+      const seg = String(row[segH] ?? '').trim();
+      if (seg) {
+        const sc = custSegCounts.get(cust) ?? custSegCounts.set(cust, new Map()).get(cust)!;
+        sc.set(seg, (sc.get(seg) ?? 0) + 1);
+      }
+    }
     if (qty > 0) {
       const key = `${cust}\u0000${sku}`;
       pairQty.set(key, (pairQty.get(key) ?? 0) + qty);
     }
   }
 
+  // Most frequent segment value per customer (rows can disagree).
+  const topSegment = (name: string): string | undefined => {
+    const sc = custSegCounts.get(name);
+    if (!sc || sc.size === 0) return undefined;
+    return Array.from(sc.entries()).sort((a, b) => b[1] - a[1])[0][0];
+  };
+
   const customers = Array.from(custTotals.entries())
-    .map(([name, t]) => ({ name, gross: t.gross, qty: t.qty }))
+    .map(([name, t]) => ({ name, gross: t.gross, qty: t.qty, segment: topSegment(name) }))
     // Ranked by summed gross sales; a file without the gross column
     // falls back to summed qty so the Top-N is never arbitrary.
     .sort((a, b) => (b.gross - a.gross) || (b.qty - a.qty));
