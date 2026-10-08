@@ -580,7 +580,10 @@ export interface Project {
     /** SKU Reach (customer coverage) sheet settings. */
     coverageConfig?: {
       /** Second-level x grouping inside each category. */
-      mode?: 'matrix' | 'lens';
+      /** 'matrix' = by range plan (historical token), 'lens' = by
+       * lens with labelled columns, 'hybrid' = plans sub-split by
+       * lens background tints with a legend. */
+      mode?: 'matrix' | 'lens' | 'hybrid';
       /** Lenses shown as groups/backgrounds in lens mode, in order. */
       lensIds?: string[];
       /** Hide discontinued / close-out SKUs entirely. */

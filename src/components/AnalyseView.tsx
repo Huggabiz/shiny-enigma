@@ -398,14 +398,14 @@ export function AnalyseView() {
 
   // SKU Reach (coverage) sheet settings — persisted as one object.
   const covConfig = av?.coverageConfig;
-  const [covMode, setCovModeState] = useState<'matrix' | 'lens'>(() => covConfig?.mode ?? 'matrix');
+  const [covMode, setCovModeState] = useState<'matrix' | 'lens' | 'hybrid'>(() => covConfig?.mode ?? 'matrix');
   const [covLensIds, setCovLensIdsState] = useState<string[]>(() => covConfig?.lensIds ?? []);
   const [covHideEol, setCovHideEolState] = useState<boolean>(() => covConfig?.hideEol ?? false);
   const [covTopN, setCovTopNState] = useState<number>(() => covConfig?.topN ?? 30);
   const persistCoverage = (patch: Partial<NonNullable<typeof covConfig>>) => {
     setAnalyseConfig({ coverageConfig: { mode: covMode, lensIds: covLensIds, hideEol: covHideEol, topN: covTopN, ...patch } });
   };
-  const setCovMode = (v: 'matrix' | 'lens') => { setCovModeState(v); persistCoverage({ mode: v }); };
+  const setCovMode = (v: 'matrix' | 'lens' | 'hybrid') => { setCovModeState(v); persistCoverage({ mode: v }); };
   const setCovHideEol = (v: boolean) => { setCovHideEolState(v); persistCoverage({ hideEol: v }); };
   const setCovTopN = (v: number) => { setCovTopNState(v); persistCoverage({ topN: v }); };
   const toggleCovLens = (id: string) => {
@@ -1007,11 +1007,12 @@ export function AnalyseView() {
                 <input type="number" min="5" max="60" step="1" className="analyse-config-input" style={{ width: 44 }}
                   value={covTopN} onChange={(e) => setCovTopN(Math.max(5, Math.min(60, Number(e.target.value) || 30)))} />
               </label>
-              <div className="analyse-metric-toggle" role="tablist" title="Second-level grouping inside each category: by the range plan each SKU belongs to, or by selected lenses">
+              <div className="analyse-metric-toggle" role="tablist" title="Second-level grouping inside each category: by range plan, by selected lenses, or plans sub-split by lens background tints (legend below the chart)">
                 <button role="tab" className={covMode === 'matrix' ? 'active' : ''} onClick={() => setCovMode('matrix')}>Plans</button>
                 <button role="tab" className={covMode === 'lens' ? 'active' : ''} onClick={() => setCovMode('lens')}>Lenses</button>
+                <button role="tab" className={covMode === 'hybrid' ? 'active' : ''} onClick={() => setCovMode('hybrid')}>Plans × Lenses</button>
               </div>
-              {covMode === 'lens' && (
+              {covMode !== 'matrix' && (
                 <div className="toolbar-dropdown-wrapper">
                   <button className="toolbar-btn" style={{ fontSize: 10, padding: '3px 9px' }} onClick={() => setShowCovLensPicker((v) => !v)}>
                     Lenses ({covLensIds.length}/{projectLenses.length}) ▾
@@ -4181,7 +4182,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   textScale: number; hiddenCats: Set<string>;
   retailer: import('../types').RetailerSales | undefined;
-  mode: 'matrix' | 'lens';
+  mode: 'matrix' | 'lens' | 'hybrid';
   lenses: Lens[];
   hideEol: boolean;
   topN: number;
@@ -4192,7 +4193,10 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
 
   const data = useMemo(() => {
     type SkuRec = { sku: string; name: string; eol: boolean; stocked: number[] };
-    type SubGroup = { key: string; color: string | null; recs: SkuRec[] };
+    // label: text drawn above the column (null = none, e.g. hybrid
+    // lens segments identified by tint alone). tight: hugs the
+    // previous column (a segment of the same plan, not a new group).
+    type SubGroup = { key: string; label: string | null; color: string | null; recs: SkuRec[]; tight?: boolean };
     type CatGroup = { cat: string; subs: SubGroup[]; n: number };
 
     const customers = (retailer?.customers ?? []).slice(0, topN);
@@ -4247,17 +4251,36 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
           // selected plan containing it), in sidebar order.
           for (const k of planOrder) {
             const inK = live.filter((r) => r.planName === k);
-            if (inK.length) subs.push({ key: k, color: null, recs: sortRecs(inK) });
+            if (inK.length) subs.push({ key: k, label: k, color: null, recs: sortRecs(inK) });
+          }
+        } else if (mode === 'hybrid') {
+          // Plans sub-split by lens: segments hug each other inside a
+          // plan, identified by lens tint only (legend below), with
+          // the plan name labelling the first segment.
+          for (const k of planOrder) {
+            const inPlan = live.filter((r) => r.planName === k);
+            if (inPlan.length === 0) continue;
+            let firstSeg = true;
+            lenses.forEach((l, i) => {
+              const seg = inPlan.filter((r) => r.lensIdx === i);
+              if (seg.length === 0) return;
+              subs.push({ key: `${k} · ${l.name}`, label: firstSeg ? k : null, color: l.color, recs: sortRecs(seg), tight: !firstSeg });
+              firstSeg = false;
+            });
+            const other = inPlan.filter((r) => r.lensIdx === -1);
+            if (other.length) {
+              subs.push({ key: `${k} · ${lenses.length ? 'No lens' : 'All'}`, label: firstSeg ? k : null, color: null, recs: sortRecs(other), tight: !firstSeg });
+            }
           }
         } else {
           lenses.forEach((l, i) => {
             const inL = live.filter((r) => r.lensIdx === i);
-            if (inL.length) subs.push({ key: l.name, color: l.color, recs: sortRecs(inL) });
+            if (inL.length) subs.push({ key: l.name, label: l.name, color: l.color, recs: sortRecs(inL) });
           });
           const other = live.filter((r) => r.lensIdx === -1);
-          if (other.length) subs.push({ key: lenses.length ? 'Other' : 'All', color: null, recs: sortRecs(other) });
+          if (other.length) subs.push({ key: lenses.length ? 'Other' : 'All', label: lenses.length ? 'Other' : 'All', color: null, recs: sortRecs(other) });
         }
-        if (eol.length) subs.push({ key: 'Discon/Close', color: '#c62828', recs: sortRecs(eol) });
+        if (eol.length) subs.push({ key: 'Discon/Close', label: 'Discon/Close', color: '#c62828', recs: sortRecs(eol) });
         return { cat, subs, n: rs.length };
       })
       .filter((c) => c.subs.length > 0);
@@ -4269,7 +4292,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
     const W = dims.width / textScale;
     const H = dims.height / textScale;
-    const margin = { top: 64, right: 40, bottom: 10, left: 128 };
+    const margin = { top: 64, right: 40, bottom: mode === 'hybrid' && lenses.length > 0 ? 24 : 10, left: 128 };
     const iW = W - margin.left - margin.right, iH = H - margin.top - margin.bottom;
     if (iW < 60 || iH < 40) return;
     const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -4299,7 +4322,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     // a per-customer "n/total" stat strip on its right; in plan mode
     // only the Discon/Close column does. Width sized to digit count.
     const statWFor = (s: { color: string | null; key: string; recs: { sku: string }[] }) =>
-      mode === 'lens' || s.key === 'Discon/Close'
+      mode !== 'matrix' || s.key === 'Discon/Close'
         ? (String(s.recs.length).length * 2 + 1) * 2.7 + 5
         : 0;
     let p = 4.2;
@@ -4307,7 +4330,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
       const L = Math.max(1, Math.floor((rowH - 3) / p));
       let total = 0;
       for (const c of cats) {
-        for (const s of c.subs) total += Math.ceil(s.recs.length / L) * p + SUB_PAD * 2 + statWFor(s) + SUB_GAP;
+        for (const s of c.subs) total += Math.ceil(s.recs.length / L) * p + SUB_PAD * 2 + statWFor(s) + (s.tight ? 1 : SUB_GAP);
         total += CAT_GAP;
       }
       if (total <= iW || p <= 1.5) break;
@@ -4323,16 +4346,19 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     const catSpans: { cat: string; x0: number; x1: number; n: number }[] = [];
     for (const c of cats) {
       const x0 = cx;
+      let firstSub = true;
       for (const s of c.subs) {
+        if (!firstSub) cx += s.tight ? 1 : SUB_GAP;
+        firstSub = false;
         const perLine = Math.ceil(s.recs.length / L);
         const statW = statWFor(s);
         const w = perLine * p + SUB_PAD * 2 + statW;
         // Best-covered customer within this subgroup (shown customers).
         const counts = customers.map((_, ci) => s.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0));
         cols.push({ cat: c.cat, sub: s, x: cx, w, perLine, best: Math.max(1, ...counts), statW });
-        cx += w + SUB_GAP;
+        cx += w;
       }
-      catSpans.push({ cat: c.cat, x0, x1: cx - SUB_GAP, n: c.n });
+      catSpans.push({ cat: c.cat, x0, x1: cx, n: c.n });
       cx += CAT_GAP;
     }
 
@@ -4371,10 +4397,13 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
           .attr('y1', 0).attr('y2', iH).attr('stroke', '#ddd').attr('stroke-width', 0.5);
       }
       // Angled label, word-wrapped onto parallel lines so full plan /
-      // lens names stay readable instead of ellipsizing.
+      // lens names stay readable instead of ellipsizing. Hybrid lens
+      // segments carry no label — the tint + legend identify them.
+      if (col.sub.label) {
+      const labelText = col.sub.label;
       const wrapLines = (() => {
         const MAXC = 12, MAXL = 3;
-        const words = col.sub.key.split(/\s+/);
+        const words = labelText.split(/\s+/);
         const lines: string[] = [];
         let cur = '';
         for (const w of words) {
@@ -4395,15 +4424,41 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
       const label = g.append('text')
         .attr('transform', `translate(${col.x + col.w / 2 + 2},-6) rotate(-60)`)
         .attr('font-size', '5.5px').attr('font-weight', '600')
-        .attr('fill', col.sub.key === 'Discon/Close' ? '#c62828' : '#666');
+        .attr('fill', labelText === 'Discon/Close' ? '#c62828' : '#666');
       // Anchor the LAST line on the column's baseline and stack earlier
       // lines up-left into the header, so no line dips into the dots.
       wrapLines.forEach((ln, li) => {
         label.append('tspan').attr('x', 0).attr('dy', li === 0 ? -(wrapLines.length - 1) * 5.5 : 5.5).text(ln);
       });
       label.append('title').text(`${col.cat} › ${col.sub.key} · ${col.sub.recs.length} SKUs`);
-      g.append('line').attr('x1', col.x - SUB_GAP / 2).attr('x2', col.x - SUB_GAP / 2).attr('y1', -2).attr('y2', iH)
-        .attr('stroke', '#e0e0e0').attr('stroke-width', 0.5).attr('stroke-dasharray', '2,2');
+      }
+      if (!col.sub.tight) {
+        g.append('line').attr('x1', col.x - SUB_GAP / 2).attr('x2', col.x - SUB_GAP / 2).attr('y1', -2).attr('y2', iH)
+          .attr('stroke', '#e0e0e0').attr('stroke-width', 0.5).attr('stroke-dasharray', '2,2');
+      }
+    }
+
+    // Hybrid legend: lens tints decoded below the chart.
+    if (mode === 'hybrid' && lenses.length > 0) {
+      let lx2 = 0;
+      const legY = iH + 14;
+      const entries: { name: string; color: string | null }[] = [
+        ...lenses.map((l) => ({ name: l.name, color: l.color as string | null })),
+        { name: 'No lens', color: null },
+        { name: 'Discon/Close', color: '#c62828' },
+      ];
+      for (const e of entries) {
+        if (e.color) {
+          g.append('rect').attr('x', lx2).attr('y', legY - 5).attr('width', 7).attr('height', 7).attr('rx', 1.5)
+            .attr('fill', e.color).attr('opacity', 0.35).attr('stroke', e.color).attr('stroke-width', 0.75);
+        } else {
+          g.append('rect').attr('x', lx2).attr('y', legY - 5).attr('width', 7).attr('height', 7).attr('rx', 1.5)
+            .attr('fill', '#fff').attr('stroke', '#bbb').attr('stroke-width', 0.75);
+        }
+        g.append('text').attr('x', lx2 + 10).attr('y', legY + 1).attr('font-size', '6.5px')
+          .attr('fill', e.name === 'Discon/Close' ? '#c62828' : '#555').text(e.name);
+        lx2 += 10 + e.name.length * 3.6 + 14;
+      }
     }
 
     g.append('text').attr('x', iW + 6).attr('y', -6).attr('font-size', '6px').attr('font-weight', '700').attr('fill', '#888').text('SKUs');
