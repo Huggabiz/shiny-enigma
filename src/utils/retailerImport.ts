@@ -65,7 +65,9 @@ export function parseRetailerSales(buffer: ArrayBuffer, fileName?: string): { da
 
   const customers = Array.from(custTotals.entries())
     .map(([name, t]) => ({ name, gross: t.gross, qty: t.qty }))
-    .sort((a, b) => b.gross - a.gross);
+    // Ranked by summed gross sales; a file without the gross column
+    // falls back to summed qty so the Top-N is never arbitrary.
+    .sort((a, b) => (b.gross - a.gross) || (b.qty - a.qty));
   const custIdx = new Map(customers.map((c, i) => [c.name, i]));
 
   const bySku: Record<string, [number, number][]> = {};

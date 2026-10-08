@@ -421,6 +421,7 @@ export function AnalyseView() {
   const [covView, setCovView] = useState<'dots' | 'opps'>('dots');
   const [oppCustomer, setOppCustomer] = useState('');
   const [oppCategory, setOppCategory] = useState('');
+  const [oppMinScore, setOppMinScore] = useState(0.1);
   const covImportRef = useRef<HTMLInputElement>(null);
   const [covImportBusy, setCovImportBusy] = useState(false);
   const projectLenses = useMemo(
@@ -436,7 +437,7 @@ export function AnalyseView() {
       hiddenCats: growthHiddenCats, retailer: project.retailerSales,
       mode: covMode, lenses: covLenses, hideEol: covHideEol, topN: covTopN,
     });
-    const opps = buildOpportunities(covData, covLenses);
+    const opps = buildOpportunities(covData, covLenses, oppMinScore);
     const rows = opps.map((o, i) => ({
       Rank: i + 1, Customer: o.customer, SKU: o.sku, Product: o.name,
       Category: o.cat, 'Range Plan': o.plan, Lens: o.lens ?? '',
@@ -768,7 +769,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppMinScore={oppMinScore} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -1047,7 +1048,11 @@ export function AnalyseView() {
                       {allCategories.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </label>
-                  <button className="analyse-snip-btn" onClick={handleOppsExport} title="Download the FULL ranked list (all customers and categories) as Excel">
+                  <label className="analyse-config-item" title="Hide gaps scoring below this — raise it to shorten the list to only the strongest asks">Min score
+                    <input type="number" min="0" max="2" step="0.05" className="analyse-config-input" style={{ width: 48 }}
+                      value={oppMinScore} onChange={(e) => setOppMinScore(Math.max(0, Number(e.target.value) || 0))} />
+                  </label>
+                  <button className="analyse-snip-btn" onClick={handleOppsExport} title="Download the FULL ranked list (all customers and categories, above the min score) as Excel">
                     Export opportunities
                   </button>
                 </>
@@ -1069,16 +1074,27 @@ export function AnalyseView() {
                   {showCovLensPicker && (
                     <div className="toolbar-dropdown" onMouseLeave={() => setShowCovLensPicker(false)}
                       style={{ bottom: '100%', top: 'auto', marginBottom: 4, maxHeight: 260, overflowY: 'auto' }}>
+                      <div style={{ padding: '4px 12px', fontSize: 9.5, color: '#888', maxWidth: 190 }}>
+                        Tick order = importance: the 1st lens weighs most in opportunity scoring (×2.0, then ×1.5, ×1.33…). Untick and retick to reorder.
+                      </div>
                       {projectLenses.length === 0 && <div style={{ padding: '6px 12px', fontSize: 11, color: '#888' }}>No lenses defined in this project.</div>}
-                      {projectLenses.map((l) => (
-                        <label key={l.id} className="dropdown-checkbox">
-                          <input type="checkbox" checked={covLensIds.includes(l.id)} onChange={() => toggleCovLens(l.id)} />
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: 'inline-block', flexShrink: 0 }} />
-                            {l.name}
-                          </span>
-                        </label>
-                      ))}
+                      {projectLenses.map((l) => {
+                        const rank = covLensIds.indexOf(l.id);
+                        return (
+                          <label key={l.id} className="dropdown-checkbox">
+                            <input type="checkbox" checked={rank >= 0} onChange={() => toggleCovLens(l.id)} />
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: 'inline-block', flexShrink: 0 }} />
+                              {l.name}
+                              {rank >= 0 && (
+                                <span style={{ fontSize: 9, fontWeight: 700, color: '#1976d2' }}>
+                                  #{rank + 1} ·×{lensWeight(rank).toFixed(2).replace(/0$/, '')}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -4340,17 +4356,25 @@ function buildCoverageData(args: {
     return { customers, cats, totalSkus: raws.length, raws };
 }
 
+/** Lens importance weight by selection rank (0-based): 1st-ranked
+ * lens doubles a gap's score, 2nd x1.5, 3rd x1.33, tailing to 1. */
+function lensWeight(rank: number): number {
+  return 1 + 1 / (rank + 1);
+}
+
 /** Ranked missed opportunities: for every (customer, unstocked live
  * SKU) pair, score = peer adoption x the customer's own coverage of
- * that SKU's category, boosted 1.5x when the SKU is in a selected
- * lens. Low-affinity value customers (Costco/TJX-style) sink
- * naturally; discon/close-out SKUs never count as opportunities. */
+ * that SKU's category, x the lens-importance weight when the SKU is
+ * in a selected lens (selection order = importance). Low-affinity
+ * value customers (Costco/TJX-style) sink naturally; discon /
+ * close-out SKUs never count as opportunities; scores below minScore
+ * are dropped. */
 interface OppRow {
   customer: string; sku: string; name: string; cat: string; plan: string;
   lens: string | null; peers: number; nCust: number; affinity: number; score: number;
 }
 
-function buildOpportunities(data: CovData, lenses: Lens[]): OppRow[] {
+function buildOpportunities(data: CovData, lenses: Lens[], minScore = 0): OppRow[] {
   const { customers, raws } = data;
   const nCust = customers.length;
   if (nCust === 0) return [];
@@ -4375,7 +4399,8 @@ function buildOpportunities(data: CovData, lenses: Lens[]): OppRow[] {
       if (stockedSet.has(ci)) continue;
       const affinity = stockedArr[ci] / total;
       if (affinity < 0.15) continue; // value-channel narrowness — expected gap
-      const score = adoption * affinity * (r.lensIdx >= 0 ? 1.5 : 1);
+      const score = adoption * affinity * (r.lensIdx >= 0 ? lensWeight(r.lensIdx) : 1);
+      if (score < minScore) continue;
       rows.push({
         customer: customers[ci].name, sku: r.sku, name: r.name, cat: r.cat, plan: r.planName,
         lens: r.lensIdx >= 0 ? (lenses[r.lensIdx]?.name ?? null) : null,
@@ -4386,7 +4411,7 @@ function buildOpportunities(data: CovData, lenses: Lens[]): OppRow[] {
   return rows.sort((a, b) => b.score - a.score);
 }
 
-function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, retailer, mode, lenses, hideEol, topN, view, oppCustomer, oppCategory }: {
+function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, retailer, mode, lenses, hideEol, topN, view, oppCustomer, oppCategory, oppMinScore }: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   textScale: number; hiddenCats: Set<string>;
   retailer: import('../types').RetailerSales | undefined;
@@ -4397,6 +4422,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
   view: 'dots' | 'opps';
   oppCustomer: string;
   oppCategory: string;
+  oppMinScore: number;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
@@ -4405,7 +4431,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
   const data = useMemo(
     () => buildCoverageData({ plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN }),
     [plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN]);
-  const opps = useMemo(() => (view === 'opps' ? buildOpportunities(data, lenses) : []), [view, data, lenses]);
+  const opps = useMemo(() => (view === 'opps' ? buildOpportunities(data, lenses, oppMinScore) : []), [view, data, lenses, oppMinScore]);
 
   useEffect(() => {
     if (!svgRef.current) return; // opportunities view renders no SVG
@@ -4688,9 +4714,14 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
         ) : (
           <>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e' }}>Missed opportunities</div>
-            <div style={{ fontSize: 9.5, color: '#888', margin: '2px 0 10px' }}>
-              score = share of the top {data.customers.length} customers stocking the SKU × this customer's own coverage of its category (×1.5 for lens SKUs).
-              Narrow value customers sink automatically. Showing top {shown.length}{opps.length > shown.length ? ` of ${opps.length} scored gaps` : ''} — Excel export has the full list.
+            <div style={{ fontSize: 9.5, color: '#888', margin: '2px 0 2px', lineHeight: 1.5 }}>
+              <b>How it's scored:</b> score = (peers stocking the SKU ÷ {data.customers.length}) × (this customer's coverage of the SKU's category)
+              {lenses.length > 0 && <> × lens importance ({lenses.map((l, i) => `${l.name} ×${lensWeight(i).toFixed(2)}`).join(', ')} — ranked by tick order)</>}.
+              A customer stocking little of a category everywhere (value channels) scores low on every gap and drops out naturally.
+            </div>
+            <div style={{ fontSize: 9.5, color: '#888', margin: '0 0 10px' }}>
+              Hidden: SKUs under 20% peer adoption, customers under 15% category coverage, scores below {oppMinScore}, and discon/close-out SKUs.
+              Showing top {shown.length}{opps.length > shown.length ? ` of ${opps.length} scored gaps` : ''} — the Excel export has the full list.
             </div>
             <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 10.5, color: '#333' }}>
               <thead>
