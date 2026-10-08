@@ -4549,39 +4549,46 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
         g.append('line').attr('x1', col.x + col.w - col.statW).attr('x2', col.x + col.w - col.statW)
           .attr('y1', 0).attr('y2', iH).attr('stroke', '#ddd').attr('stroke-width', 0.5);
       }
-      // Angled label, word-wrapped onto parallel lines so full plan /
-      // lens names stay readable instead of ellipsizing. Hybrid lens
-      // segments carry no label — the tint + legend identify them.
+      // Angled label, centred ALONG the column's own -60° diagonal.
+      // Text parallel to the delineators can be any length without
+      // crossing them — only perpendicular stacking (extra lines)
+      // eats across the band, so the wrap adapts: a narrow column
+      // prefers fewer, longer lines, and the line block is centred
+      // on the column so it never leans over a neighbour's line.
+      // Hybrid lens segments carry no label (tint + legend instead).
       if (col.sub.label) {
       const labelText = col.sub.label;
-      const wrapLines = (() => {
-        const MAXC = 12, MAXL = 3;
+      const LINE_H = 5.5;
+      const wrap = (maxc: number) => {
         const words = labelText.split(/\s+/);
         const lines: string[] = [];
         let cur = '';
         for (const w of words) {
           if (!cur) cur = w;
-          else if ((cur + ' ' + w).length <= MAXC) cur += ' ' + w;
+          else if ((cur + ' ' + w).length <= maxc) cur += ' ' + w;
           else { lines.push(cur); cur = w; }
         }
         if (cur) lines.push(cur);
-        const out: string[] = [];
-        for (const l of lines) {
-          let t = l;
-          while (t.length > MAXC + 3) { out.push(t.slice(0, MAXC + 2) + '-'); t = t.slice(MAXC + 2); }
-          out.push(t);
-        }
-        if (out.length > MAXL) { const kept = out.slice(0, MAXL); kept[MAXL - 1] += '…'; return kept; }
-        return out;
-      })();
+        return lines;
+      };
+      // How many parallel lines fit between this column's delineators.
+      const bandCap = Math.max(1, Math.floor((0.866 * col.w - 2) / LINE_H));
+      let maxc = 12;
+      let wrapLines = wrap(maxc);
+      while (wrapLines.length > bandCap && maxc < 40) { maxc += 6; wrapLines = wrap(maxc); }
+      if (wrapLines.length > bandCap) wrapLines = [labelText];
+      // Anchor mid-band on the diagonal through the column centre.
+      const rise = 26;
+      const ax = col.x + col.w / 2 + rise / Math.tan(Math.PI / 3);
       const label = g.append('text')
-        .attr('transform', `translate(${col.x + col.w / 2 + 2},-6) rotate(-60)`)
+        .attr('transform', `translate(${ax},${-6 - rise}) rotate(-60)`)
+        .attr('text-anchor', 'middle')
         .attr('font-size', '5.5px').attr('font-weight', '600')
         .attr('fill', labelText === 'Discon/Close' ? '#c62828' : '#666');
-      // Anchor the LAST line on the column's baseline and stack earlier
-      // lines up-left into the header, so no line dips into the dots.
       wrapLines.forEach((ln, li) => {
-        label.append('tspan').attr('x', 0).attr('dy', li === 0 ? -(wrapLines.length - 1) * 5.5 : 5.5).text(ln);
+        label.append('tspan').attr('x', 0)
+          .attr('dy', li === 0 ? -((wrapLines.length - 1) * LINE_H) / 2 : LINE_H)
+          .text(ln);
       });
       label.append('title').text(`${col.cat} › ${col.sub.key} · ${col.sub.recs.length} SKUs`);
       }
