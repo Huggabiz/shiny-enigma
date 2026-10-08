@@ -4440,8 +4440,17 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
       label.append('title').text(`${col.cat} › ${col.sub.key} · ${col.sub.recs.length} SKUs`);
       }
       if (!col.sub.tight) {
-        g.append('line').attr('x1', col.x - SUB_GAP / 2).attr('x2', col.x - SUB_GAP / 2).attr('y1', -2).attr('y2', iH)
+        const bx = col.x - SUB_GAP / 2;
+        g.append('line').attr('x1', bx).attr('x2', bx).attr('y1', -2).attr('y2', iH)
           .attr('stroke', '#e0e0e0').attr('stroke-width', 0.5).attr('stroke-dasharray', '2,2');
+        // Plan delineator through the header band, at the same -60°
+        // angle as the labels so it reads as part of the label row.
+        if (mode !== 'lens') {
+          const rise = 50;
+          g.append('line').attr('x1', bx).attr('y1', -2)
+            .attr('x2', bx + rise / Math.tan(Math.PI / 3)).attr('y2', -2 - rise)
+            .attr('stroke', '#d5d5d5').attr('stroke-width', 0.6);
+        }
       }
     }
 
