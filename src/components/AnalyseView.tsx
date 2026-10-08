@@ -4321,8 +4321,11 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     // In lens mode EVERY column (lenses, Other, Discon/Close) carries
     // a per-customer "n/total" stat strip on its right; in plan mode
     // only the Discon/Close column does. Width sized to digit count.
+    // No stat strips in hybrid mode — with a segment per plan × lens
+    // they overwhelmed the dots (the hover readout still has the
+    // numbers there).
     const statWFor = (s: { color: string | null; key: string; recs: { sku: string }[] }) =>
-      mode !== 'matrix' || s.key === 'Discon/Close'
+      mode === 'lens' || (mode === 'matrix' && s.key === 'Discon/Close')
         ? (String(s.recs.length).length * 2 + 1) * 2.7 + 5
         : 0;
     let p = 4.2;
@@ -4389,7 +4392,11 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     for (const col of cols) {
       // Lens / EOL background tint over the full column height.
       if (col.sub.color) {
-        g.append('rect').attr('x', col.x).attr('y', -40).attr('width', col.w).attr('height', iH + 40)
+        // Hybrid: tint only the data rows so the plan labels above
+        // stay on clean ground; the labelled modes tint the header
+        // band too, tying the name to its column.
+        const tintTop = mode === 'hybrid' ? 0 : -40;
+        g.append('rect').attr('x', col.x).attr('y', tintTop).attr('width', col.w).attr('height', iH - tintTop)
           .attr('fill', col.sub.color).attr('opacity', col.sub.key === 'Discon/Close' ? 0.06 : 0.09);
       }
       if (col.statW > 0) {
