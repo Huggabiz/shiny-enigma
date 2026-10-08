@@ -590,8 +590,15 @@ export interface Project {
       lensIds?: string[];
       /** Hide discontinued / close-out SKUs entirely. */
       hideEol?: boolean;
-      /** How many top customers (by gross sales) to show. */
+      /** How many top customers (by gross sales) to show. Display
+       * only — scoring always runs over the full import. */
       topN?: number;
+      /** Top-N applied globally, or within each sales segment. */
+      topMode?: 'global' | 'segment';
+      /** Segment filter (empty = all segments). */
+      segments?: string[];
+      /** Order and section the customer rows by segment. */
+      groupBySeg?: boolean;
     };
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */

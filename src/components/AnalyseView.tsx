@@ -404,7 +404,7 @@ export function AnalyseView() {
   const [covHideEol, setCovHideEolState] = useState<boolean>(() => covConfig?.hideEol ?? false);
   const [covTopN, setCovTopNState] = useState<number>(() => covConfig?.topN ?? 30);
   const persistCoverage = (patch: Partial<NonNullable<typeof covConfig>>) => {
-    setAnalyseConfig({ coverageConfig: { mode: covMode, lensIds: covLensIds, hideEol: covHideEol, topN: covTopN, ...patch } });
+    setAnalyseConfig({ coverageConfig: { mode: covMode, lensIds: covLensIds, hideEol: covHideEol, topN: covTopN, topMode: covTopMode, segments: covSegments, groupBySeg: covGroupBySeg, ...patch } });
   };
   const setCovMode = (v: 'matrix' | 'lens' | 'hybrid') => { setCovModeState(v); persistCoverage({ mode: v }); };
   const setCovHideEol = (v: boolean) => { setCovHideEolState(v); persistCoverage({ hideEol: v }); };
@@ -425,13 +425,28 @@ export function AnalyseView() {
   const [covShowOpps, setCovShowOpps] = useState(false);
   const [oppSegment, setOppSegment] = useState('');
   const [oppGroupSeg, setOppGroupSeg] = useState(false);
+  // Segment selection / grouping for the whole sheet (persisted).
+  const [covTopMode, setCovTopModeState] = useState<'global' | 'segment'>(() => covConfig?.topMode ?? 'global');
+  const [covSegments, setCovSegmentsState] = useState<string[]>(() => covConfig?.segments ?? []);
+  const [covGroupBySeg, setCovGroupBySegState] = useState<boolean>(() => covConfig?.groupBySeg ?? false);
+  const setCovTopMode = (v: 'global' | 'segment') => { setCovTopModeState(v); persistCoverage({ topMode: v }); };
+  const setCovGroupBySeg = (v: boolean) => { setCovGroupBySegState(v); persistCoverage({ groupBySeg: v }); };
+  const toggleCovSegment = (seg: string) => {
+    setCovSegmentsState((prev) => {
+      const next = prev.includes(seg) ? prev.filter((x) => x !== seg) : [...prev, seg];
+      persistCoverage({ segments: next });
+      return next;
+    });
+  };
+  const [showCovSegPicker, setShowCovSegPicker] = useState(false);
+  // All segments in the import (full population — not capped by Top N).
   const oppSegments = useMemo(() => {
     const set = new Set<string>();
-    for (const c of (project?.retailerSales?.customers ?? []).slice(0, covTopN)) {
+    for (const c of project?.retailerSales?.customers ?? []) {
       if (c.segment) set.add(c.segment);
     }
     return Array.from(set).sort();
-  }, [project?.retailerSales, covTopN]);
+  }, [project?.retailerSales]);
   const covImportRef = useRef<HTMLInputElement>(null);
   const [covImportBusy, setCovImportBusy] = useState(false);
   const projectLenses = useMemo(
@@ -446,6 +461,7 @@ export function AnalyseView() {
       plans: selectedPlans, catalogue: project.catalogue, shelfSide,
       hiddenCats: growthHiddenCats, retailer: project.retailerSales,
       mode: covMode, lenses: covLenses, hideEol: covHideEol, topN: covTopN,
+      topMode: covTopMode, segments: covSegments, groupBySeg: covGroupBySeg,
     });
     const opps = buildOpportunities(covData, covLenses, oppMinScore);
     const rows = opps.map((o, i) => ({
@@ -779,7 +795,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppSegment={oppSegment} oppGroupSeg={oppGroupSeg} oppMinScore={oppMinScore} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} topMode={covTopMode} segments={covSegments} groupBySeg={covGroupBySeg} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppSegment={oppSegment} oppGroupSeg={oppGroupSeg} oppMinScore={oppMinScore} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -1093,10 +1109,45 @@ export function AnalyseView() {
                   </button>
                 </>
               )}
-              <label className="analyse-config-item" title="How many top customers (ranked by gross sales) to show">Top
+              <label className="analyse-config-item" title="How many top customers (ranked by gross sales) to SHOW. Display only — coverage colours and opportunity scores are always computed over the full import.">Top
                 <input type="number" min="5" max="60" step="1" className="analyse-config-input" style={{ width: 44 }}
                   value={covTopN} onChange={(e) => setCovTopN(Math.max(5, Math.min(60, Number(e.target.value) || 30)))} />
+                {oppSegments.length > 0 && (
+                  <select className="analyse-config-input" style={{ width: 92, textAlign: 'left' }} value={covTopMode}
+                    onChange={(e) => setCovTopMode(e.target.value as 'global' | 'segment')}
+                    title="Apply the Top-N limit across all customers, or take the top N within each sales segment">
+                    <option value="global">global</option>
+                    <option value="segment">per segment</option>
+                  </select>
+                )}
               </label>
+              {oppSegments.length > 0 && (
+                <>
+                  <div className="toolbar-dropdown-wrapper">
+                    <button className="toolbar-btn" style={{ fontSize: 10, padding: '3px 9px' }} onClick={() => setShowCovSegPicker((v) => !v)}>
+                      Segments ({covSegments.length === 0 ? 'all' : covSegments.length}/{oppSegments.length}) ▾
+                    </button>
+                    {showCovSegPicker && (
+                      <div className="toolbar-dropdown" onMouseLeave={() => setShowCovSegPicker(false)}
+                        style={{ bottom: '100%', top: 'auto', marginBottom: 4, maxHeight: 260, overflowY: 'auto' }}>
+                        <div style={{ padding: '4px 12px', fontSize: 9.5, color: '#888', maxWidth: 180 }}>
+                          Filter the displayed customers by sales segment. None ticked = all segments.
+                        </div>
+                        {oppSegments.map((sg) => (
+                          <label key={sg} className="dropdown-checkbox">
+                            <input type="checkbox" checked={covSegments.includes(sg)} onChange={() => toggleCovSegment(sg)} />
+                            {sg}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <label className="analyse-config-item" title="Order and section the customer rows by sales segment">
+                    <input type="checkbox" checked={covGroupBySeg} onChange={(e) => setCovGroupBySeg(e.target.checked)} />
+                    Group rows by segment
+                  </label>
+                </>
+              )}
               <div className="analyse-metric-toggle" role="tablist" title="Second-level grouping inside each category: by range plan, by selected lenses, or plans sub-split by lens background tints (legend below the chart)">
                 <button role="tab" className={covMode === 'matrix' ? 'active' : ''} onClick={() => setCovMode('matrix')}>Plans</button>
                 <button role="tab" className={covMode === 'lens' ? 'active' : ''} onClick={() => setCovMode('lens')}>Lenses</button>
@@ -4287,14 +4338,24 @@ type CovSkuRec = { sku: string; name: string; eol: boolean; stocked: number[] };
 type CovSubGroup = { key: string; label: string | null; color: string | null; recs: CovSkuRec[]; tight?: boolean };
 type CovCatGroup = { cat: string; subs: CovSubGroup[]; n: number };
 type CovRaw = CovSkuRec & { cat: string; planName: string; lensIdx: number };
-interface CovData { customers: { name: string; gross: number; qty: number; segment?: string }[]; cats: CovCatGroup[]; totalSkus: number; raws: CovRaw[] }
+type CovCustomer = { name: string; gross: number; qty: number; segment?: string };
+/** customers = the DISPLAYED rows (post segment-filter and top-N),
+ * each carrying idx — its index in allCustomers, which is what the
+ * stocked arrays are keyed by. All scoring runs over allCustomers so
+ * display settings never move the underlying numbers. */
+interface CovData {
+  allCustomers: CovCustomer[];
+  customers: (CovCustomer & { idx: number })[];
+  cats: CovCatGroup[]; totalSkus: number; raws: CovRaw[];
+}
 
 function buildCoverageData(args: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string; hiddenCats: Set<string>;
   retailer: import('../types').RetailerSales | undefined;
   mode: 'matrix' | 'lens' | 'hybrid'; lenses: Lens[]; hideEol: boolean; topN: number;
+  topMode: 'global' | 'segment'; segments: string[]; groupBySeg: boolean;
 }): CovData {
-  const { plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN } = args;
+  const { plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN, topMode, segments, groupBySeg } = args;
 
     
     // label: text drawn above the column (null = none, e.g. hybrid
@@ -4303,13 +4364,41 @@ function buildCoverageData(args: {
     
     
 
-    const customers = (retailer?.customers ?? []).slice(0, topN);
-    const nCust = customers.length;
+    const allCustomers = retailer?.customers ?? [];
+    // Stocked arrays index the FULL customer list — display selection
+    // below never changes what the calculations see.
     const stockedFor = (sku: string): number[] => {
       const pairs = retailer?.bySku[sku];
       if (!pairs) return [];
-      return pairs.filter(([ci]) => ci < nCust).map(([ci]) => ci);
+      return pairs.map(([ci]) => ci);
     };
+
+    // Display selection: segment filter, then top-N globally or per
+    // segment, optionally ordered/sectioned by segment. allCustomers
+    // is gross-sorted at import, so order is preserved by filters.
+    let pool = allCustomers.map((c, i) => ({ ...c, idx: i }));
+    if (segments.length > 0) pool = pool.filter((c) => c.segment && segments.includes(c.segment));
+    let customers: typeof pool;
+    if (topMode === 'segment') {
+      const perSeg = new Map<string, typeof pool>();
+      for (const c of pool) {
+        const k = c.segment ?? '';
+        (perSeg.get(k) ?? perSeg.set(k, []).get(k)!).push(c);
+      }
+      customers = Array.from(perSeg.values()).flatMap((cs) => cs.slice(0, topN));
+    } else {
+      customers = pool.slice(0, topN);
+    }
+    if (groupBySeg || topMode === 'segment') {
+      // Segments ordered by their displayed gross, customers within
+      // keep gross order.
+      const segGross = new Map<string, number>();
+      for (const c of customers) segGross.set(c.segment ?? '', (segGross.get(c.segment ?? '') ?? 0) + c.gross);
+      customers = [...customers].sort((a, b) =>
+        (segGross.get(b.segment ?? '')! - segGross.get(a.segment ?? '')!)
+        || (a.segment ?? '').localeCompare(b.segment ?? '')
+        || b.gross - a.gross);
+    }
 
     // SKUs from the selected plans — first plan wins, category filter
     // honoured, owning plan and lens membership resolved here.
@@ -4389,7 +4478,7 @@ function buildCoverageData(args: {
       })
       .filter((c) => c.subs.length > 0);
 
-    return { customers, cats, totalSkus: raws.length, raws };
+    return { allCustomers, customers, cats, totalSkus: raws.length, raws };
 }
 
 /** Lens importance weight by selection rank (0-based): 1st-ranked
@@ -4411,9 +4500,12 @@ interface OppRow {
 }
 
 function buildOpportunities(data: CovData, lenses: Lens[], minScore = 0): OppRow[] {
-  const { customers, raws } = data;
-  const nCust = customers.length;
-  if (nCust === 0) return [];
+  const { allCustomers, customers, raws } = data;
+  // All calculations run over the FULL import; only the displayed
+  // customers produce rows, so changing Top-N or filters never moves
+  // anyone's underlying score.
+  const nCust = allCustomers.length;
+  if (nCust === 0 || customers.length === 0) return [];
   const live = raws.filter((r) => !r.eol);
   // Customer affinity per category (live SKUs only).
   const catTotals = new Map<string, number>();
@@ -4431,14 +4523,15 @@ function buildOpportunities(data: CovData, lenses: Lens[], minScore = 0): OppRow
     const total = catTotals.get(r.cat) ?? 1;
     const stockedArr = catStocked.get(r.cat)!;
     const stockedSet = new Set(r.stocked);
-    for (let ci = 0; ci < nCust; ci++) {
+    for (const cust of customers) {
+      const ci = cust.idx;
       if (stockedSet.has(ci)) continue;
       const affinity = stockedArr[ci] / total;
       if (affinity < 0.15) continue; // value-channel narrowness — expected gap
       const score = adoption * affinity * (r.lensIdx >= 0 ? lensWeight(r.lensIdx) : 1);
       if (score < minScore) continue;
       rows.push({
-        customer: customers[ci].name, segment: customers[ci].segment ?? '', sku: r.sku, name: r.name, cat: r.cat, plan: r.planName,
+        customer: allCustomers[ci].name, segment: allCustomers[ci].segment ?? '', sku: r.sku, name: r.name, cat: r.cat, plan: r.planName,
         lens: r.lensIdx >= 0 ? (lenses[r.lensIdx]?.name ?? null) : null,
         peers, nCust, affinity, score,
       });
@@ -4447,7 +4540,7 @@ function buildOpportunities(data: CovData, lenses: Lens[], minScore = 0): OppRow
   return rows.sort((a, b) => b.score - a.score);
 }
 
-function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, retailer, mode, lenses, hideEol, topN, view, oppCustomer, oppCategory, oppSegment, oppGroupSeg, oppMinScore, showOpps }: {
+function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, retailer, mode, lenses, hideEol, topN, topMode, segments, groupBySeg, view, oppCustomer, oppCategory, oppSegment, oppGroupSeg, oppMinScore, showOpps }: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   textScale: number; hiddenCats: Set<string>;
   retailer: import('../types').RetailerSales | undefined;
@@ -4455,6 +4548,9 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
   lenses: Lens[];
   hideEol: boolean;
   topN: number;
+  topMode: 'global' | 'segment';
+  segments: string[];
+  groupBySeg: boolean;
   view: 'dots' | 'opps';
   oppCustomer: string;
   oppCategory: string;
@@ -4468,8 +4564,8 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const data = useMemo(
-    () => buildCoverageData({ plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN }),
-    [plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN]);
+    () => buildCoverageData({ plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN, topMode, segments, groupBySeg }),
+    [plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN, topMode, segments, groupBySeg]);
   const opps = useMemo(
     () => (view === 'opps' || showOpps ? buildOpportunities(data, lenses, oppMinScore) : []),
     [view, showOpps, data, lenses, oppMinScore]);
@@ -4543,8 +4639,9 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
         const perLine = Math.ceil(s.recs.length / L);
         const statW = statWFor(s);
         const w = perLine * p + SUB_PAD * 2 + statW;
-        // Best-covered customer within this subgroup (shown customers).
-        const counts = customers.map((_, ci) => s.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0));
+        // Best-covered customer within this subgroup — over the FULL
+        // import, so display filters never change the colour basis.
+        const counts = data.allCustomers.map((_, ci) => s.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0));
         cols.push({ cat: c.cat, sub: s, x: cx, w, perLine, best: Math.max(1, ...counts), statW });
         cx += w;
       }
@@ -4556,7 +4653,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
 
     // Opportunity overlay lookup: customerIndex:sku pairs above the
     // min score (only populated when the toggle is on).
-    const custIdxByName = new Map(customers.map((c, i) => [c.name, i]));
+    const custIdxByName = new Map(data.allCustomers.map((c, i) => [c.name, i]));
     const oppSet = new Set<string>();
     if (showOpps) {
       for (const o of opps) {
@@ -4691,9 +4788,18 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     g.append('text').attr('x', iW + 6).attr('y', -6).attr('font-size', '6px').attr('font-weight', '700').attr('fill', '#888').text('SKUs');
 
     // ---- Rows ----
-    customers.forEach((cust, ci) => {
-      const y = ci * rowH;
-      if (ci % 2 === 1) {
+    customers.forEach((cust, rowI) => {
+      const ci = cust.idx;
+      const y = rowI * rowH;
+      // Segment section boundary when rows are grouped.
+      if (groupBySeg && cust.segment && (rowI === 0 || customers[rowI - 1].segment !== cust.segment)) {
+        g.append('line').attr('x1', -margin.left + 2).attr('x2', iW + margin.right - 6)
+          .attr('y1', y).attr('y2', y).attr('stroke', '#90a4ae').attr('stroke-width', rowI === 0 ? 0 : 0.9);
+        g.append('text').attr('x', -margin.left + 4).attr('y', y + 6)
+          .attr('font-size', '5.5px').attr('font-weight', '700').attr('fill', '#1976d2')
+          .attr('letter-spacing', '0.4').text(cust.segment.toUpperCase());
+      }
+      if (rowI % 2 === 1) {
         g.append('rect').attr('x', -margin.left + 2).attr('y', y).attr('width', iW + margin.left + margin.right - 6).attr('height', rowH)
           .attr('fill', '#000').attr('opacity', 0.03);
       }
@@ -4705,7 +4811,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
       // Overall score vs the best-covered customer across all SKUs.
       let myTotal = 0;
       for (const col of cols) myTotal += col.sub.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0);
-      const bestTotal = Math.max(1, ...customers.map((_, cj) =>
+      const bestTotal = Math.max(1, ...data.allCustomers.map((_, cj) =>
         cols.reduce((s, col) => s + col.sub.recs.reduce((k, r) => k + (r.stocked.includes(cj) ? 1 : 0), 0), 0)));
       const od = g.append('circle').attr('cx', -9).attr('cy', y + rowH / 2).attr('r', Math.min(4.5, rowH * 0.3))
         .attr('fill', ramp(myTotal / bestTotal)).attr('stroke', '#fff').attr('stroke-width', 0.5);
@@ -4756,8 +4862,9 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
 
     // Hover readout per subgroup cell via transparent rects (cheaper
     // than a title on every dot).
-    customers.forEach((cust, ci) => {
-      const y = ci * rowH;
+    customers.forEach((cust, rowI) => {
+      const ci = cust.idx;
+      const y = rowI * rowH;
       for (const col of cols) {
         const cnt = col.sub.recs.reduce((k, r) => k + (r.stocked.includes(ci) ? 1 : 0), 0);
         g.append('rect').attr('x', col.x).attr('y', y).attr('width', col.w).attr('height', rowH)
@@ -4803,7 +4910,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
           <>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e' }}>Missed opportunities</div>
             <div style={{ fontSize: 9.5, color: '#888', margin: '2px 0 2px', lineHeight: 1.5 }}>
-              <b>How it's scored:</b> score = (peers stocking the SKU ÷ {data.customers.length}) × (this customer's coverage of the SKU's category)
+              <b>How it's scored:</b> score = (peers stocking the SKU ÷ all {data.allCustomers.length} imported customers) × (this customer's coverage of the SKU's category)
               {lenses.length > 0 && <> × lens importance ({lenses.map((l, i) => `${l.name} ×${lensWeight(i).toFixed(2)}`).join(', ')} — ranked by tick order)</>}.
               A customer stocking little of a category everywhere (value channels) scores low on every gap and drops out naturally.
             </div>
