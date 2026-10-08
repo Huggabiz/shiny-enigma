@@ -1007,8 +1007,8 @@ export function AnalyseView() {
                 <input type="number" min="5" max="60" step="1" className="analyse-config-input" style={{ width: 44 }}
                   value={covTopN} onChange={(e) => setCovTopN(Math.max(5, Math.min(60, Number(e.target.value) || 30)))} />
               </label>
-              <div className="analyse-metric-toggle" role="tablist" title="Second-level grouping inside each category">
-                <button role="tab" className={covMode === 'matrix' ? 'active' : ''} onClick={() => setCovMode('matrix')}>Matrix</button>
+              <div className="analyse-metric-toggle" role="tablist" title="Second-level grouping inside each category: by the range plan each SKU belongs to, or by selected lenses">
+                <button role="tab" className={covMode === 'matrix' ? 'active' : ''} onClick={() => setCovMode('matrix')}>Plans</button>
                 <button role="tab" className={covMode === 'lens' ? 'active' : ''} onClick={() => setCovMode('lens')}>Lenses</button>
               </div>
               {covMode === 'lens' && (
@@ -4204,19 +4204,17 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     };
 
     // SKUs from the selected plans — first plan wins, category filter
-    // honoured, matrix x-position and lens membership resolved here.
+    // honoured, owning plan and lens membership resolved here.
     const lensSets = lenses.map((l) =>
       new Set(l.scope === 'per-stage' ? (l.stageProductIds?.[shelfSide] ?? []) : l.productIds));
     const seen = new Set<string>();
-    const matrixOrder: string[] = [];
-    type Raw = SkuRec & { cat: string; matrixX: string; lensIdx: number };
+    const planOrder: string[] = [];
+    type Raw = SkuRec & { cat: string; planName: string; lensIdx: number };
     const raws: Raw[] = [];
     for (const plan of plans) {
       const shelf = resolveShelf(plan, shelfSide);
       if (!shelf) continue;
-      const ml = shelf.matrixLayout;
-      for (const xl of ml?.xLabels ?? []) if (!matrixOrder.includes(xl)) matrixOrder.push(xl);
-      const assignByItem = new Map<string, MatrixCellAssignment>((ml?.assignments ?? []).map((a) => [a.itemId, a]));
+      if (!planOrder.includes(plan.name)) planOrder.push(plan.name);
       for (const item of shelf.items) {
         const prod = getProductForItem(item, catalogue);
         if (!prod || seen.has(prod.id)) continue;
@@ -4225,12 +4223,10 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
         if (hiddenCats.has(cat)) continue;
         const eol = /discon|close/i.test(prod.itemRanking ?? '');
         if (eol && hideEol) continue;
-        const a = assignByItem.get(item.id);
-        const matrixX = a && ml ? (ml.xLabels[a.col] ?? 'Unplaced') : 'Unplaced';
         let lensIdx = -1;
         for (let i = 0; i < lensSets.length; i++) { if (lensSets[i].has(prod.id)) { lensIdx = i; break; } }
         const sku = (prod.sku ?? '').trim().toUpperCase();
-        raws.push({ sku, name: prod.name, eol, stocked: stockedFor(sku), cat, matrixX, lensIdx });
+        raws.push({ sku, name: prod.name, eol, stocked: stockedFor(sku), cat, planName: plan.name, lensIdx });
       }
     }
 
@@ -4246,9 +4242,11 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
         const eol = rs.filter((r) => r.eol);
         const subs: SubGroup[] = [];
         if (mode === 'matrix') {
-          const keys = [...matrixOrder, 'Unplaced'];
-          for (const k of keys) {
-            const inK = live.filter((r) => r.matrixX === k);
+          // 'matrix' is the stored token for historical reasons; the
+          // grouping is now the range plan the SKU belongs to (first
+          // selected plan containing it), in sidebar order.
+          for (const k of planOrder) {
+            const inK = live.filter((r) => r.planName === k);
             if (inK.length) subs.push({ key: k, color: null, recs: sortRecs(inK) });
           }
         } else {
@@ -4297,10 +4295,11 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     // mini-lines as the row height allows. Solve the pitch so the full
     // width fits the canvas.
     const CAT_GAP = 8, SUB_GAP = 3, SUB_PAD = 3;
-    // In lens mode, each lens column carries a per-customer "n/total"
-    // stat strip on its right; width sized to the digit count.
+    // In lens mode EVERY column (lenses, Other, Discon/Close) carries
+    // a per-customer "n/total" stat strip on its right; in plan mode
+    // only the Discon/Close column does. Width sized to digit count.
     const statWFor = (s: { color: string | null; key: string; recs: { sku: string }[] }) =>
-      mode === 'lens' && s.color && s.key !== 'Discon/Close'
+      mode === 'lens' || s.key === 'Discon/Close'
         ? (String(s.recs.length).length * 2 + 1) * 2.7 + 5
         : 0;
     let p = 4.2;
