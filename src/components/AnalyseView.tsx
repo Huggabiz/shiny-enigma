@@ -422,6 +422,7 @@ export function AnalyseView() {
   const [oppCustomer, setOppCustomer] = useState('');
   const [oppCategory, setOppCategory] = useState('');
   const [oppMinScore, setOppMinScore] = useState(0.1);
+  const [covShowOpps, setCovShowOpps] = useState(false);
   const covImportRef = useRef<HTMLInputElement>(null);
   const [covImportBusy, setCovImportBusy] = useState(false);
   const projectLenses = useMemo(
@@ -769,7 +770,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppMinScore={oppMinScore} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppMinScore={oppMinScore} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -1034,6 +1035,18 @@ export function AnalyseView() {
                 <button role="tab" className={covView === 'dots' ? 'active' : ''} onClick={() => setCovView('dots')}>Dots</button>
                 <button role="tab" className={covView === 'opps' ? 'active' : ''} onClick={() => setCovView('opps')}>Opportunities</button>
               </div>
+              {covView === 'dots' && project.retailerSales && (
+                <label className="analyse-config-item" title="Overlay missed opportunities (scored gaps above the min score) as glowing pink dots in the empty slots where the SKU would sit">
+                  <input type="checkbox" checked={covShowOpps} onChange={(e) => setCovShowOpps(e.target.checked)} />
+                  Show opportunities
+                </label>
+              )}
+              {covView === 'dots' && covShowOpps && project.retailerSales && (
+                <label className="analyse-config-item" title="Hide gaps scoring below this">Min score
+                  <input type="number" min="0" max="2" step="0.05" className="analyse-config-input" style={{ width: 48 }}
+                    value={oppMinScore} onChange={(e) => setOppMinScore(Math.max(0, Number(e.target.value) || 0))} />
+                </label>
+              )}
               {covView === 'opps' && project.retailerSales && (
                 <>
                   <label className="analyse-config-item">Customer
@@ -4411,7 +4424,7 @@ function buildOpportunities(data: CovData, lenses: Lens[], minScore = 0): OppRow
   return rows.sort((a, b) => b.score - a.score);
 }
 
-function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, retailer, mode, lenses, hideEol, topN, view, oppCustomer, oppCategory, oppMinScore }: {
+function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, retailer, mode, lenses, hideEol, topN, view, oppCustomer, oppCategory, oppMinScore, showOpps }: {
   plans: RangePlan[]; catalogue: Product[]; shelfSide: string;
   textScale: number; hiddenCats: Set<string>;
   retailer: import('../types').RetailerSales | undefined;
@@ -4423,6 +4436,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
   oppCustomer: string;
   oppCategory: string;
   oppMinScore: number;
+  showOpps: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
@@ -4431,7 +4445,9 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
   const data = useMemo(
     () => buildCoverageData({ plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN }),
     [plans, catalogue, shelfSide, hiddenCats, retailer, mode, lenses, hideEol, topN]);
-  const opps = useMemo(() => (view === 'opps' ? buildOpportunities(data, lenses, oppMinScore) : []), [view, data, lenses, oppMinScore]);
+  const opps = useMemo(
+    () => (view === 'opps' || showOpps ? buildOpportunities(data, lenses, oppMinScore) : []),
+    [view, showOpps, data, lenses, oppMinScore]);
 
   useEffect(() => {
     if (!svgRef.current) return; // opportunities view renders no SVG
@@ -4513,6 +4529,17 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
 
     const ramp = (f: number) => d3.interpolateRdYlGn(0.08 + 0.9 * Math.max(0, Math.min(1, f)));
 
+    // Opportunity overlay lookup: customerIndex:sku pairs above the
+    // min score (only populated when the toggle is on).
+    const custIdxByName = new Map(customers.map((c, i) => [c.name, i]));
+    const oppSet = new Set<string>();
+    if (showOpps) {
+      for (const o of opps) {
+        const ci = custIdxByName.get(o.customer);
+        if (ci !== undefined) oppSet.add(`${ci}:${o.sku}`);
+      }
+    }
+
     // ---- Header: legend, category bands, subgroup labels ----
     const lg = svg.append('defs').append('linearGradient').attr('id', 'cov-ramp');
     lg.selectAll('stop').data([0, 0.25, 0.5, 0.75, 1]).enter().append('stop')
@@ -4525,6 +4552,12 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     legend.append('text').attr('x', 0).attr('y', 18).attr('font-size', '6px').attr('fill', '#888').text('colour vs best customer in group:');
     legend.append('rect').attr('x', 0).attr('y', 22).attr('width', 56).attr('height', 5).attr('rx', 2.5).attr('fill', 'url(#cov-ramp)');
     legend.append('text').attr('x', 60).attr('y', 27).attr('font-size', '5.5px').attr('fill', '#888').text('none - best');
+    if (showOpps) {
+      legend.append('circle').attr('cx', 4).attr('cy', 35).attr('r', 3.6).attr('fill', '#ff4081').attr('opacity', 0.3);
+      legend.append('circle').attr('cx', 4).attr('cy', 35).attr('r', 1.7).attr('fill', '#e91e63');
+      legend.append('text').attr('x', 11).attr('y', 37).attr('font-size', '6px').attr('fill', '#c2185b')
+        .text(`missed opportunity (score >= ${oppMinScore})`);
+    }
 
     for (const span of catSpans) {
       const t = g.append('text').attr('x', span.x0 + 1).attr('y', -52).attr('font-size', '8px').attr('font-weight', '700').attr('fill', '#1a1a2e')
@@ -4663,6 +4696,22 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
             .attr('fill', cnt === 0 ? '#c62828' : '#444')
             .text(`${cnt}/${col.sub.recs.length}`);
         }
+        // Opportunity overlay: a glowing pink dot in the EMPTY slot
+        // where the missing SKU would sit (halo + core — cheaper than
+        // an SVG blur filter across hundreds of dots).
+        if (showOpps && oppSet.size > 0) {
+          col.sub.recs.forEach((r, i2) => {
+            if (r.stocked.includes(ci) || !oppSet.has(`${ci}:${r.sku}`)) return;
+            const line = Math.floor(i2 / col.perLine);
+            const pos = i2 % col.perLine;
+            const cxp = col.x + SUB_PAD + pos * p + p / 2;
+            const cyp = y + 2 + line * p + p / 2;
+            g.append('circle').attr('cx', cxp).attr('cy', cyp).attr('r', dotR * 2.2)
+              .attr('fill', '#ff4081').attr('opacity', 0.3);
+            g.append('circle').attr('cx', cxp).attr('cy', cyp).attr('r', dotR * 0.95)
+              .attr('fill', '#e91e63');
+          });
+        }
         if (cnt === 0) continue;
         const color = ramp(cnt / col.best);
         col.sub.recs.forEach((r, i2) => {
@@ -4693,7 +4742,8 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
             if (rc) setTooltip({
               x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8,
               label: `${cust.name} — ${col.cat} › ${col.sub.key}`,
-              value: `${cnt} of ${col.sub.recs.length} SKUs stocked (best customer: ${col.best})`,
+              value: `${cnt} of ${col.sub.recs.length} SKUs stocked (best customer: ${col.best})`
+                + (showOpps ? (() => { const k = col.sub.recs.filter((r) => !r.stocked.includes(ci) && oppSet.has(`${ci}:${r.sku}`)).length; return k ? ` · ${k} opportunit${k !== 1 ? 'ies' : 'y'}` : ''; })() : ''),
               depth: 'Coverage',
             });
           })
@@ -4704,7 +4754,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
           .on('mouseleave', () => setTooltip(null));
       }
     });
-  }, [data, retailer, dims, wrapperRef, textScale, view]);
+  }, [data, retailer, dims, wrapperRef, textScale, view, showOpps, opps, oppMinScore]);
 
   if (view === 'opps') {
     const shown = opps
