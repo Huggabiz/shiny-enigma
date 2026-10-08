@@ -4556,13 +4556,18 @@ function buildOpportunities(data: CovData, lenses: Lens[], minGbp = 0, lensOnly 
     for (const r of skus) {
       if (lensOnly && r.lensIdx < 0) continue;
       const peersStocking = r.pairs.length;
-      if (peersStocking / nCust < 0.2) continue; // hardly anyone stocks it
+      // Absolute floor, NOT a share of the (possibly huge) import —
+      // the real transferability gate is the >=3 comparable peers
+      // with shared range below.
+      if (peersStocking < 5) continue;
       const has = new Set(r.pairs.map(([ci]) => ci));
       for (const cust of shown) {
         const ci = cust.idx;
         if (has.has(ci)) continue;
         const affinity = (stockedCount.get(ci) ?? 0) / catTotal;
-        if (affinity < 0.15) continue; // value-channel narrowness
+        // Gentle narrowness gate only — the demand-transfer sizing
+        // already scales estimates down for low-rate customers.
+        if (affinity < 0.08) continue;
         const ests: number[] = [];
         const ratios: number[] = [];
         let overlapSum = 0;
@@ -5086,7 +5091,7 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
             </div>
             <div style={{ fontSize: 9.5, color: '#888', margin: '0 0 10px' }}>
               Ranking = Est £ × lens importance{lenses.length > 0 ? ` (${lenses.map((l, i) => `${l.name} ×${lensWeight(i).toFixed(2)}`).join(', ')}, untagged ×${UNTAGGED_WEIGHT})` : ''}.
-              Hidden: under 20% peer adoption, under 15% category coverage, below {gbp0(oppMinGbp)}, discon/close-out.
+              Hidden: SKUs stocked by fewer than 5 customers anywhere, customers under 8% category coverage, estimates below {gbp0(oppMinGbp)}, discon/close-out.
               {` ${filtered.length} gap${filtered.length !== 1 ? 's' : ''} in view · the Excel export has the full list.`}
             </div>
             {body}
