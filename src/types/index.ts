@@ -600,6 +600,8 @@ export interface Project {
       /** Order and section the customer rows by segment. */
       groupBySeg?: boolean;
     };
+    /** SKU Coverage sheet: the watched SKU codes (uppercased). */
+    coverageSkus?: string[];
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;

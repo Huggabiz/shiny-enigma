@@ -11,7 +11,7 @@ import './AnalyseView.css';
 
 type Metric = 'rrp' | 'revenue' | 'margin';
 type AspMode = 'standard' | 'weighted';
-type SheetId = 'dashboard' | 'icicle' | 'scatter' | 'lifecycle' | 'pareto' | 'growth' | 'growth-plans' | 'growth-groups' | 'margin-compare' | 'rrp-compare' | 'coverage' | 'sunburst';
+type SheetId = 'dashboard' | 'icicle' | 'scatter' | 'lifecycle' | 'pareto' | 'growth' | 'growth-plans' | 'growth-groups' | 'margin-compare' | 'rrp-compare' | 'coverage' | 'sku-coverage' | 'sunburst';
 
 const SHEETS: { id: SheetId; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -25,6 +25,7 @@ const SHEETS: { id: SheetId; label: string }[] = [
   { id: 'margin-compare', label: 'Margin Compare' },
   { id: 'rrp-compare', label: 'RRP Compare' },
   { id: 'coverage', label: 'SKU Reach' },
+  { id: 'sku-coverage', label: 'SKU Coverage' },
   { id: 'sunburst', label: 'Sunburst' },
 ];
 
@@ -427,6 +428,10 @@ export function AnalyseView() {
   // read By customer, All is the flat ranked list.
   const [oppViewBy, setOppViewBy] = useState<'all' | 'segment' | 'customer'>('all');
   const [oppLensOnly, setOppLensOnly] = useState(false);
+  // SKU Coverage sheet: the watched SKU list (persisted).
+  const watchedSkus = useMemo(() => av?.coverageSkus ?? [], [av?.coverageSkus]);
+  const setWatchedSkus = (skus: string[]) => setAnalyseConfig({ coverageSkus: skus });
+  const [showSkuListDialog, setShowSkuListDialog] = useState(false);
   // Segment selection / grouping for the whole sheet (persisted).
   const [covTopMode, setCovTopModeState] = useState<'global' | 'segment'>(() => covConfig?.topMode ?? 'global');
   const [covSegments, setCovSegmentsState] = useState<string[]>(() => covConfig?.segments ?? []);
@@ -481,6 +486,34 @@ export function AnalyseView() {
     XLSX.utils.book_append_sheet(wb, ws, 'Missed opportunities');
     XLSX.writeFile(wb, 'missed-opportunities.xlsx');
   };
+
+  // Shared "data source" controls: shown on every sheet that reads
+  // the customer sales import, so provenance travels with the data.
+  const customerSourceControls = project ? (
+    <>
+      <input ref={covImportRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleCovImport(f); }} />
+      <span className="analyse-config-item" style={{ cursor: 'default', fontWeight: 600 }}>Source:</span>
+      {project.retailerSales ? (
+        <span className="analyse-config-item" style={{ cursor: 'default', color: '#2e7d32' }}
+          title={`Imported ${new Date(project.retailerSales.importedAt).toLocaleString()} · ${Object.keys(project.retailerSales.bySku).length} SKUs`}>
+          ✓ Customer sales — {project.retailerSales.fileName ?? 'spreadsheet'} · {project.retailerSales.customers.length.toLocaleString('en-GB')} customers
+        </span>
+      ) : (
+        <span className="analyse-config-item" style={{ cursor: 'default', color: '#c62828' }}>no customer sales data</span>
+      )}
+      <button className="analyse-snip-btn" disabled={covImportBusy} onClick={() => covImportRef.current?.click()}
+        title="Import the customer sales spreadsheet (Product Code, Customer Name, Qty, Segment). Stored separately from the catalogue — only the coverage sheets read it.">
+        {covImportBusy ? 'Importing…' : project.retailerSales ? 'Re-import' : 'Import'}
+      </button>
+      {project.retailerSales && (
+        <button className="analyse-snip-btn" style={{ color: '#c62828', borderColor: '#ffcdd2' }}
+          onClick={() => { if (confirm('Remove the imported customer data from this project?')) setRetailerSales(undefined); }}>
+          Clear
+        </button>
+      )}
+    </>
+  ) : null;
 
   const handleCovImport = async (file: File) => {
     setCovImportBusy(true);
@@ -772,6 +805,14 @@ export function AnalyseView() {
           onClose={() => setShowGroupsDialog(false)}
         />
       )}
+      {showSkuListDialog && (
+        <SkuListDialog
+          skus={watchedSkus}
+          catalogue={project.catalogue}
+          onChange={setWatchedSkus}
+          onClose={() => setShowSkuListDialog(false)}
+        />
+      )}
       {showCompoundDialog && (
         <CompoundGroupsDialog
           groups={compoundGroups}
@@ -800,7 +841,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} topMode={covTopMode} segments={covSegments} groupBySeg={covGroupBySeg} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppViewBy={oppViewBy} oppLensOnly={oppLensOnly} oppMinGbp={oppMinGbp} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'sku-coverage' ? <SkuCoverageSheet skus={watchedSkus} catalogue={project.catalogue} retailer={project.retailerSales} onEdit={() => setShowSkuListDialog(true)} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} topMode={covTopMode} segments={covSegments} groupBySeg={covGroupBySeg} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppViewBy={oppViewBy} oppLensOnly={oppLensOnly} oppMinGbp={oppMinGbp} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -1040,26 +1081,23 @@ export function AnalyseView() {
             </div>
           )}
 
+          {activeSheet === 'sku-coverage' && (
+            <div className="analyse-chart-config">
+              {customerSourceControls}
+              <div className="analyse-config-separator" />
+              <button className="analyse-snip-btn" onClick={() => setShowSkuListDialog(true)}
+                title="Choose the SKUs to analyse — search the catalogue or paste a list of SKU codes">
+                Edit SKU list ({watchedSkus.length})
+              </button>
+              <span className="analyse-config-item" style={{ cursor: 'default' }}>Regions come from the customer data's Segment column · all {project.retailerSales ? project.retailerSales.customers.length.toLocaleString('en-GB') : 0} customers counted</span>
+              <span style={{ flex: 1 }} />
+              <div className="analyse-config-separator" />
+              <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
+            </div>
+          )}
           {activeSheet === 'coverage' && (
             <div className="analyse-chart-config">
-              <input ref={covImportRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }}
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleCovImport(f); }} />
-              <button className="analyse-snip-btn" disabled={covImportBusy} onClick={() => covImportRef.current?.click()}
-                title="Import the customer sales spreadsheet (Product Code, Customer Name, Qty). Stored separately from the catalogue — nothing else in the app depends on it.">
-                {covImportBusy ? 'Importing…' : project.retailerSales ? 'Re-import customer data' : 'Import customer data'}
-              </button>
-              {project.retailerSales && (
-                <>
-                  <span className="analyse-config-item" style={{ cursor: 'default', color: '#2e7d32' }}
-                    title={`Imported ${new Date(project.retailerSales.importedAt).toLocaleString()}${project.retailerSales.fileName ? ` from ${project.retailerSales.fileName}` : ''}`}>
-                    ✓ {project.retailerSales.customers.length} customers
-                  </span>
-                  <button className="analyse-snip-btn" style={{ color: '#c62828', borderColor: '#ffcdd2' }}
-                    onClick={() => { if (confirm('Remove the imported customer data from this project?')) setRetailerSales(undefined); }}>
-                    Clear
-                  </button>
-                </>
-              )}
+              {customerSourceControls}
               <div className="analyse-config-separator" />
               <div className="analyse-metric-toggle" role="tablist" title="Dot matrix, or the ranked missed-opportunities table derived from it">
                 <button role="tab" className={covView === 'dots' ? 'active' : ''} onClick={() => setCovView('dots')}>Dots</button>
@@ -5110,6 +5148,204 @@ function CoverageChart({ plans, catalogue, shelfSide, textScale, hiddenCats, ret
     <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
       <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" />
       <ChartTooltip tooltip={tooltip} />
+    </div>
+  );
+}
+
+
+// ---------- SKU Coverage (watched SKUs × regions, from customer data) ----------
+
+function SkuListDialog({ skus, catalogue, onChange, onClose }: {
+  skus: string[]; catalogue: Product[];
+  onChange: (skus: string[]) => void; onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [pasteText, setPasteText] = useState('');
+  const norm = (v: string) => v.trim().toUpperCase();
+  const add = (codes: string[]) => {
+    const next = [...skus];
+    for (const c of codes.map(norm)) if (c && !next.includes(c)) next.push(c);
+    onChange(next);
+  };
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return catalogue
+      .filter((p) => (p.sku ?? '').toLowerCase().includes(q) || (p.name ?? '').toLowerCase().includes(q))
+      .filter((p) => !skus.includes(norm(p.sku ?? '')))
+      .slice(0, 8);
+  }, [query, catalogue, skus]);
+  const nameFor = (code: string) => catalogue.find((p) => norm(p.sku ?? '') === code)?.name;
+
+  return (
+    <div className="slab-dialog-overlay" onClick={onClose}>
+      <div className="slab-dialog" style={{ width: 480, maxHeight: '82vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+        <h3>SKU Coverage list</h3>
+        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#666' }}>
+          Search the catalogue to add SKUs, or paste a list of SKU codes (any separator).
+          Codes not in the catalogue still work — coverage comes from the customer data.
+        </p>
+        <input className="slab-dialog-input" style={{ width: '100%', boxSizing: 'border-box' }} placeholder="Search by SKU or product name…"
+          value={query} onChange={(e) => setQuery(e.target.value)} />
+        {matches.length > 0 && (
+          <div style={{ border: '1px solid #e0e0e0', borderRadius: 6, marginTop: 4, maxHeight: 180, overflowY: 'auto' }}>
+            {matches.map((p) => (
+              <div key={p.id} style={{ display: 'flex', gap: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer', alignItems: 'center' }}
+                onClick={() => { add([p.sku ?? '']); setQuery(''); }}>
+                <span style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 11, color: '#777', width: 84, flexShrink: 0 }}>{p.sku}</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                <span style={{ color: '#1976d2', fontWeight: 700 }}>+</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+          <textarea className="slab-dialog-input" rows={2} style={{ flex: 1, resize: 'vertical', fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 11 }}
+            placeholder={'Paste SKU codes, e.g.\n20214, 20215 20330\n20456'}
+            value={pasteText} onChange={(e) => setPasteText(e.target.value)} />
+          <button className="slab-dialog-btn primary" style={{ alignSelf: 'flex-start' }}
+            onClick={() => { add(pasteText.split(/[\s,;|]+/)); setPasteText(''); }}
+            disabled={!pasteText.trim()}>Add</button>
+        </div>
+        <div style={{ margin: '12px 0 4px', fontSize: 11, color: '#888' }}>{skus.length} SKU{skus.length !== 1 ? 's' : ''} selected</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+          {skus.map((c) => (
+            <span key={c} title={nameFor(c) ?? 'Not in catalogue'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 7px', borderRadius: 10, fontSize: 10.5,
+                background: nameFor(c) ? '#e3f2fd' : '#fff3e0', border: '1px solid ' + (nameFor(c) ? '#bbdefb' : '#ffe0b2') }}>
+              <span style={{ fontFamily: 'ui-monospace, Consolas, monospace' }}>{c}</span>
+              <span style={{ cursor: 'pointer', color: '#999', fontWeight: 700 }} onClick={() => onChange(skus.filter((x) => x !== c))}>×</span>
+            </span>
+          ))}
+        </div>
+        <div className="slab-dialog-actions" style={{ justifyContent: 'space-between' }}>
+          <button className="slab-dialog-btn cancel" disabled={skus.length === 0}
+            onClick={() => { if (confirm('Clear the whole SKU list?')) onChange([]); }}>Clear all</button>
+          <button className="slab-dialog-btn primary" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SkuCoverageSheet({ skus, catalogue, retailer, onEdit }: {
+  skus: string[]; catalogue: Product[];
+  retailer: import('../types').RetailerSales | undefined;
+  onEdit: () => void;
+}) {
+  const data = useMemo(() => {
+    if (!retailer) return null;
+    const customers = retailer.customers;
+    // Regions = the Segment column, ordered by total gross desc.
+    const regGross = new Map<string, number>();
+    const regCount = new Map<string, number>();
+    for (const c of customers) {
+      const r = c.segment || 'No region';
+      regGross.set(r, (regGross.get(r) ?? 0) + c.gross);
+      regCount.set(r, (regCount.get(r) ?? 0) + 1);
+    }
+    const regions = Array.from(regGross.entries()).sort((a, b) => b[1] - a[1]).map(([r]) => r);
+    const regIdx = new Map(regions.map((r, i) => [r, i]));
+
+    const rows = skus.map((code) => {
+      const prod = catalogue.find((p) => (p.sku ?? '').trim().toUpperCase() === code);
+      const pairs = retailer.bySku[code] ?? [];
+      const perRegion = regions.map(() => ({ n: 0, units: 0 }));
+      let totalUnits = 0;
+      for (const [ci, qty] of pairs) {
+        const seg = customers[ci]?.segment || 'No region';
+        const ri = regIdx.get(seg);
+        if (ri === undefined) continue;
+        perRegion[ri].n++; perRegion[ri].units += qty;
+        totalUnits += qty;
+      }
+      return {
+        code, name: prod?.name, category: prod?.category,
+        perRegion, stockists: pairs.length, totalUnits,
+        regionsCovered: perRegion.filter((x) => x.n > 0).length,
+      };
+    });
+    const maxCell = Math.max(1, ...rows.flatMap((r) => r.perRegion.map((x) => x.n)));
+    // Region summary over the selected SKUs.
+    const regionSummary = regions.map((r, ri) => ({
+      region: r,
+      customers: regCount.get(r) ?? 0,
+      skusPresent: rows.filter((row) => row.perRegion[ri].n > 0).length,
+      stockists: rows.reduce((sm, row) => sm + row.perRegion[ri].n, 0),
+    }));
+    return { regions, rows, maxCell, regionSummary };
+  }, [skus, catalogue, retailer]);
+
+  const td: React.CSSProperties = { padding: '3px 7px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap', fontSize: 10.5 };
+  if (!retailer) {
+    return <div style={{ color: '#888', fontSize: 13, textAlign: 'center', paddingTop: 80 }}>No customer data yet — import it in the bar below.</div>;
+  }
+  if (skus.length === 0) {
+    return (
+      <div style={{ color: '#888', fontSize: 13, textAlign: 'center', paddingTop: 80 }}>
+        No SKUs selected — <span style={{ color: '#1976d2', cursor: 'pointer', fontWeight: 600 }} onClick={onEdit}>build your SKU list</span> to see regional coverage.
+      </div>
+    );
+  }
+  const d = data!;
+  const cellBg = (n: number) => n === 0 ? '#fdecea' : `rgba(25,118,210,${(0.10 + 0.75 * n / d.maxCell).toFixed(2)})`;
+  const cellFg = (n: number) => n === 0 ? '#c62828' : (n / d.maxCell > 0.55 ? '#fff' : '#1a1a2e');
+
+  return (
+    <div style={{ width: '100%', height: '100%', overflow: 'auto', padding: '14px 18px', boxSizing: 'border-box', background: '#fff' }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e' }}>SKU coverage by region</div>
+      <div style={{ fontSize: 9.5, color: '#888', margin: '2px 0 10px' }}>
+        Cell = retailers with net sales of the SKU in that region (qty &gt; 0), shaded by count; hover for units.
+        Regions are the customer data's Segment values, ordered by gross sales. {skus.length} SKUs · all {retailer.customers.length.toLocaleString('en-GB')} customers counted.
+      </div>
+
+      <table style={{ borderCollapse: 'collapse', color: '#333' }}>
+        <thead>
+          <tr style={{ textAlign: 'left', color: '#888', fontSize: 9 }}>
+            <th style={td}>SKU</th>
+            <th style={{ ...td, minWidth: 180 }}>Product</th>
+            {d.regions.map((r) => (
+              <th key={r} style={{ ...td, textAlign: 'center', maxWidth: 64, whiteSpace: 'normal', lineHeight: 1.15 }}
+                title={`${r} · ${d.regionSummary.find((x) => x.region === r)?.customers ?? 0} customers in the data`}>
+                {r.replace(/^Sales\s+/i, '')}
+              </th>
+            ))}
+            <th style={{ ...td, textAlign: 'right' }}>Retailers</th>
+            <th style={{ ...td, textAlign: 'right' }}>Regions</th>
+            <th style={{ ...td, textAlign: 'right' }}>Units</th>
+          </tr>
+          <tr style={{ fontSize: 9, color: '#555' }}>
+            <td style={{ ...td, fontWeight: 700 }} colSpan={2}>Selected SKUs present ({skus.length} watched)</td>
+            {d.regionSummary.map((rs) => (
+              <td key={rs.region} style={{ ...td, textAlign: 'center', fontWeight: 700, background: '#f5f7fa' }}
+                title={`${rs.region}: ${rs.skusPresent} of ${skus.length} selected SKUs stocked by at least one retailer · ${rs.stockists} stockist listings`}>
+                {rs.skusPresent}/{skus.length}
+              </td>
+            ))}
+            <td style={td} colSpan={3} />
+          </tr>
+        </thead>
+        <tbody>
+          {d.rows.map((row, i) => (
+            <tr key={row.code} style={{ background: i % 2 ? '#fafafa' : '#fff' }}>
+              <td style={{ ...td, fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 9.5, color: '#777' }}>{row.code}</td>
+              <td style={{ ...td, whiteSpace: 'normal', maxWidth: 220 }}>
+                {row.name ?? <span style={{ color: '#e65100' }}>not in catalogue</span>}
+                {row.category && <span style={{ color: '#999', fontSize: 9 }}> · {row.category}</span>}
+              </td>
+              {row.perRegion.map((cell, ri) => (
+                <td key={ri} style={{ ...td, textAlign: 'center', background: cellBg(cell.n), color: cellFg(cell.n), fontWeight: cell.n > 0 ? 700 : 400 }}
+                  title={`${d.regions[ri]}: ${cell.n} retailer${cell.n !== 1 ? 's' : ''} · ${cell.units.toLocaleString('en-GB')} units`}>
+                  {cell.n > 0 ? cell.n : '—'}
+                </td>
+              ))}
+              <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{row.stockists}</td>
+              <td style={{ ...td, textAlign: 'right' }}>{row.regionsCovered}/{d.regions.length}</td>
+              <td style={{ ...td, textAlign: 'right', color: '#555' }}>{row.totalUnits.toLocaleString('en-GB')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
