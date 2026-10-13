@@ -5,6 +5,8 @@ import { useProjectStore } from '../store/useProjectStore';
 import { getActivePlan, getStages } from '../types';
 import { launchAgeYears } from '../utils/launchSeason';
 import { parseRetailerSales } from '../utils/retailerImport';
+import { feature } from 'topojson-client';
+import landTopo from '../data/land-110m.json';
 import * as XLSX from 'xlsx';
 import type { Lens, MatrixCellAssignment, Product, RangePlan, Shelf, ShelfItem } from '../types';
 import './AnalyseView.css';
@@ -841,7 +843,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'sku-coverage' ? <SkuCoverageSheet skus={watchedSkus} catalogue={project.catalogue} retailer={project.retailerSales} onEdit={() => setShowSkuListDialog(true)} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} topMode={covTopMode} segments={covSegments} groupBySeg={covGroupBySeg} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppViewBy={oppViewBy} oppLensOnly={oppLensOnly} oppMinGbp={oppMinGbp} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'sku-coverage' ? <SkuCoverageSheet skus={watchedSkus} catalogue={project.catalogue} retailer={project.retailerSales} onEdit={() => setShowSkuListDialog(true)} textScale={activeTextScale} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} topMode={covTopMode} segments={covSegments} groupBySeg={covGroupBySeg} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppViewBy={oppViewBy} oppLensOnly={oppLensOnly} oppMinGbp={oppMinGbp} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -1091,6 +1093,19 @@ export function AnalyseView() {
               </button>
               <span className="analyse-config-item" style={{ cursor: 'default' }}>Regions come from the customer data's Segment column · all {project.retailerSales ? project.retailerSales.customers.length.toLocaleString('en-GB') : 0} customers counted</span>
               <span style={{ flex: 1 }} />
+              <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
+                <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
+                  onChange={(e) => setAspect(Number(e.target.value))}
+                  onDoubleClick={() => setAspect(0)} style={{ width: 70, height: 12 }} />
+                <span>{(16 * (activeAspect < 0 ? 1 + activeAspect * 0.45 : 1)).toFixed(1)}:{(9 * (activeAspect > 0 ? 1 - activeAspect * 0.45 : 1)).toFixed(1)}</span>
+                {activeAspect !== 0 && (
+                  <button className="analyse-aspect-reset" onClick={(e) => { e.preventDefault(); setAspect(0); }} title="Reset to 16:9">↺</button>
+                )}
+              </label>
+              <label className="analyse-config-item" title="Scale all text in this chart — per sheet, saved with the project.">Text
+                <input type="range" min="1" max="2.2" step="0.05" value={activeTextScale} onChange={(e) => setTextScale(Number(e.target.value))} style={{ width: 70, height: 12 }} />
+                <span>{activeTextScale.toFixed(2)}×</span>
+              </label>
               <div className="analyse-config-separator" />
               <button className="analyse-snip-btn" onClick={handleSnip}>{snipStatus ?? 'Copy to clipboard'}</button>
             </div>
@@ -5228,124 +5243,263 @@ function SkuListDialog({ skus, catalogue, onChange, onClose }: {
   );
 }
 
-function SkuCoverageSheet({ skus, catalogue, retailer, onEdit }: {
+function SkuCoverageSheet({ skus, catalogue, retailer, onEdit, textScale }: {
   skus: string[]; catalogue: Product[];
   retailer: import('../types').RetailerSales | undefined;
   onEdit: () => void;
+  textScale: number;
 }) {
-  const data = useMemo(() => {
-    if (!retailer) return null;
-    const customers = retailer.customers;
-    // Regions = the Segment column, ordered by total gross desc.
-    const regGross = new Map<string, number>();
-    const regCount = new Map<string, number>();
-    for (const c of customers) {
-      const r = c.segment || 'No region';
-      regGross.set(r, (regGross.get(r) ?? 0) + c.gross);
-      regCount.set(r, (regCount.get(r) ?? 0) + 1);
-    }
-    const regions = Array.from(regGross.entries()).sort((a, b) => b[1] - a[1]).map(([r]) => r);
-    const regIdx = new Map(regions.map((r, i) => [r, i]));
+  const svgRef = useRef<SVGSVGElement>(null);
+  const { wrapperRef, dims, measureRef } = useMeasure();
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-    const rows = skus.map((code) => {
+  const data = useMemo(() => {
+    if (!retailer || skus.length === 0) return null;
+    const customers = retailer.customers;
+
+    // Geographic anchors for known region segments; anything else
+    // (Amazon, Internet, Loyalty, new names) becomes a channel card.
+    const GEO: Record<string, { lon: number; lat: number; dx: number; dy: number; anchor: 'start' | 'middle' | 'end' }> = {
+      'uk': { lon: -2.5, lat: 54, dx: -46, dy: -10, anchor: 'end' },
+      'benelux': { lon: 5.3, lat: 52, dx: -38, dy: -38, anchor: 'end' },
+      'nordics': { lon: 16, lat: 63, dx: 8, dy: -18, anchor: 'start' },
+      'germany': { lon: 10.2, lat: 51.2, dx: 36, dy: -6, anchor: 'start' },
+      'france': { lon: 2.3, lat: 46.8, dx: 14, dy: 30, anchor: 'start' },
+      'iberia': { lon: -4, lat: 40, dx: -44, dy: 24, anchor: 'end' },
+      'emea': { lon: 28, lat: 8, dx: 12, dy: 14, anchor: 'start' },
+      'china': { lon: 104, lat: 35, dx: 10, dy: -12, anchor: 'start' },
+      'apac': { lon: 118, lat: 10, dx: 12, dy: 10, anchor: 'start' },
+      'aus&nz': { lon: 134, lat: -26, dx: 8, dy: 20, anchor: 'start' },
+      'aus & nz': { lon: 134, lat: -26, dx: 8, dy: 20, anchor: 'start' },
+      'ausnz': { lon: 134, lat: -26, dx: 8, dy: 20, anchor: 'start' },
+      'latam': { lon: -62, lat: -14, dx: 10, dy: 14, anchor: 'start' },
+      'north america': { lon: -100, lat: 40, dx: 6, dy: 30, anchor: 'start' },
+      'canada': { lon: -108, lat: 58, dx: -4, dy: -16, anchor: 'middle' },
+    };
+    const normSeg = (seg: string) => seg.replace(/^sales\s+/i, '').trim().toLowerCase();
+
+    // Region roster from the data itself.
+    const regMap = new Map<string, { name: string; customerIdx: number[]; gross: number }>();
+    customers.forEach((c, i) => {
+      const name = c.segment || 'Unassigned';
+      const e = regMap.get(name) ?? regMap.set(name, { name, customerIdx: [], gross: 0 }).get(name)!;
+      e.customerIdx.push(i); e.gross += c.gross;
+    });
+
+    // Per-region stats over the watched SKUs.
+    const skuPairs = skus.map((code) => ({ code, pairs: retailer.bySku[code] ?? [] }));
+    const custRegion = customers.map((c) => c.segment || 'Unassigned');
+    const regions = Array.from(regMap.values()).map((r) => {
+      let listings = 0;
+      const present = new Set<string>();
+      const stockistSet = new Set<number>();
+      for (const { code, pairs } of skuPairs) {
+        for (const [ci] of pairs) {
+          if (custRegion[ci] !== r.name) continue;
+          listings++; present.add(code); stockistSet.add(ci);
+        }
+      }
+      const geo = GEO[normSeg(r.name)];
+      // Avg per-SKU distribution within the region: listings spread
+      // over (watched SKUs × customers trading in the region).
+      const pDist = r.customerIdx.length > 0 ? listings / (skus.length * r.customerIdx.length) : 0;
+      return {
+        name: r.name, short: r.name.replace(/^Sales\s+/i, ''), geo: geo ?? null,
+        customers: r.customerIdx.length, gross: r.gross,
+        listings, present: present.size, stockists: stockistSet.size, pDist,
+      };
+    }).sort((a, b) => b.gross - a.gross);
+
+    // Benchmark: global distribution of each watched SKU vs the
+    // median of its catalogue category (over SKUs with any sales).
+    const nCust = customers.length;
+    const catDist = new Map<string, number[]>();
+    for (const prod of catalogue) {
+      const code = (prod.sku ?? '').trim().toUpperCase();
+      const pairs = retailer.bySku[code];
+      if (!pairs || pairs.length === 0) continue;
+      const cat = prod.category || 'Uncategorised';
+      (catDist.get(cat) ?? catDist.set(cat, []).get(cat)!).push(pairs.length / nCust);
+    }
+    const medianOf = (a: number[]) => {
+      const v = [...a].sort((x, y) => x - y);
+      return v.length === 0 ? 0 : v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+    };
+    const catMedian = new Map<string, number>(Array.from(catDist.entries()).map(([c, a]) => [c, medianOf(a)]));
+    const bench = skus.map((code) => {
       const prod = catalogue.find((p) => (p.sku ?? '').trim().toUpperCase() === code);
       const pairs = retailer.bySku[code] ?? [];
-      const perRegion = regions.map(() => ({ n: 0, units: 0 }));
-      let totalUnits = 0;
-      for (const [ci, qty] of pairs) {
-        const seg = customers[ci]?.segment || 'No region';
-        const ri = regIdx.get(seg);
-        if (ri === undefined) continue;
-        perRegion[ri].n++; perRegion[ri].units += qty;
-        totalUnits += qty;
-      }
+      const dist = pairs.length / nCust;
+      const med = prod ? (catMedian.get(prod.category || 'Uncategorised') ?? 0) : 0;
       return {
-        code, name: prod?.name, category: prod?.category,
-        perRegion, stockists: pairs.length, totalUnits,
-        regionsCovered: perRegion.filter((x) => x.n > 0).length,
+        code, name: prod?.name, cat: prod?.category,
+        stockists: pairs.length, dist, med, delta: dist - med,
       };
-    });
-    const maxCell = Math.max(1, ...rows.flatMap((r) => r.perRegion.map((x) => x.n)));
-    // Region summary over the selected SKUs.
-    const regionSummary = regions.map((r, ri) => ({
-      region: r,
-      customers: regCount.get(r) ?? 0,
-      skusPresent: rows.filter((row) => row.perRegion[ri].n > 0).length,
-      stockists: rows.reduce((sm, row) => sm + row.perRegion[ri].n, 0),
-    }));
-    return { regions, rows, maxCell, regionSummary };
+    }).sort((a, b) => a.delta - b.delta);
+
+    const totals = {
+      stockists: new Set(skuPairs.flatMap(({ pairs }) => pairs.map(([ci]) => ci))).size,
+      listings: skuPairs.reduce((sm, x) => sm + x.pairs.length, 0),
+      geoCovered: regions.filter((r) => r.geo && r.present > 0).length,
+      geoTotal: regions.filter((r) => r.geo).length,
+      chCovered: regions.filter((r) => !r.geo && r.present > 0).length,
+      chTotal: regions.filter((r) => !r.geo).length,
+    };
+    return { regions, bench, totals, nCust };
   }, [skus, catalogue, retailer]);
 
-  const td: React.CSSProperties = { padding: '3px 7px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap', fontSize: 10.5 };
-  if (!retailer) {
-    return <div style={{ color: '#888', fontSize: 13, textAlign: 'center', paddingTop: 80 }}>No customer data yet — import it in the bar below.</div>;
-  }
-  if (skus.length === 0) {
-    return (
-      <div style={{ color: '#888', fontSize: 13, textAlign: 'center', paddingTop: 80 }}>
-        No SKUs selected — <span style={{ color: '#1976d2', cursor: 'pointer', fontWeight: 600 }} onClick={onEdit}>build your SKU list</span> to see regional coverage.
-      </div>
+  useEffect(() => {
+    const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
+    const W = dims.width / textScale;
+    const H = dims.height / textScale;
+    if (W < 100 || H < 80) return;
+    const M = 14;
+    const g = svg.append('g').attr('transform', `translate(${M},${M})`);
+    const iW = W - M * 2, iH = H - M * 2;
+
+    if (!retailer || skus.length === 0 || !data) {
+      g.append('text').attr('x', iW / 2).attr('y', iH / 2).attr('text-anchor', 'middle')
+        .attr('font-size', '12px').attr('fill', '#888')
+        .text(!retailer
+          ? 'No customer data yet - import it in the bar below.'
+          : 'No SKUs selected - use "Edit SKU list" in the bar below.');
+      return;
+    }
+
+    const pct1 = (v: number) => `${(v * 100).toFixed(1)}%`;
+
+    // ---- Header ----
+    g.append('text').attr('x', 0).attr('y', 8).attr('font-size', '12px').attr('font-weight', '700').attr('fill', '#1a1a2e')
+      .text(`Global coverage — ${skus.length} SKU${skus.length !== 1 ? 's' : ''}`);
+    g.append('text').attr('x', 0).attr('y', 19).attr('font-size', '7px').attr('fill', '#888')
+      .text(`${data.totals.stockists.toLocaleString('en-GB')} retailers stock at least one · ${data.totals.listings.toLocaleString('en-GB')} listings · regions ${data.totals.geoCovered}/${data.totals.geoTotal} · channels ${data.totals.chCovered}/${data.totals.chTotal} · %dist = listings ÷ (SKUs × region customers)`);
+
+    // ---- Layout ----
+    const panelW = Math.min(230, iW * 0.3);
+    const mapW = iW - panelW - 16;
+    const chRegions = data.regions.filter((r) => !r.geo);
+    const chRows = Math.ceil(chRegions.length / 4) || 0;
+    const chH = chRows > 0 ? chRows * 26 + 14 : 0;
+    const mapTop = 26, mapH = iH - mapTop - chH - 4;
+
+    // ---- Map ----
+    const land = feature(
+      landTopo as unknown as Parameters<typeof feature>[0],
+      (landTopo as unknown as { objects: { land: Parameters<typeof feature>[1] } }).objects.land,
     );
-  }
-  const d = data!;
-  const cellBg = (n: number) => n === 0 ? '#fdecea' : `rgba(25,118,210,${(0.10 + 0.75 * n / d.maxCell).toFixed(2)})`;
-  const cellFg = (n: number) => n === 0 ? '#c62828' : (n / d.maxCell > 0.55 ? '#fff' : '#1a1a2e');
+    const projection = d3.geoNaturalEarth1();
+    projection.fitExtent([[0, mapTop], [mapW, mapTop + mapH]], land as d3.GeoPermissibleObjects);
+    const geoPath = d3.geoPath(projection);
+    g.append('path').attr('d', geoPath(land as d3.GeoPermissibleObjects))
+      .attr('fill', '#eef1f4').attr('stroke', '#d5dbe0').attr('stroke-width', 0.5);
+
+    const geoRegions = data.regions.filter((r) => r.geo);
+    const maxListings = Math.max(1, ...geoRegions.map((r) => r.listings));
+    const hover = (label: string, value: string) => (ev: MouseEvent) => {
+      const rc = wrapperRef.current?.getBoundingClientRect();
+      if (rc) setTooltip({ x: ev.clientX - rc.left + 12, y: ev.clientY - rc.top - 8, label, value, depth: 'Region' });
+    };
+
+    for (const r of geoRegions) {
+      const pos = projection([r.geo!.lon, r.geo!.lat]);
+      if (!pos) continue;
+      const [x, y] = pos;
+      const covered = r.present > 0;
+      const rad = covered ? 4 + 9 * Math.sqrt(r.listings / maxListings) : 3.2;
+      const fill = covered
+        ? d3.interpolateBlues(0.35 + 0.6 * (r.present / skus.length))
+        : '#ffffff';
+      const circle = g.append('circle').attr('cx', x).attr('cy', y).attr('r', rad)
+        .attr('fill', fill).attr('stroke', covered ? '#fff' : '#c62828')
+        .attr('stroke-width', covered ? 1 : 1.1).style('cursor', 'default');
+      circle.on('mouseenter', hover(r.name,
+        `${r.present}/${skus.length} SKUs present · ${r.stockists} retailer${r.stockists !== 1 ? 's' : ''} · ${r.listings} listings · ${pct1(r.pDist)} avg distribution · ${r.customers} customers trade here`))
+        .on('mouseleave', () => setTooltip(null));
+      if (covered && rad > 7) {
+        g.append('text').attr('x', x).attr('y', y + 2.4).attr('text-anchor', 'middle')
+          .attr('font-size', '6px').attr('font-weight', '700').attr('fill', '#fff')
+          .style('pointer-events', 'none').text(r.present);
+      }
+      // Callout: leader line + two-line label.
+      const lx = x + r.geo!.dx, ly = y + r.geo!.dy;
+      g.append('line').attr('x1', x).attr('y1', y).attr('x2', lx - (r.geo!.anchor === 'end' ? -3 : r.geo!.anchor === 'start' ? 3 : 0)).attr('y2', ly - 3)
+        .attr('stroke', '#b0bec5').attr('stroke-width', 0.5);
+      const t = g.append('text').attr('x', lx).attr('y', ly).attr('text-anchor', r.geo!.anchor);
+      t.append('tspan').attr('font-size', '6.5px').attr('font-weight', '700')
+        .attr('fill', covered ? '#1a1a2e' : '#c62828').text(r.short);
+      t.append('tspan').attr('x', lx).attr('dy', 7).attr('font-size', '5.8px').attr('fill', covered ? '#555' : '#c62828')
+        .text(covered ? `${r.present}/${skus.length} · ${r.stockists} ret · ${pct1(r.pDist)}` : 'not listed');
+    }
+
+    // ---- Channel cards (non-geographic segments) ----
+    if (chRegions.length > 0) {
+      const stripY = mapTop + mapH + 10;
+      g.append('text').attr('x', 0).attr('y', stripY - 1).attr('font-size', '6px').attr('font-weight', '700')
+        .attr('letter-spacing', '0.5').attr('fill', '#999').text('CHANNELS');
+      const cw = Math.min(150, (mapW - 18) / Math.min(4, chRegions.length) - 6);
+      chRegions.forEach((r, i) => {
+        const cx2 = (i % 4) * (cw + 6);
+        const cy2 = stripY + 3 + Math.floor(i / 4) * 26;
+        const covered = r.present > 0;
+        g.append('rect').attr('x', cx2).attr('y', cy2).attr('width', cw).attr('height', 22).attr('rx', 4)
+          .attr('fill', covered ? '#f3f7fb' : '#fdf3f2').attr('stroke', covered ? '#cfd8dc' : '#f3c1bd').attr('stroke-width', 0.75)
+          .style('cursor', 'default')
+          .on('mouseenter', hover(r.name, `${r.present}/${skus.length} SKUs · ${r.stockists} retailers · ${r.listings} listings · ${pct1(r.pDist)} avg distribution`))
+          .on('mouseleave', () => setTooltip(null));
+        g.append('text').attr('x', cx2 + 6).attr('y', cy2 + 9).attr('font-size', '6.5px').attr('font-weight', '700')
+          .attr('fill', covered ? '#1a1a2e' : '#c62828').style('pointer-events', 'none').text(r.short);
+        g.append('text').attr('x', cx2 + 6).attr('y', cy2 + 17.5).attr('font-size', '5.8px').attr('fill', '#666')
+          .style('pointer-events', 'none')
+          .text(covered ? `${r.present}/${skus.length} SKUs · ${r.stockists} ret · ${pct1(r.pDist)}` : 'not listed');
+      });
+    }
+
+    // ---- Benchmark panel: watched SKUs vs their category ----
+    const px = mapW + 16;
+    g.append('rect').attr('x', px).attr('y', mapTop).attr('width', panelW).attr('height', iH - mapTop).attr('rx', 6)
+      .attr('fill', '#fcfcfd').attr('stroke', '#e6e6e6').attr('stroke-width', 0.75);
+    g.append('text').attr('x', px + 9).attr('y', mapTop + 13).attr('font-size', '6.5px').attr('font-weight', '700')
+      .attr('letter-spacing', '0.5').attr('fill', '#999').text('GLOBAL % DISTRIBUTION VS CATEGORY MEDIAN');
+    const rows = data.bench;
+    const maxRows = Math.floor((iH - mapTop - 34) / 15);
+    const shownRows = rows.slice(0, maxRows);
+    const scaleMax = Math.max(0.02, ...rows.map((r) => Math.max(r.dist, r.med))) * 1.1;
+    const barX = px + 72, barW = panelW - 72 - 44;
+    shownRows.forEach((r, i) => {
+      const y = mapTop + 24 + i * 15;
+      const t = g.append('text').attr('x', px + 9).attr('y', y + 5.5)
+        .attr('font-size', '6px').attr('font-weight', '600').attr('fill', '#333')
+        .text(r.code.length > 10 ? r.code.slice(0, 9) + '…' : r.code);
+      t.append('title').text(`${r.code} ${r.name ?? ''} · ${r.stockists} retailers globally · ${pct1(r.dist)} vs category median ${pct1(r.med)}`);
+      // SKU bar + category median tick.
+      g.append('rect').attr('x', barX).attr('y', y).attr('width', Math.max(1, barW * (r.dist / scaleMax))).attr('height', 7).attr('rx', 2)
+        .attr('fill', r.delta < 0 ? '#e65100' : '#1976d2').attr('fill-opacity', 0.85);
+      const mx = barX + barW * (r.med / scaleMax);
+      g.append('line').attr('x1', mx).attr('x2', mx).attr('y1', y - 1.5).attr('y2', y + 8.5)
+        .attr('stroke', '#455a64').attr('stroke-width', 1);
+      g.append('text').attr('x', px + panelW - 8).attr('y', y + 5.5).attr('text-anchor', 'end')
+        .attr('font-size', '6px').attr('font-weight', '700')
+        .attr('fill', r.delta < 0 ? '#c62828' : '#2e7d32')
+        .text(`${r.delta >= 0 ? '+' : ''}${(r.delta * 100).toFixed(1)}pt`);
+    });
+    if (rows.length > shownRows.length) {
+      g.append('text').attr('x', px + 9).attr('y', mapTop + 24 + shownRows.length * 15 + 6)
+        .attr('font-size', '5.8px').attr('fill', '#999')
+        .text(`+ ${rows.length - shownRows.length} more SKUs (sorted most under-distributed first)`);
+    }
+    g.append('text').attr('x', px + 9).attr('y', iH - 6).attr('font-size', '5.5px').attr('fill', '#999')
+      .text('bar = SKU %dist · tick = category median · sorted worst gap first');
+  }, [data, retailer, skus.length, dims, wrapperRef, textScale]);
 
   return (
-    <div style={{ width: '100%', height: '100%', overflow: 'auto', padding: '14px 18px', boxSizing: 'border-box', background: '#fff' }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e' }}>SKU coverage by region</div>
-      <div style={{ fontSize: 9.5, color: '#888', margin: '2px 0 10px' }}>
-        Cell = retailers with net sales of the SKU in that region (qty &gt; 0), shaded by count; hover for units.
-        Regions are the customer data's Segment values, ordered by gross sales. {skus.length} SKUs · all {retailer.customers.length.toLocaleString('en-GB')} customers counted.
-      </div>
-
-      <table style={{ borderCollapse: 'collapse', color: '#333' }}>
-        <thead>
-          <tr style={{ textAlign: 'left', color: '#888', fontSize: 9 }}>
-            <th style={td}>SKU</th>
-            <th style={{ ...td, minWidth: 180 }}>Product</th>
-            {d.regions.map((r) => (
-              <th key={r} style={{ ...td, textAlign: 'center', maxWidth: 64, whiteSpace: 'normal', lineHeight: 1.15 }}
-                title={`${r} · ${d.regionSummary.find((x) => x.region === r)?.customers ?? 0} customers in the data`}>
-                {r.replace(/^Sales\s+/i, '')}
-              </th>
-            ))}
-            <th style={{ ...td, textAlign: 'right' }}>Retailers</th>
-            <th style={{ ...td, textAlign: 'right' }}>Regions</th>
-            <th style={{ ...td, textAlign: 'right' }}>Units</th>
-          </tr>
-          <tr style={{ fontSize: 9, color: '#555' }}>
-            <td style={{ ...td, fontWeight: 700 }} colSpan={2}>Selected SKUs present ({skus.length} watched)</td>
-            {d.regionSummary.map((rs) => (
-              <td key={rs.region} style={{ ...td, textAlign: 'center', fontWeight: 700, background: '#f5f7fa' }}
-                title={`${rs.region}: ${rs.skusPresent} of ${skus.length} selected SKUs stocked by at least one retailer · ${rs.stockists} stockist listings`}>
-                {rs.skusPresent}/{skus.length}
-              </td>
-            ))}
-            <td style={td} colSpan={3} />
-          </tr>
-        </thead>
-        <tbody>
-          {d.rows.map((row, i) => (
-            <tr key={row.code} style={{ background: i % 2 ? '#fafafa' : '#fff' }}>
-              <td style={{ ...td, fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 9.5, color: '#777' }}>{row.code}</td>
-              <td style={{ ...td, whiteSpace: 'normal', maxWidth: 220 }}>
-                {row.name ?? <span style={{ color: '#e65100' }}>not in catalogue</span>}
-                {row.category && <span style={{ color: '#999', fontSize: 9 }}> · {row.category}</span>}
-              </td>
-              {row.perRegion.map((cell, ri) => (
-                <td key={ri} style={{ ...td, textAlign: 'center', background: cellBg(cell.n), color: cellFg(cell.n), fontWeight: cell.n > 0 ? 700 : 400 }}
-                  title={`${d.regions[ri]}: ${cell.n} retailer${cell.n !== 1 ? 's' : ''} · ${cell.units.toLocaleString('en-GB')} units`}>
-                  {cell.n > 0 ? cell.n : '—'}
-                </td>
-              ))}
-              <td style={{ ...td, textAlign: 'right', fontWeight: 700 }}>{row.stockists}</td>
-              <td style={{ ...td, textAlign: 'right' }}>{row.regionsCovered}/{d.regions.length}</td>
-              <td style={{ ...td, textAlign: 'right', color: '#555' }}>{row.totalUnits.toLocaleString('en-GB')}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div ref={measureRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <svg ref={svgRef} className="analyse-sunburst" viewBox={`0 0 ${dims.width / textScale} ${dims.height / textScale}`} preserveAspectRatio="xMidYMid meet" />
+      <ChartTooltip tooltip={tooltip} />
+      {retailer && skus.length === 0 && (
+        <button className="analyse-snip-btn" style={{ position: 'absolute', left: '50%', top: '58%', transform: 'translateX(-50%)' }} onClick={onEdit}>
+          Build SKU list
+        </button>
+      )}
     </div>
   );
 }
