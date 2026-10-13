@@ -434,6 +434,43 @@ export function AnalyseView() {
   const watchedSkus = useMemo(() => av?.coverageSkus ?? [], [av?.coverageSkus]);
   const setWatchedSkus = (skus: string[]) => setAnalyseConfig({ coverageSkus: skus });
   const [showSkuListDialog, setShowSkuListDialog] = useState(false);
+  // Benchmark config for the SKU Coverage sheet (persisted).
+  const covBench = av?.coverageBench;
+  const [benchMode, setBenchModeState] = useState<'category' | 'subcat' | 'plan'>(covBench?.mode ?? 'category');
+  const [benchPlanId, setBenchPlanIdState] = useState<string>(covBench?.planId ?? '');
+  const [budgetRrpInput, setBudgetRrpInput] = useState<string>(covBench?.budgetRrp != null ? String(covBench.budgetRrp) : '');
+  const persistBench = (patch: { mode?: 'category' | 'subcat' | 'plan'; planId?: string; budgetRrp?: number }) => {
+    const budgetRrp = parseFloat(budgetRrpInput);
+    setAnalyseConfig({ coverageBench: {
+      mode: benchMode, planId: benchPlanId,
+      budgetRrp: Number.isNaN(budgetRrp) ? undefined : budgetRrp,
+      ...patch,
+    } });
+  };
+  const setBenchMode = (m: 'category' | 'subcat' | 'plan') => { setBenchModeState(m); persistBench({ mode: m }); };
+  const setBenchPlanId = (id: string) => { setBenchPlanIdState(id); persistBench({ planId: id }); };
+  const setBudgetRrp = (raw: string) => {
+    setBudgetRrpInput(raw);
+    const v = parseFloat(raw);
+    persistBench({ budgetRrp: Number.isNaN(v) || v <= 0 ? undefined : v });
+  };
+  const budgetRrp = useMemo(() => {
+    const v = parseFloat(budgetRrpInput);
+    return Number.isNaN(v) || v <= 0 ? null : v;
+  }, [budgetRrpInput]);
+  const benchPlan = useMemo(() => {
+    if (benchMode !== 'plan') return null;
+    const plan = project?.plans.find((pl) => pl.id === benchPlanId) ?? (selectedPlans[0] ?? null);
+    if (!plan) return null;
+    const shelf = resolveShelf(plan, shelfSide);
+    const codes: string[] = [];
+    for (const item of shelf?.items ?? []) {
+      const prod = getProductForItem(item, project?.catalogue ?? []);
+      const code = (prod?.sku ?? '').trim().toUpperCase();
+      if (code) codes.push(code);
+    }
+    return { name: plan.name, codes };
+  }, [benchMode, benchPlanId, project?.plans, project?.catalogue, selectedPlans, shelfSide]);
   // Segment selection / grouping for the whole sheet (persisted).
   const [covTopMode, setCovTopModeState] = useState<'global' | 'segment'>(() => covConfig?.topMode ?? 'global');
   const [covSegments, setCovSegmentsState] = useState<string[]>(() => covConfig?.segments ?? []);
@@ -843,7 +880,7 @@ export function AnalyseView() {
           <div className="analyse-canvas-wrapper">
             <div className="analyse-canvas-area">
               <div className="analyse-canvas" ref={canvasRef} style={canvasStyle}>
-                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'sku-coverage' ? <SkuCoverageSheet skus={watchedSkus} catalogue={project.catalogue} retailer={project.retailerSales} onEdit={() => setShowSkuListDialog(true)} textScale={activeTextScale} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} topMode={covTopMode} segments={covSegments} groupBySeg={covGroupBySeg} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppViewBy={oppViewBy} oppLensOnly={oppLensOnly} oppMinGbp={oppMinGbp} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
+                {activeSheet === 'dashboard' ? <DashboardSheet plans={dashboardPlans} scopeName={dashboardScopeName} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} arpsExcl={arpsExclRankings} /> : activeSheet === 'icicle' ? <Icicle {...chartProps} /> : activeSheet === 'scatter' ? <ScatterPlot plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} config={scatterConfig} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'lifecycle' ? <LifecycleChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'pareto' ? <ParetoChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={hiddenCats} onToggleCat={(cat) => setHiddenCats((prev) => { const n = new Set(prev); if (n.has(cat)) n.delete(cat); else n.add(cat); return n; })} /> : activeSheet === 'growth' ? <GrowthChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-plans' ? <GrowthPlanChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showCombined={showCombinedNewness} showGrowth={showGrowthUplift} vertical={growthVertical} arpsExcl={arpsExclRankings} /> : activeSheet === 'growth-groups' ? <GrowthGroupChart groups={planGroups} compounds={compoundGroups} restName={compoundRestName} restIndex={compoundRestIndex} restHatch={compoundRestHatch} shadeLightFirst={compoundShadeLightFirst} groupsTitle={planGroupsTitle} compoundsTitle={compoundGroupsTitle} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} growthPct={growthPct} growthMetric={growthMetric} showGrowth={showGrowthUplift} vertical={growthVertical} showSummary={showGroupSummary} arpsExcl={arpsExclRankings} /> : activeSheet === 'margin-compare' ? <MarginCompareChart groups={planGroups} plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} /> : activeSheet === 'rrp-compare' ? <RrpCompareChart columns={rrpColumns} catalogue={project.catalogue} shelfSide={shelfSide} catColors={catColors} textScale={activeTextScale} hiddenCats={growthHiddenCats} regions={rrpRegions} onToggleRegion={toggleRrpRegion} targets={rrpTargets} /> : activeSheet === 'sku-coverage' ? <SkuCoverageSheet skus={watchedSkus} catalogue={project.catalogue} retailer={project.retailerSales} onEdit={() => setShowSkuListDialog(true)} textScale={activeTextScale} benchMode={benchMode} benchPlan={benchPlan} budgetRrp={budgetRrp} /> : activeSheet === 'coverage' ? <CoverageChart plans={selectedPlans} catalogue={project.catalogue} shelfSide={shelfSide} textScale={activeTextScale} hiddenCats={growthHiddenCats} retailer={project.retailerSales} mode={covMode} lenses={covLenses} hideEol={covHideEol} topN={covTopN} topMode={covTopMode} segments={covSegments} groupBySeg={covGroupBySeg} view={covView} oppCustomer={oppCustomer} oppCategory={oppCategory} oppViewBy={oppViewBy} oppLensOnly={oppLensOnly} oppMinGbp={oppMinGbp} showOpps={covShowOpps} /> : <Sunburst {...chartProps} />}
               </div>
               {activeSheet === 'scatter' && <ScatterStats points={scatterVisiblePoints} growthPct={growthPct} onGrowthChange={setGrowthPct} growthMetric={growthMetric} onGrowthMetricChange={setGrowthMetric} catColors={catColors} />}
             </div>
@@ -1091,7 +1128,24 @@ export function AnalyseView() {
                 title="Choose the SKUs to analyse — search the catalogue or paste a list of SKU codes">
                 Edit SKU list ({watchedSkus.length})
               </button>
-              <span className="analyse-config-item" style={{ cursor: 'default' }}>Regions come from the customer data's Segment column · all {project.retailerSales ? project.retailerSales.customers.length.toLocaleString('en-GB') : 0} customers counted</span>
+              <label className="analyse-config-item" title="Benchmark the watched SKUs' distribution against their category, sub-category, or the products of one range plan">Compare vs
+                <select className="analyse-config-input" style={{ width: 104, textAlign: 'left' }} value={benchMode}
+                  onChange={(e) => setBenchMode(e.target.value as 'category' | 'subcat' | 'plan')}>
+                  <option value="category">Category</option>
+                  <option value="subcat">Sub-category</option>
+                  <option value="plan">Range plan</option>
+                </select>
+              </label>
+              {benchMode === 'plan' && (
+                <select className="analyse-config-input" style={{ width: 130, textAlign: 'left' }} value={benchPlanId || (selectedPlans[0]?.id ?? '')}
+                  onChange={(e) => setBenchPlanId(e.target.value)} title="The range plan whose products form the comparison set">
+                  {project.plans.map((pl) => <option key={pl.id} value={pl.id}>{pl.name}</option>)}
+                </select>
+              )}
+              <label className="analyse-config-item" title="Exclude budget lines from the comparison set: peers with a UK RRP below this are ignored. Blank = include everything.">Excl. budget &lt; £
+                <input type="number" min="0" step="0.5" className="analyse-config-input" style={{ width: 48 }}
+                  value={budgetRrpInput} placeholder="—" onChange={(e) => setBudgetRrp(e.target.value)} />
+              </label>
               <span style={{ flex: 1 }} />
               <label className="analyse-config-item" title="Canvas aspect ratio — per sheet, saved with the project. Centre = 16:9; drag left to narrow the width at the same height, right to shorten the height at the same width. Double-click to reset.">Aspect
                 <input type="range" min="-1" max="1" step="0.05" value={activeAspect}
@@ -5243,11 +5297,14 @@ function SkuListDialog({ skus, catalogue, onChange, onClose }: {
   );
 }
 
-function SkuCoverageSheet({ skus, catalogue, retailer, onEdit, textScale }: {
+function SkuCoverageSheet({ skus, catalogue, retailer, onEdit, textScale, benchMode, benchPlan, budgetRrp }: {
   skus: string[]; catalogue: Product[];
   retailer: import('../types').RetailerSales | undefined;
   onEdit: () => void;
   textScale: number;
+  benchMode: 'category' | 'subcat' | 'plan';
+  benchPlan: { name: string; codes: string[] } | null;
+  budgetRrp: number | null;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { wrapperRef, dims, measureRef } = useMeasure();
@@ -5289,48 +5346,105 @@ function SkuCoverageSheet({ skus, catalogue, retailer, onEdit, textScale }: {
     // Per-region stats over the watched SKUs.
     const skuPairs = skus.map((code) => ({ code, pairs: retailer.bySku[code] ?? [] }));
     const custRegion = customers.map((c) => c.segment || 'Unassigned');
+    // Benchmark peer set: same category / sub-category / a named
+    // range plan's products — always excluding the watched SKUs
+    // themselves, SKUs with no sales anywhere, and (when the budget
+    // filter is set) peers priced below it.
+    const watchedSet = new Set(skus);
+    const codeOf = (p: Product) => (p.sku ?? '').trim().toUpperCase();
+    const peerEligible = (p: Product) => {
+      const code = codeOf(p);
+      if (!code || watchedSet.has(code)) return false;
+      if (!retailer.bySku[code] || retailer.bySku[code].length === 0) return false;
+      if (budgetRrp != null && (p.rrp ?? 0) < budgetRrp) return false;
+      return true;
+    };
+    const planCodeSet = benchPlan ? new Set(benchPlan.codes) : null;
+    const peerProducts = catalogue.filter((p) => {
+      if (!peerEligible(p)) return false;
+      if (benchMode === 'plan') return planCodeSet ? planCodeSet.has(codeOf(p)) : false;
+      return true; // category/subcat matching happens per watched SKU
+    });
+    const benchLabel = benchMode === 'plan'
+      ? (benchPlan ? `${benchPlan.name}` : 'range plan')
+      : benchMode === 'subcat' ? 'sub-category' : 'category';
+    const benchShort = benchMode === 'plan' ? 'plan' : benchMode === 'subcat' ? 'subcat' : 'cat';
+    // Union peer set for region-level comparison. For category /
+    // sub-category modes: peers sharing any watched SKU's category /
+    // sub-category.
+    const watchedProds = skus.map((code) => catalogue.find((p) => codeOf(p) === code)).filter((p): p is Product => !!p);
+    const watchedCats = new Set(watchedProds.map((p) => p.category || 'Uncategorised'));
+    const watchedSubs = new Set(watchedProds.map((p) => `${p.category || 'Uncategorised'}\u0000${p.subCategory || 'Unspecified'}`));
+    const regionPeers = peerProducts.filter((p) => {
+      if (benchMode === 'plan') return true;
+      if (benchMode === 'subcat') return watchedSubs.has(`${p.category || 'Uncategorised'}\u0000${p.subCategory || 'Unspecified'}`);
+      return watchedCats.has(p.category || 'Uncategorised');
+    });
+    const regionPeerPairs = regionPeers.map((p) => retailer.bySku[codeOf(p)] ?? []);
+
     const regions = Array.from(regMap.values()).map((r) => {
       let listings = 0;
-      const present = new Set<string>();
+      const presentCodes = new Set<string>();
       const stockistSet = new Set<number>();
       for (const { code, pairs } of skuPairs) {
         for (const [ci] of pairs) {
           if (custRegion[ci] !== r.name) continue;
-          listings++; present.add(code); stockistSet.add(ci);
+          listings++; presentCodes.add(code); stockistSet.add(ci);
         }
       }
       const geo = GEO[normSeg(r.name)];
       // Avg per-SKU distribution within the region: listings spread
       // over (watched SKUs × customers trading in the region).
       const pDist = r.customerIdx.length > 0 ? listings / (skus.length * r.customerIdx.length) : 0;
+      // Same measure for the benchmark peer set in this region.
+      let peerListings = 0;
+      for (const pairs of regionPeerPairs) {
+        for (const [ci] of pairs) if (custRegion[ci] === r.name) peerListings++;
+      }
+      const peerDist = r.customerIdx.length > 0 && regionPeers.length > 0
+        ? peerListings / (regionPeers.length * r.customerIdx.length) : 0;
       return {
         name: r.name, short: r.name.replace(/^Sales\s+/i, ''), geo: geo ?? null,
         customers: r.customerIdx.length, gross: r.gross,
-        listings, present: present.size, stockists: stockistSet.size, pDist,
+        listings, present: presentCodes.size, presentCodes, stockists: stockistSet.size, pDist,
+        peerDist, delta: pDist - peerDist,
       };
     }).sort((a, b) => b.gross - a.gross);
 
-    // Benchmark: global distribution of each watched SKU vs the
-    // median of its catalogue category (over SKUs with any sales).
+    // Per-SKU benchmark: global distribution of each watched SKU vs
+    // the median of its peer set (mode-aware, budget filter applied).
     const nCust = customers.length;
-    const catDist = new Map<string, number[]>();
-    for (const prod of catalogue) {
-      const code = (prod.sku ?? '').trim().toUpperCase();
-      const pairs = retailer.bySku[code];
-      if (!pairs || pairs.length === 0) continue;
-      const cat = prod.category || 'Uncategorised';
-      (catDist.get(cat) ?? catDist.set(cat, []).get(cat)!).push(pairs.length / nCust);
-    }
     const medianOf = (a: number[]) => {
       const v = [...a].sort((x, y) => x - y);
       return v.length === 0 ? 0 : v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
     };
-    const catMedian = new Map<string, number>(Array.from(catDist.entries()).map(([c, a]) => [c, medianOf(a)]));
+    const distOf = (p: Product) => (retailer.bySku[codeOf(p)]?.length ?? 0) / nCust;
+    let medFor: (prod: Product | undefined) => number;
+    if (benchMode === 'plan') {
+      const planMed = medianOf(peerProducts.map(distOf));
+      medFor = () => planMed;
+    } else if (benchMode === 'subcat') {
+      const map = new Map<string, number[]>();
+      for (const p of peerProducts) {
+        const k = `${p.category || 'Uncategorised'}\u0000${p.subCategory || 'Unspecified'}`;
+        (map.get(k) ?? map.set(k, []).get(k)!).push(distOf(p));
+      }
+      const med = new Map(Array.from(map.entries()).map(([k, a]) => [k, medianOf(a)]));
+      medFor = (prod) => prod ? (med.get(`${prod.category || 'Uncategorised'}\u0000${prod.subCategory || 'Unspecified'}`) ?? 0) : 0;
+    } else {
+      const map = new Map<string, number[]>();
+      for (const p of peerProducts) {
+        const k = p.category || 'Uncategorised';
+        (map.get(k) ?? map.set(k, []).get(k)!).push(distOf(p));
+      }
+      const med = new Map(Array.from(map.entries()).map(([k, a]) => [k, medianOf(a)]));
+      medFor = (prod) => prod ? (med.get(prod.category || 'Uncategorised') ?? 0) : 0;
+    }
     const bench = skus.map((code) => {
-      const prod = catalogue.find((p) => (p.sku ?? '').trim().toUpperCase() === code);
+      const prod = catalogue.find((p) => codeOf(p) === code);
       const pairs = retailer.bySku[code] ?? [];
       const dist = pairs.length / nCust;
-      const med = prod ? (catMedian.get(prod.category || 'Uncategorised') ?? 0) : 0;
+      const med = medFor(prod);
       return {
         code, name: prod?.name, cat: prod?.category,
         stockists: pairs.length, dist, med, delta: dist - med,
@@ -5345,8 +5459,8 @@ function SkuCoverageSheet({ skus, catalogue, retailer, onEdit, textScale }: {
       chCovered: regions.filter((r) => !r.geo && r.present > 0).length,
       chTotal: regions.filter((r) => !r.geo).length,
     };
-    return { regions, bench, totals, nCust };
-  }, [skus, catalogue, retailer]);
+    return { regions, bench, totals, nCust, benchLabel, benchShort, peerCount: peerProducts.length };
+  }, [skus, catalogue, retailer, benchMode, benchPlan, budgetRrp]);
 
   useEffect(() => {
     const svg = d3.select(svgRef.current); svg.selectAll('*').remove();
@@ -5375,11 +5489,12 @@ function SkuCoverageSheet({ skus, catalogue, retailer, onEdit, textScale }: {
       .text(`${data.totals.stockists.toLocaleString('en-GB')} retailers stock at least one · ${data.totals.listings.toLocaleString('en-GB')} listings · regions ${data.totals.geoCovered}/${data.totals.geoTotal} · channels ${data.totals.chCovered}/${data.totals.chTotal} · %dist = listings ÷ (SKUs × region customers)`);
 
     // ---- Layout ----
-    const panelW = Math.min(230, iW * 0.3);
+    const panelW = Math.min(290, iW * 0.34);
     const mapW = iW - panelW - 16;
     const chRegions = data.regions.filter((r) => !r.geo);
+    const CH_CARD_H = 28;
     const chRows = Math.ceil(chRegions.length / 4) || 0;
-    const chH = chRows > 0 ? chRows * 26 + 14 : 0;
+    const chH = chRows > 0 ? chRows * (CH_CARD_H + 4) + 14 : 0;
     const mapTop = 26, mapH = iH - mapTop - chH - 4;
 
     // ---- Map ----
@@ -5429,28 +5544,53 @@ function SkuCoverageSheet({ skus, catalogue, retailer, onEdit, textScale }: {
         .attr('fill', covered ? '#1a1a2e' : '#c62828').text(r.short);
       t.append('tspan').attr('x', lx).attr('dy', 7).attr('font-size', '5.8px').attr('fill', covered ? '#555' : '#c62828')
         .text(covered ? `${r.present}/${skus.length} · ${r.stockists} ret · ${pct1(r.pDist)}` : 'not listed');
+      // Benchmark call-out: watched vs the comparison set, in-region.
+      if (r.customers > 0 && data.peerCount > 0) {
+        const d2 = r.delta;
+        t.append('tspan').attr('x', lx).attr('dy', 7).attr('font-size', '5.6px').attr('font-weight', '700')
+          .attr('fill', d2 >= 0 ? '#2e7d32' : '#c62828')
+          .text(`vs ${data.benchShort} ${d2 >= 0 ? '+' : ''}${(d2 * 100).toFixed(1)}pt`);
+      }
     }
 
     // ---- Channel cards (non-geographic segments) ----
     if (chRegions.length > 0) {
       const stripY = mapTop + mapH + 10;
       g.append('text').attr('x', 0).attr('y', stripY - 1).attr('font-size', '6px').attr('font-weight', '700')
-        .attr('letter-spacing', '0.5').attr('fill', '#999').text('CHANNELS');
-      const cw = Math.min(150, (mapW - 18) / Math.min(4, chRegions.length) - 6);
+        .attr('letter-spacing', '0.5').attr('fill', '#999').text('CHANNELS · one dot per watched SKU, filled = listed');
+      const cw = Math.min(170, (mapW - 18) / Math.min(4, chRegions.length) - 6);
       chRegions.forEach((r, i) => {
         const cx2 = (i % 4) * (cw + 6);
-        const cy2 = stripY + 3 + Math.floor(i / 4) * 26;
+        const cy2 = stripY + 3 + Math.floor(i / 4) * (CH_CARD_H + 4);
         const covered = r.present > 0;
-        g.append('rect').attr('x', cx2).attr('y', cy2).attr('width', cw).attr('height', 22).attr('rx', 4)
+        const d2 = r.delta;
+        g.append('rect').attr('x', cx2).attr('y', cy2).attr('width', cw).attr('height', CH_CARD_H).attr('rx', 4)
           .attr('fill', covered ? '#f3f7fb' : '#fdf3f2').attr('stroke', covered ? '#cfd8dc' : '#f3c1bd').attr('stroke-width', 0.75)
           .style('cursor', 'default')
-          .on('mouseenter', hover(r.name, `${r.present}/${skus.length} SKUs · ${r.stockists} retailers · ${r.listings} listings · ${pct1(r.pDist)} avg distribution`))
+          .on('mouseenter', hover(r.name, `${r.present}/${skus.length} SKUs · ${r.stockists} retailers · ${r.listings} listings · ${pct1(r.pDist)} avg distribution · vs ${data.benchShort} ${d2 >= 0 ? '+' : ''}${(d2 * 100).toFixed(1)}pt`))
           .on('mouseleave', () => setTooltip(null));
         g.append('text').attr('x', cx2 + 6).attr('y', cy2 + 9).attr('font-size', '6.5px').attr('font-weight', '700')
           .attr('fill', covered ? '#1a1a2e' : '#c62828').style('pointer-events', 'none').text(r.short);
-        g.append('text').attr('x', cx2 + 6).attr('y', cy2 + 17.5).attr('font-size', '5.8px').attr('fill', '#666')
+        g.append('text').attr('x', cx2 + cw - 6).attr('y', cy2 + 9).attr('text-anchor', 'end')
+          .attr('font-size', '5.6px').attr('font-weight', '700')
+          .attr('fill', covered ? (d2 >= 0 ? '#2e7d32' : '#c62828') : '#c62828')
           .style('pointer-events', 'none')
-          .text(covered ? `${r.present}/${skus.length} SKUs · ${r.stockists} ret · ${pct1(r.pDist)}` : 'not listed');
+          .text(covered ? `${r.present}/${skus.length} · ${pct1(r.pDist)} · ${d2 >= 0 ? '+' : ''}${(d2 * 100).toFixed(1)}pt` : 'not listed');
+        // The watched SKUs as a dot strip: filled when this channel
+        // lists them, hollow when not — gaps visible at a glance.
+        const perRow = Math.ceil(skus.length / 2);
+        const pitch = Math.max(2.4, Math.min(5.5, (cw - 12) / Math.max(1, perRow)));
+        skus.forEach((code, si) => {
+          const row2 = Math.floor(si / perRow);
+          const col2 = si % perRow;
+          const dx2 = cx2 + 7 + col2 * pitch;
+          const dy2 = cy2 + 15 + row2 * 5.2;
+          const on = r.presentCodes.has(code);
+          g.append('circle').attr('cx', dx2).attr('cy', dy2).attr('r', on ? 1.7 : 1.2)
+            .attr('fill', on ? '#1976d2' : 'none')
+            .attr('stroke', on ? 'none' : '#c5cdd3').attr('stroke-width', 0.7)
+            .style('pointer-events', 'none');
+        });
       });
     }
 
@@ -5459,18 +5599,22 @@ function SkuCoverageSheet({ skus, catalogue, retailer, onEdit, textScale }: {
     g.append('rect').attr('x', px).attr('y', mapTop).attr('width', panelW).attr('height', iH - mapTop).attr('rx', 6)
       .attr('fill', '#fcfcfd').attr('stroke', '#e6e6e6').attr('stroke-width', 0.75);
     g.append('text').attr('x', px + 9).attr('y', mapTop + 13).attr('font-size', '6.5px').attr('font-weight', '700')
-      .attr('letter-spacing', '0.5').attr('fill', '#999').text('GLOBAL % DISTRIBUTION VS CATEGORY MEDIAN');
+      .attr('letter-spacing', '0.5').attr('fill', '#999')
+      .text(`GLOBAL % DIST VS ${data.benchLabel.toUpperCase()} MEDIAN${budgetRrp != null ? ` · PEERS ≥ £${budgetRrp}` : ''}`);
     const rows = data.bench;
     const maxRows = Math.floor((iH - mapTop - 34) / 15);
     const shownRows = rows.slice(0, maxRows);
     const scaleMax = Math.max(0.02, ...rows.map((r) => Math.max(r.dist, r.med))) * 1.1;
-    const barX = px + 72, barW = panelW - 72 - 44;
+    const labelW2 = Math.min(128, panelW * 0.46);
+    const barX = px + 9 + labelW2, barW = panelW - 9 - labelW2 - 44;
     shownRows.forEach((r, i) => {
       const y = mapTop + 24 + i * 15;
-      const t = g.append('text').attr('x', px + 9).attr('y', y + 5.5)
-        .attr('font-size', '6px').attr('font-weight', '600').attr('fill', '#333')
-        .text(r.code.length > 10 ? r.code.slice(0, 9) + '…' : r.code);
-      t.append('title').text(`${r.code} ${r.name ?? ''} · ${r.stockists} retailers globally · ${pct1(r.dist)} vs category median ${pct1(r.med)}`);
+      const maxName = Math.max(3, Math.floor((labelW2 - 34) / 2.9));
+      const t = g.append('text').attr('x', px + 9).attr('y', y + 5.5);
+      t.append('tspan').attr('font-size', '6px').attr('font-weight', '700').attr('fill', '#333').text(r.code);
+      t.append('tspan').attr('dx', 3).attr('font-size', '5.6px').attr('fill', '#888')
+        .text(r.name ? (r.name.length > maxName ? r.name.slice(0, maxName - 1) + '…' : r.name) : '—');
+      t.append('title').text(`${r.code} ${r.name ?? ''} · ${r.stockists} retailers globally · ${pct1(r.dist)} vs ${data.benchLabel} median ${pct1(r.med)}`);
       // SKU bar + category median tick.
       g.append('rect').attr('x', barX).attr('y', y).attr('width', Math.max(1, barW * (r.dist / scaleMax))).attr('height', 7).attr('rx', 2)
         .attr('fill', r.delta < 0 ? '#e65100' : '#1976d2').attr('fill-opacity', 0.85);
@@ -5488,7 +5632,7 @@ function SkuCoverageSheet({ skus, catalogue, retailer, onEdit, textScale }: {
         .text(`+ ${rows.length - shownRows.length} more SKUs (sorted most under-distributed first)`);
     }
     g.append('text').attr('x', px + 9).attr('y', iH - 6).attr('font-size', '5.5px').attr('fill', '#999')
-      .text('bar = SKU %dist · tick = category median · sorted worst gap first');
+      .text(`bar = SKU %dist · tick = ${data.benchLabel} median (${data.peerCount} peers) · sorted worst gap first`);
   }, [data, retailer, skus.length, dims, wrapperRef, textScale]);
 
   return (

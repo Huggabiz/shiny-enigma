@@ -602,6 +602,10 @@ export interface Project {
     };
     /** SKU Coverage sheet: the watched SKU codes (uppercased). */
     coverageSkus?: string[];
+    /** SKU Coverage benchmark: compare watched SKUs vs their
+     * category, sub-category, or a named range plan's products;
+     * budgetRrp (when set) excludes peers priced below it. */
+    coverageBench?: { mode?: 'category' | 'subcat' | 'plan'; planId?: string; budgetRrp?: number };
     /** Per-sheet text-size multiplier (1 = default) for presentation
      * exports where the chart is shrunk. Keyed by sheet id. */
     textScales?: Record<string, number>;
